@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Checkout | Swiggy Clone</title>
+    <link rel="stylesheet" href="../static/cart.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body > <header class="navbar">
+        <div class="nav-container">
+            <div class="left-nav">
+                <a href="index.html"><img src="https://upload.wikimedia.org/wikipedia/en/thumb/1/12/Swiggy_logo.svg/1200px-Swiggy_logo.svg.png" alt="Swiggy Logo" class="logo"></a>
+                <span class="checkout-text">SECURE CHECKOUT</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="cart-container">
+        <div class="cart-left">
+            <div class="checkout-card active-step">
+                <div class="step-header">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <div>
+                        <h3>Delivery Address</h3>
+                        <p>Home - Madhapur, Hyderabad, Telangana 500081</p>
+                    </div>
+                </div>
+                <button class="change-btn">CHANGE</button>
+            </div>
+
+            <div class="checkout-card">
+                <div class="step-header">
+                    <i class="fa-solid fa-wallet"></i>
+                    <div>
+                        <h3>Payment</h3>
+                    </div>
+                </div>
+                <p class="payment-hint">Select your payment method after reviewing the items.</p>
+            </div>
+        </div>
+
+        <div class="cart-right">
+            <div class="order-summary-card">
+                <div class="res-mini-header">
+                    <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80" alt="Res">
+                    <div class="res-info">
+                        <h4>Burger King</h4>
+                        <p>Banjara Hills</p>
+                    </div>
+                </div>
+
+                <div class="cart-items" id="cart_items">
+                    </div>
+                </div>
+
+                <div class="coupon-box">
+                    <i class="fa-solid fa-percent"></i>
+                    <input type="text" placeholder="Apply Coupon">
+                </div>
+
+                <div class="bill-details">
+                    <h5>Bill Details</h5>
+                    <div class="bill-row">
+                        <span>Item Total</span>
+                        <span>₹149</span>
+                    </div>
+                    <div class="bill-row">
+                        <span>Delivery Fee | 2.5 kms</span>
+                        <span>₹30</span>
+                    </div>
+                    <div class="bill-row">
+                        <span>Govt Taxes & Restaurant Charges</span>
+                        <span>₹18</span>
+                    </div>
+                    <hr>
+                    <div class="bill-row total">
+                        <span>TO PAY</span>
+                        <span>₹197</span>
+                    </div>
+                </div>
+                
+                <button class="pay-btn">PROCEED TO PAY</button>
+            </div>
+        </div>
+    </main>
+<script src="../static/cart.js"></script>
+</body>
+</html>

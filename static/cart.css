@@ -1,0 +1,162 @@
+/* Checkout/Cart Layout */
+.checkout-text {
+    margin-left: 20px;
+    font-weight: 800;
+    font-size: 14px;
+    color: #3d4152;
+}
+body{
+    background-color: #3d4152;
+}
+.cart-container {
+    max-width: 1100px;
+    margin: 110px auto;
+    display: flex;
+    gap: 30px;
+    padding: 0 20px;
+}
+
+.cart-left {
+    flex: 2;
+}
+
+.cart-right {
+    flex: 1;
+}
+
+.checkout-card {
+    background: #fff;
+    padding: 30px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.step-header {
+    display: flex;
+    gap: 20px;
+}
+
+.step-header i {
+    background: #282c3f;
+    color: #fff;
+    padding: 10px;
+    height: 35px;
+    width: 35px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.change-btn {
+    border: 1px solid #fc8019;
+    color: #fc8019;
+    background: white;
+    padding: 8px 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.payment-hint {
+    margin-left: 55px;
+    color: #7e808c;
+    font-size: 14px;
+}
+
+/* Right Side: Bill Card */
+.order-summary-card {
+    background: white;
+    padding: 20px;
+}
+
+.res-mini-header {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.res-mini-header img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+}
+
+.cart-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.quantity-control {
+    border: 1px solid #d4d5d9;
+    display: flex;
+    gap: 10px;
+    padding: 2px 8px;
+    color: #60b246;
+    font-weight: bold;
+}
+
+.quantity-control button {
+    border: none;
+    background: none;
+    color: #bebfc5;
+    cursor: pointer;
+}
+
+.coupon-box {
+    background: #f9f9f9;
+    border: 1px dashed #bebfc5;
+    padding: 15px;
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.coupon-box input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    outline: none;
+}
+
+.bill-details h5 {
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    font-size: 12px;
+}
+
+.bill-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #686b78;
+    margin-bottom: 10px;
+}
+
+.bill-row.total {
+    color: #282c3f;
+    font-weight: bold;
+    font-size: 15px;
+    margin-top: 15px;
+}
+
+.pay-btn {
+    width: 100%;
+    background: #60b246;
+    color: white;
+    border: none;
+    padding: 15px;
+    font-weight: bold;
+    margin-top: 20px;
+    cursor: pointer;
+}
+
+/* Mobile View for Cart */
+@media (max-width: 900px) {
+    .cart-container {
+        flex-direction: column;
+    }
+}

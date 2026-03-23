@@ -1,0 +1,201 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'ProximaNova', Arial, Helvetica, sans-serif;
+}
+
+body {
+    background-color: #3d4152;
+    color: white;
+}
+
+/* Header Styling */
+.navbar {
+    height: 80px;
+    box-shadow: 0 15px 40px -20px rgba(40,44,63,.15);
+    position: fixed;
+    top: 0;
+    width: 100%;
+    /* background: #fff; */
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+}
+
+.left-nav {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    height: 50px;
+    transition: transform 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.logo:hover {
+    transform: scale(1.1);
+}
+
+.location {
+    margin-left: 30px;
+    font-size: 14px;
+    color: #686b78;
+}
+
+.location b {
+    color: #3d4152;
+    border-bottom: 2px solid #3d4152;
+    margin-right: 5px;
+}
+
+.right-nav ul {
+    display: flex;
+    list-style: none;
+}
+
+.right-nav li {
+    margin-left: 60px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.right-nav li i {
+    margin-right: 10px;
+}
+
+.right-nav li:hover {
+    color: #fc8019;
+}
+
+.new-tag {
+    color: #ffa700;
+    font-size: 10px;
+    margin-left: 5px;
+    vertical-align: super;
+}
+
+/* Main Layout */
+.container {
+    margin-top: 100px;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 20px;
+}
+
+/* Filters */
+.filters h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    overflow-x: auto; /* For mobile responsiveness */
+    padding-bottom: 10px;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 1px solid #e2e2e7;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.filter-btn:hover {
+    background: #f0f0f0;
+}
+
+/* Restaurant Grid */
+.restaurant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 30px;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.card:hover {
+    transform: scale(0.95);
+}
+
+.card-img {
+    position: relative;
+    width: 100%;
+    height: 180px;
+}
+
+.card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 15px;
+}
+
+.img-overlay {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: white;
+    font-weight: 800;
+    font-size: 20px;
+    text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+}
+
+.card-details {
+    padding-top: 12px;
+}
+
+.card-details h3 {
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.rating {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.rating i {
+    color: #1ba672;
+}
+
+.cuisine, .area {
+    color: #686b78;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .right-nav {
+        display: none; /* In a real clone, you'd add a bottom nav or hamburger */
+    }
+    
+    .restaurant-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+}
