@@ -84,7 +84,34 @@ def delete_cart(uid):
     key = f"cart:{uid}"
     r.delete(key)
 # delete_cart("69a959defa10620eb63cf31d")
-def add_cart(uid, item, res_name, qty, price):
+# def add_cart(uid, item, res_name, qty, price):
+#     key = f"cart:{uid}"
+
+#     existing = r.get(key)
+
+#     if existing:
+#         cart = json.loads(existing)
+#     else:
+#         cart = {
+#             "uid": uid,
+#             "cart": {}
+#         }
+
+#     # Ensure restaurant exists
+#     if res_name not in cart["cart"]:
+#         cart["cart"][res_name] = {}
+
+#     # Add/update item
+#     if item in cart["cart"][res_name]:
+#         cart["cart"][res_name][item]["qty"] += qty
+#     else:
+#         cart["cart"][res_name][item] = {
+#             "qty": qty,
+#             "price": price
+#         }
+
+#     r.set(key, json.dumps(cart))
+def add_cart(resid, uid, item, res_name, qty, price):
     key = f"cart:{uid}"
 
     existing = r.get(key)
@@ -97,17 +124,21 @@ def add_cart(uid, item, res_name, qty, price):
             "cart": {}
         }
 
-    # Ensure restaurant exists
-    if res_name not in cart["cart"]:
-        cart["cart"][res_name] = {}
+    # Ensure restaurant exists using resid
+    if resid not in cart["cart"]:
+        cart["cart"][resid] = {
+            "name": res_name,   # store name for UI
+            "items": {}
+        }
 
     # Add/update item
-    if item in cart["cart"][res_name]:
-        cart["cart"][res_name][item]["qty"] += qty
+    if item in cart["cart"][resid]["items"]:
+        cart["cart"][resid]["items"][item]["qty"] += qty
     else:
-        cart["cart"][res_name][item] = {
+        cart["cart"][resid]["items"][item] = {
             "qty": qty,
             "price": price
         }
 
     r.set(key, json.dumps(cart))
+# delete_cart(None)

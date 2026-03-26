@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", async () => {
     const display_resturants = document.getElementById("resturants_container")
     const cartBtn=document.getElementById("cartBtn")
+    const orderBtn=document.getElementById("orderBtn")
     res = await fetch("/list_resturants", {
         method: "POST",
         "headers": { "Content-Type": "application/json" },
@@ -49,8 +50,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     cartBtn.addEventListener("click", () => {
         console.log("clicked")
-        const userid = localStorage.getItem("userid")
+        const userid = localStorage.getItem("userId")
         console.log(userid)
         window.location.href = `/cart/${userid}`
+    })
+    orderBtn.addEventListener("click",()=>{
+        console.log("clicked")
+        const userid = localStorage.getItem("userId")
+        console.log(userid)
+        window.location.href = `/orders/${userid}`
     })
 })

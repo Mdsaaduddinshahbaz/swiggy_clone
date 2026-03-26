@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seller Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="../static/seller.css">
+</head>
+
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">Seller Panel</div>
+
+  <div class="nav-item" onclick="goToOrders()">📦 Orders</div>
+  <div class="nav-item" onclick="goToMenu()">🍔 Menu</div>
+  <div class="nav-item" onclick="goToAnalytics()">📊 Analytics</div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Dashboard</h1>
+    <div class="status">🟢 Online</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="cards">
+    <div class="card">
+      <h2 id="totalOrders">0</h2>
+      <p>Total Orders</p>
+    </div>
+
+    <div class="card">
+      <h2 id="pendingOrders">0</h2>
+      <p>Pending</p>
+    </div>
+
+    <div class="card">
+      <h2 id="completedOrders">0</h2>
+      <p>Completed</p>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+
+    <div class="action" onclick="goToOrders()">
+      <div class="icon">📦</div>
+      <div class="title">View Orders</div>
+      <div class="desc">Manage incoming orders</div>
+    </div>
+
+    <div class="action" onclick="goToMenu()">
+      <div class="icon">🍔</div>
+      <div class="title">Manage Menu</div>
+      <div class="desc">Edit your items</div>
+    </div>
+
+    <div class="action" onclick="goToAnalytics()">
+      <div class="icon">📊</div>
+      <div class="title">Analytics</div>
+      <div class="desc">Track performance</div>
+    </div>
+
+  </div>
+
+</div>
+<script src="../static/seller.js"></script>
+
+</body>
+</html>

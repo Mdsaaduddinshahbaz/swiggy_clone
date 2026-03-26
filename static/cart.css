@@ -2,11 +2,18 @@
 .checkout-text {
     margin-left: 20px;
     font-weight: 800;
-    font-size: 14px;
-    color: #3d4152;
+    font-size: 16px;
+    color: white;
 }
 body{
     background-color: #3d4152;
+}
+.right-nav{
+        margin-left: 50%;
+
+}
+.navbar{
+    display: flex;
 }
 .cart-container {
     max-width: 1100px;
@@ -15,7 +22,9 @@ body{
     gap: 30px;
     padding: 0 20px;
 }
-
+#orderBtn{
+    cursor: pointer;
+}
 .cart-left {
     flex: 2;
 }

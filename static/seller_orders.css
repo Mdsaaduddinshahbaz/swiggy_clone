@@ -1,0 +1,61 @@
+.orders-container {
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+body{
+        background: #3d4152;
+}
+.order-card {
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.order-id {
+    font-weight: bold;
+}
+
+.order-status {
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.status-placed { background: orange; color: white; }
+.status-preparing { background: blue; color: white; }
+.status-delivered { background: green; color: white; }
+
+.restaurant-name {
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.item {
+    display: flex;
+    justify-content: space-between;
+    margin: 5px 0;
+}
+
+.total {
+    text-align: right;
+    font-weight: bold;
+    margin-top: 10px;
+}
+h1{
+    color: white;
+}
+.token-no{
+    margin-bottom: 10px;
+    font-weight: 700;
+}

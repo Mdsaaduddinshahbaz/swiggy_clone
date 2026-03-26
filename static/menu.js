@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const decoded = decodeURIComponent(res_name);
     const menu_items_container = document.getElementById("menu_container")
     const cartBtn = document.getElementById("cartBtn")
+    const orderBtn = document.getElementById("orderBtn")
     // const res_info=document.getElementById("res_info")
     const res_info = document.querySelector(".res-info");
     const heading = res_info.querySelector("h1");
@@ -43,9 +44,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     cartBtn.addEventListener("click", () => {
         console.log("clicked")
-        const userid = localStorage.getItem("userid")
+        const userid = localStorage.getItem("userId")
         console.log(userid)
         window.location.href = `/cart/${userid}`
+    })
+    orderBtn.addEventListener("click",()=>{
+        console.log("clicked")
+        const userid = localStorage.getItem("userId")
+        console.log(userid)
+        window.location.href = `/orders/${userid}`
     })
     menu_items_container.addEventListener("click", async (e) => {
         if (e.target.classList.contains("add-btn")) {
@@ -56,12 +63,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             const price = item.querySelector(".price").innerText;
 
             console.log("Added:", names, price);
-            const userid = localStorage.getItem("userid")
+            const userid = localStorage.getItem("userId")
             // 👉 Here you can send to backend / Redis
             const res = await fetch("/add_to_cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    resid:res_id,
                     userid: userid,
                     item: names,
                     ress_name:decoded,

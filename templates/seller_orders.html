@@ -1,0 +1,18 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='seller_orders.css') }}">
+</head>
+<body>
+    <div class="orders-container">
+    <h1>Your Orders</h1>
+
+    <div id="orders-list"></div>
+</div>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- <script src="/static/js/seller_orders.js"></script> -->
+<script src="{{ url_for('static', filename='seller_orders.js') }}"></script>
+</body>
+</html>
