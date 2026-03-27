@@ -5,8 +5,11 @@ from redis_db import add_cart,get_cart
 app=Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-@app.route("/", methods=["GET", "POST"])
-def home():
+# @app.route("/", methods=["GET", "POST"])
+# def home():
+#     return render_template('home.html')
+@app.route("/user/<userid>", methods=["GET", "POST"])
+def home(userid):
     return render_template('home.html')
 
 @app.post("/add_res_items")
@@ -24,10 +27,13 @@ def add_itemss():
 def add_resturant():
     data=request.get_json()
     name=data["name"]
-    latt=data["latt"]
-    long=data["long"]
-    add_resturants(name,long,latt)
-    return ({"success":True})
+    address=data["address"]
+    phone=data["phone"]
+    latt = round(float(data["lat"]), 4)
+    long = round(float(data["lng"]), 4)
+    owner_id=data["owner_id"]
+    id=add_resturants(name,long,latt)
+    return ({"success":True,"res_id":id})
 @app.post("/remove_items")
 def remove_item():
     data=request.get_json()
@@ -166,18 +172,21 @@ def signup_user():
         # print(email)
         res=create_new_user(email,username,password)
         print(res)
-        if(res):
-            return ({"success":True})
+        if(res["success"]):
+            return ({"success":True,"user_id":res["id"]})
         else:
             return ({"success":False})
-@app.route("/login")
-def login():
+@app.get("/seller/resturantSetup/<seller_id>")
+def renderSetup(seller_id):
+    return render_template("resturant_setup.html")
+@app.route("/login/<role>")
+def login(role):
     try:
         return render_template("auth.html")
     except:
         return({"success":False})
-@app.route("/signup")
-def signup():
+@app.route("/signup/<role>")
+def signup(role):
     try:
         return render_template("signup.html")
     except:
@@ -185,5 +194,8 @@ def signup():
 @app.get("/seller/<seller_id>")
 def sellerTemplate(seller_id):
     return render_template("seller.html")
+@app.get("/landing")
+def renderLanding():
+    return render_template("landing.html")
 if __name__ == "__main__":
     socketio.run(app, debug=True)

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Setup Restaurant</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='resturant_setup.css') }}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>Setup Your Restaurant 🍽️</h2>
+
+  <div class="input-group">
+    <label>Restaurant Name</label>
+    <input type="text" id="name" placeholder="Pizza Hub">
+  </div>
+
+  <div class="input-group">
+    <label>Address</label>
+    <input type="text" id="address" placeholder="Hyderabad">
+  </div>
+
+  <div class="input-group">
+    <label>Phone</label>
+    <input type="text" id="phone" placeholder="9876543210">
+  </div>
+
+  <div class="input-group">
+    <label>Latitude</label>
+    <input type="text" id="lat" placeholder="17.3850">
+  </div>
+
+  <div class="input-group">
+    <label>Longitude</label>
+    <input type="text" id="lng" placeholder="78.4867">
+  </div>
+
+  <button id="createBtn">Create Restaurant</button>
+  <button onclick="getLocation()">📍 Use My Location</button>
+  <div id="map" style="height: 250px; border-radius: 15px; margin-top: 10px;"></div>
+</div>
+<script src="{{ url_for('static', filename='resturant_setup.js') }}"></script>
+</body>
+</html>

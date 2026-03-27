@@ -1,5 +1,8 @@
-const resId = localStorage.getItem("res_id");
+// const resId = localStorage.getItem("res_id");
+const pathParts = window.location.pathname.split("/");
 
+const resId = pathParts[pathParts.length - 1];
+console.log(resId)
 function goToOrders() {
   window.location.href = `/seller/orders/${resId}`;
 }

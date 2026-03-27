@@ -6,10 +6,17 @@
 //   return BASEURL
 // }
 // const BASEURL=loadConfig()
-const BASEURL="http://127.0.0.1:5000"
+const BASEURL = "http://127.0.0.1:5000"
+const pathParts = window.location.pathname.split("/");
+
+const role = pathParts[pathParts.length - 1];
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector("form")
   const inputs = form.querySelectorAll("input");
+  const signupBtn=document.getElementById("signupBtn")
+  signupBtn.addEventListener("click",()=>{
+    window.location.href=`/signup/${role}`
+  })
   let formData = {};
 
   // Attach input listeners
@@ -30,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Updated formData:", formData);
     });
   });
-console.log(formData)
+  console.log(formData)
   // Handle form submit
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -43,16 +50,21 @@ console.log(formData)
 
       const data = await res.json();
       console.log(data.success)
-      if(data.success==="not found"){
+      if (data.success === "not found") {
         alert("user credentials not found")
       }
-      else if(data.success){
-      alert(data.message || "Welcome!");
-      localStorage.setItem("userId",data.user_id)
-      localStorage.setItem("username",data.username)
-      window.location.href = "http://127.0.0.1:5000/"
+      else if (data.success) {
+        alert(data.message || "Welcome!");
+        localStorage.setItem("userId", data.user_id)
+        localStorage.setItem("username", data.username)
+        if (role === "user") {
+          window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
+        }
+        else {
+          window.location.href = `http://127.0.0.1:5000/seller/${data.user_id}`
+        }
       }
-      else{
+      else {
         alert("username or password is wrong")
       }
     } catch (err) {

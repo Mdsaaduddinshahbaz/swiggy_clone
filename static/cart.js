@@ -96,6 +96,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log("clicked")
         const userid = localStorage.getItem("userId")
         console.log(userid)
-        window.location.href = `/orders/${userid}`
+        window.location.href = `/orders/${userId}`
     })
 })

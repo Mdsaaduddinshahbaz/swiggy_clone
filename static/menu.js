@@ -10,7 +10,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     // const res_info=document.getElementById("res_info")
     const res_info = document.querySelector(".res-info");
     const heading = res_info.querySelector("h1");
+    // const pathParts = window.location.pathname.split("/");
 
+    // // const userId = pathParts[pathParts.length - 1];
+    // // console.log(userId)
     heading.innerText = decoded;
     const res = await fetch("/list_items", {
         method: "POST",

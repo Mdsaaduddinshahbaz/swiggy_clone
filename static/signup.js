@@ -6,9 +6,16 @@
 //   return BASEURL
 // }
 const BASEURL="http://127.0.0.1:5000"
+
+const pathParts = window.location.pathname.split("/");
+
+const role = pathParts[pathParts.length - 1];
 document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signupform");
-
+  const loginBtn=document.getElementById("loginBtn")
+  loginBtn.addEventListener("click",()=>{
+    window.location.href=`/login/${role}`
+  })
   signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -32,7 +39,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       if (data.success) {
         alert(data.message || "Signup successful! Please login.");
-        window.location.href = "/login";
+        // window.location.href = "/login";
+        if (role === "user") {
+          // window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
+          window.location.href = `http://127.0.0.1:5000/login/user`
+        }
+        else {
+          // window.location.href = `http://127.0.0.1:5000/seller/${data.user_id}`
+          window.location.href = `http://127.0.0.1:5000/seller/resturantSetup/${data.user_id}`
+        }
       }
       else if(!data.success){
         alert(data.message || "User already exists");

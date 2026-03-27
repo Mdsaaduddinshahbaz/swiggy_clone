@@ -54,7 +54,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await res.json()
         if (data.success) {
             alert("new item added")
-            window.location.href = "/seller_items"
+            // window.location.href = "/seller_items"
+            window.location.reload()
         }
         else {
             alert("error adding items")

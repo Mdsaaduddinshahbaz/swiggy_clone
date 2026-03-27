@@ -25,8 +25,9 @@ seller_orders=db["seller_orders"]
 users=db["users"]
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
-def add_resturants(name,long,latt):
-    restaurants_name.insert_one({"name":name,"location":{"type":"Point","coordinates":[long,latt]}})
+def add_resturants(name,address,phone,owner_id,long,latt):
+    res=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
+    return str(res.inserted_id)
 def add_resturant_items(resturant_id,item_name,item_qty,price):
     resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price})
 def list_resturant_items(resturant_id):
@@ -149,14 +150,14 @@ def create_new_user(email,username, password):
     user = users.find_one({"email": email})
     print(user)
     if user is None:
-        users.insert_one({
+        result =users.insert_one({
             "email": email,
             "username":username,
             "password": password
         })
-        return True
+        return ({"success":True,"id":str(result.inserted_id)})
     else:
-        return False
+        return ({"success":False})
 def check_existing_user(email,password):
     print("in existing user")
     user=users.find_one({"email":email})
