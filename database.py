@@ -1,8 +1,9 @@
-from pymongo import MongoClient
+from pymongo import MongoClient,UpdateOne,ReturnDocument
 from dotenv import load_dotenv
 from bson import ObjectId
 from datetime import datetime
 import os
+from redis_db import delete_cart
 load_dotenv(override=True)
 api=os.getenv("MONGO_URI",None)
 client = MongoClient(api)
@@ -41,6 +42,24 @@ def list_resturant_items(resturant_id):
     return item_name
 def update_resturant_item(item_id,name,price):
     resturants_items.find_one_and_update({"_id":ObjectId(item_id)},{"$set":{"item_name":name,"price":int(price)}})
+# def list_resturants(long,latt):
+#     restaurants = restaurants_name.find({
+#         "location": {
+#             "$near": {
+#                 "$geometry": {
+#                     "type": "Point",
+#                     "coordinates": [long,latt]
+#                 },
+#                 "$maxDistance": 1000
+#             }
+#         }
+#     })
+#     res_names={}
+#     for r in restaurants:
+#         print(r["name"])
+#         res_names[r["name"]]=str(r["_id"])
+#         # res_names.append(r["name"])
+#     return res_names
 def list_resturants(long,latt):
     restaurants = restaurants_name.find({
         "location": {
@@ -56,7 +75,7 @@ def list_resturants(long,latt):
     res_names={}
     for r in restaurants:
         print(r["name"])
-        res_names[r["name"]]=str(r["_id"])
+        res_names[r["name"]]={"res_id":str(r["_id"]),"address":r["address"]}
         # res_names.append(r["name"])
     return res_names
 def add_new_customer(username,password):
@@ -84,13 +103,16 @@ def store_orders(userid, items):
     # order_id = "ORD_" + str(int(datetime.utcnow().timestamp()))
 
     # ✅ 1. Insert into user_orders
-    orders.insert_one({"user_id":userid,"token_no":token,"items":items,"time":datetime.utcnow()})
+    
 
     # ✅ 2. Prepare seller_orders
     seller_docs = []
     res_ids=[]
+    seller_inventory=[]
+    current_time=datetime.utcnow()
+    print(items)
     for res_id, data in items.items():
-
+        print(res_id,data)
         seller_doc = {
             # "order_id": order_id,
             "user_id": userid,
@@ -101,17 +123,46 @@ def store_orders(userid, items):
             "items": data["items"],
 
             "status": "placed",
-            "time": datetime.utcnow()
+            "time": current_time
         }
         res_ids.append(res_id)
+        for item in data["items"].values():
+            print(item)
+            seller_inventory.append(
+                UpdateOne(
+                    {
+                        "_id": ObjectId(item["item_id"])
+                        # "restaurant_id": res_id   # ✅ safer
+                    },
+                    {
+                        "$inc": {"sold": item["qty"]}
+                    }
+                )
+            )
 
 
         seller_docs.append(seller_doc)
 
     # ✅ 3. Insert all at once (FAST)
-    if seller_docs:
-        seller_orders.insert_many(seller_docs)
+    # if seller_docs:
+    #     seller_orders.insert_many(seller_docs)
+    # if seller_inventory:
+    #     resturants_items.bulk_write(seller_inventory)
+    with client.start_session() as session:
+        with session.start_transaction():
 
+            result=orders.insert_one({"user_id":userid,"token_no":token,"status":"placed","items":items,"time":current_time}, session=session)
+            parent_id = result.inserted_id 
+
+            # 3. Add that parent_id to every seller doc before inserting
+            for doc in seller_docs:
+                doc["parent_order_id"] = str(parent_id)
+            if seller_docs:
+                seller_orders.insert_many(seller_docs, session=session)
+
+            if seller_inventory:
+                resturants_items.bulk_write(seller_inventory, session=session)
+    delete_cart(userid)
     print("Order stored successfully")
     return res_ids
 def get_orders(userid):
@@ -122,6 +173,7 @@ def get_orders(userid):
             "order_id":str(order["_id"]),
             "token_no":order["token_no"],
             "resturants":order["items"],
+            "status":order["status"],
             "date":order["time"]
         }
 
@@ -170,4 +222,79 @@ def check_existing_user(email,password):
         else:
             return {"success":False}
     else: return {"success":404}
+# def update_order_status_seller(order_id,status,userid):
+#     with client.start_session() as session:
+#         with session.start_transaction():
+#             seller_orders.find_one_and_update({"_id":ObjectId(order_id)},{"$set":{"status":status}},session=session)
+#             orders.find_one_and_update({"user_id":userid},{"$set":{"status":status}},session=session)
+def update_order_status_seller(order_id,status,userid):
+    with client.start_session() as session:
+        with session.start_transaction():
+            updated_seller_doc = seller_orders.find_one_and_update(
+                {"_id": ObjectId(order_id)},
+                {"$set": {"status": status}},
+                session=session,
+                return_document=ReturnDocument.AFTER 
+            )
+
+            if updated_seller_doc:
+                # 2. Grab that parent_id you stored earlier
+                parent_id = updated_seller_doc.get("parent_order_id")
+
+                # 3. Update the Main Order using that specific ID
+                if parent_id:
+                    orders.find_one_and_update(
+                        {
+                            "_id": ObjectId(parent_id), 
+                            "user_id": userid
+                        },
+                        {"$set": {"status": status}},
+                        session=session
+                    )
+def update_order_status_user(order_id,status,use):
+    with client.start_session() as session:
+        with session.start_transaction():
+
+            
+            orders.find_one_and_update({"_id":ObjectId(order_id)},{"$set":{"status":status}},session=session)
+            seller_orders.update_many({"parent_order_id":order_id},{"$set":{"status":status}},session=session)
+def resturant_stats(res_id):
+    seller_order_stats=seller_orders.find({"restaurant_id":res_id})
+    Total_orders=0
+    pending=0
+    completed=0
+    canceled=0
+    for order in seller_order_stats:
+        if(order["status"]=="placed"):
+            Total_orders+=1
+            pending+=1
+        elif(order["status"]=="completed"):
+            completed+=1
+            Total_orders+=1
+        else:
+            Total_orders+=1
+            canceled+=1
+    stats={
+        "Total_orders":Total_orders,
+        "completed":completed,
+        "canceled":canceled,
+        "pending":pending
+    }
+    return stats
+def return_res_analytics(res_id):
+    # seller_orders.find({"restaurant_id":res_id})
+    resturants_itemsss=resturants_items.find({"resturant_id":res_id})
+    data=[]
+    print(res_id)
+    for items in resturants_itemsss:
+        itemss={
+            "item_name":items["item_name"],
+            "initial_qty":items["item_qty"],
+            "sold":items["sold"],
+            "remaining":items["item_qty"]
+        }
+        data.append(itemss)
+        print(data)
+    return data
+
 # get_orders("69a959defa10620eb63cf31d")

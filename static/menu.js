@@ -1,15 +1,21 @@
 document.addEventListener("DOMContentLoaded", async () => {
     const path = window.location.pathname
-    const res_id = path.split("/")[3]
+    const res_id = path.split("/")[4]
+    const addresss = path.split("/")[3]
     const res_name = path.split("/")[2]
     console.log(res_name)
     const decoded = decodeURIComponent(res_name);
+    const addresss_decoded=decodeURIComponent(addresss);
     const menu_items_container = document.getElementById("menu_container")
     const cartBtn = document.getElementById("cartBtn")
     const orderBtn = document.getElementById("orderBtn")
     // const res_info=document.getElementById("res_info")
     const res_info = document.querySelector(".res-info");
     const heading = res_info.querySelector("h1");
+    const res_location = res_info.querySelector(".res-location");
+    const breadcrump= document.querySelector(".breadcrumbs")
+    breadcrump.innerText=`Home / ${addresss_decoded} / ${decoded}`
+    res_location.innerText=addresss_decoded
     // const pathParts = window.location.pathname.split("/");
 
     // // const userId = pathParts[pathParts.length - 1];
@@ -64,8 +70,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             const item = e.target.closest(".menu-item");
             const names = item.querySelector("h3").innerText;
             const price = item.querySelector(".price").innerText;
-
-            console.log("Added:", names, price);
+            const item_id=item.getAttribute("id")
+            // console.log("Added:", names, price,item_id);
             const userid = localStorage.getItem("userId")
             // 👉 Here you can send to backend / Redis
             const res = await fetch("/add_to_cart", {
@@ -77,6 +83,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     item: names,
                     ress_name:decoded,
                     qty: 1,
+                    item_id:item_id,
                     price: parseInt(price)   // 🔥 important
                 })
             })

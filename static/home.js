@@ -17,10 +17,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Object.entries(data.results).forEach(([name, id]) => {
         //     console.log(name, id)
         // })
-        Object.entries(data.results).forEach(([name, id]) => {
+        Object.entries(data.results).forEach(([name, detail]) => {
             // console.log(element)
+            console.log(detail)
             display_resturants.innerHTML +=
-                `<div class="card" id=${id}>
+                `<div class="card" id=${detail.res_id}>
                 <div class="card-img">
                     
                     <img src="../static/food.jpg">
@@ -30,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <h3 class="resturant_name" >${name}</h3>
                     <p class="rating"><i class="fa-solid fa-circle-star"></i> 4.2 • 25-30 mins</p>
                     <p class="cuisine">Burgers, American</p>
-                    <p class="area">Banjara Hills</p>
+                    <p class="area">${detail.address}</p>
                 </div>
             </div>`
         });
@@ -46,9 +47,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.log("Card clicked")
             // console.log(card)
             const name = card.querySelector(".resturant_name").textContent
+            const addresss = card.querySelector(".area").textContent
             console.log(name)
             
-            window.location.href=`/menu/${name}/${res_id}`
+            window.location.href=`/menu/${name}/${addresss}/${res_id}`
         }
 
     })

@@ -5,7 +5,7 @@
 <title>Seller Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="../static/seller.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='seller.css') }}">
 </head>
 
 <body>
@@ -44,6 +44,10 @@
       <h2 id="completedOrders">0</h2>
       <p>Completed</p>
     </div>
+    <div class="card">
+      <h2 id="canceledOrders">0</h2>
+      <p>Canceled</p>
+    </div>
   </div>
 
   <!-- Actions -->
@@ -70,7 +74,7 @@
   </div>
 
 </div>
-<script src="../static/seller.js"></script>
+<script src="{{ url_for('static', filename='seller.js') }}"></script>
 
 </body>
 </html>

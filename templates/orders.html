@@ -7,10 +7,19 @@
 </head>
 <body>
     <div class="orders-container">
-    <h1>Your Orders</h1>
+    <div class="header">
+        <h1>Your Orders</h1>
+        <select id="filterDropdown">
+            <option value="placed">Pending</option>
+            <option value="all">All Orders</option>
+            <option value="completed">Completed</option>
+            <option value="canceled">Canceled</option>
+        </select>
+    </div>
 
     <div id="orders-list"></div>
 </div>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="../static/orders.js"></script>
 </body>
 </html>

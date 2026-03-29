@@ -27,7 +27,7 @@ async function setupRestaurant() {
     if (data.success) {
         localStorage.setItem("res_id", data.res_id);
         alert("Restaurant created!");
-        window.location.href = `/seller/${data.res_id}`;
+        window.location.href = `/seller/${name}/${data.res_id}`;
     } else {
         alert("Error creating restaurant");
     }

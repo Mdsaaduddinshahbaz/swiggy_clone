@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", async () => {
     const path = window.location.pathname
-    const res_id = path.split("/")[3]
+    const res_id = path.split("/")[4]
+    const resname=path.split("/")[3]
     console.log(res_id)
     // const res_id = localStorage.getItem("res_id")
     const menu_items_container = document.getElementById("menu_container")
@@ -12,6 +13,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const update_name = document.getElementById("update_name")
     const update_price = document.getElementById("update_price")
     const update_qty = document.getElementById("update_qty")
+    const resname_html=document.getElementById("res_name")
+    const resname_heading=document.getElementById("res_name_heading")
     // const UpdateBtn=document.getElementById("UpdateBtn")
     const res = await fetch("/list_items", {
         method: "POST",
@@ -22,6 +25,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const data = await res.json()
     if (data.success) {
         console.log(data)
+        resname_html.innerText=resname
+        resname_heading.innerText=resname
         // res_info.closest("h1").innerText = name
         Object.entries(data.res).forEach(([name, item]) => {
             menu_items_container.innerHTML +=

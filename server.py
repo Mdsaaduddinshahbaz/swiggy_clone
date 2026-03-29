@@ -1,7 +1,7 @@
-from database import add_resturant_items,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user
+from database import add_resturant_items,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics
 from flask import Flask,request,render_template
 from flask_socketio import SocketIO, emit,join_room
-from redis_db import add_cart,get_cart
+from redis_db import add_cart,get_cart,update_cart_qty
 app=Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -32,7 +32,7 @@ def add_resturant():
     latt = round(float(data["lat"]), 4)
     long = round(float(data["lng"]), 4)
     owner_id=data["owner_id"]
-    id=add_resturants(name,long,latt)
+    id=add_resturants(name,address,phone,owner_id,long,latt)
     return ({"success":True,"res_id":id})
 @app.post("/remove_items")
 def remove_item():
@@ -73,8 +73,8 @@ def carts():
     add_customer_items(itm_name,res_id,itm_id)
     return({"success":True})
 
-@app.get("/menu/<name>/<res_id>")
-def list_items(name,res_id):
+@app.get("/menu/<name>/<address>/<res_id>")
+def list_items(name,address,res_id):
     # data=request.get_json()
     # res_id=data["res_id"]
     # res=list_resturant_items(res_id)
@@ -97,12 +97,13 @@ def addToCart():
     resid=data["resid"]
     name=data["item"]
     qty=data["qty"]
+    item_id=data["item_id"]
     res_name=data["ress_name"]
     price=data["price"]
-    add_cart(resid,userid,name,res_name,qty,price)
+    add_cart(resid,userid,name,res_name,item_id,qty,price)
     return({"success":True})
-@app.get("/seller/menu/<seller_id>")
-def seller_page(seller_id):
+@app.get("/seller/menu/<name>/<seller_id>")
+def seller_page(name,seller_id):
     return render_template("seller_items.html")
 @app.post("/store_orders")
 def store_order():
@@ -146,6 +147,30 @@ def handle_join(data):
     join_room(seller_id)
 def notify_new_order(seller_id, order):
     socketio.emit('new_order', order, room=seller_id)
+@socketio.on('join_user_room')
+def handle_user_join(data):
+    user_id = data['user_id']
+    join_room(user_id)
+    print(f"User joined: {user_id}")
+@socketio.on("order_completed")
+def handle_order_completed(data):
+    print("Order completed:", data)
+
+    token_no = data.get("token_no")
+    user_id=data.get("userid")
+    order_id = data.get("order_id")
+    status=data.get("status")
+
+    # send update to USER
+    socketio.emit(
+        "order_status_updated",
+        {
+            "order_id": order_id,
+            "token_no":token_no,
+            "status": status
+        },
+        room=user_id
+    )
 @app.post("/validate_user")
 def validate():
         data=request.get_json()
@@ -191,11 +216,51 @@ def signup(role):
         return render_template("signup.html")
     except:
         return({"success":False})
-@app.get("/seller/<seller_id>")
-def sellerTemplate(seller_id):
+@app.get("/seller/<name>/<seller_id>")
+def sellerTemplate(name,seller_id):
     return render_template("seller.html")
 @app.get("/landing")
 def renderLanding():
     return render_template("landing.html")
+@app.post("/update_order")
+def update_status():
+    data=request.get_json()
+    order_id=data["order_id"]
+    status=data["status"]
+    userid=data["user_id"]
+    update_order_status_seller(order_id,status,userid)
+    return ({"success":True})
+@app.post("/update_order_user")
+def update_status_user():
+    data=request.get_json()
+    order_id=data["order_id"]
+    status=data["status"]
+    userid=data["user_id"]
+    update_order_status_user(order_id,status,userid)
+    return ({"success":True})
+@app.post("/stats")
+def returnstats():
+    data=request.get_json()
+    res_id=data["res_id"]
+    res=resturant_stats(res_id)
+    return({"success":True,"stats":res})
+@app.get("/seller/analytics/<res_id>")
+def render_analytics_template(res_id):
+    print("seller_anlytics")
+    return render_template("analytics.html")
+@app.post("/seller/analytics")
+def return_seller_stats():
+    data=request.get_json()
+    res_id=data["res_id"]
+    stats=return_res_analytics(res_id)
+    return({"success":True,"stats":stats})
+@app.post("/update_cart")
+def update_cart():
+    data=request.get_json()
+    userid=data["user_id"]
+    item_name=data["item_name"]
+    qty=data["qty"]
+    update_cart_qty(userid,item_name,qty)
+    return ({"success":True})
 if __name__ == "__main__":
     socketio.run(app, debug=True)

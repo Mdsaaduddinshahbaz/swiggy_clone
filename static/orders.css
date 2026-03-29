@@ -37,7 +37,8 @@ body{
 
 .status-placed { background: orange; color: white; }
 .status-preparing { background: blue; color: white; }
-.status-delivered { background: green; color: white; }
+.status-completed { background: green; color: white; }
+.status-canceled { background: rgb(255, 0, 0); color: white; }
 
 .restaurant-name {
     font-weight: bold;
@@ -57,4 +58,16 @@ body{
 }
 h1{
     color: white;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;  /* 🔥 pushes button to right */
+    align-items: center;
+}
+
+#filterDropdown {
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
 }

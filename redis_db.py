@@ -111,7 +111,7 @@ def delete_cart(uid):
 #         }
 
 #     r.set(key, json.dumps(cart))
-def add_cart(resid, uid, item, res_name, qty, price):
+def add_cart(resid, uid, item, res_name,item_id, qty, price):
     key = f"cart:{uid}"
 
     existing = r.get(key)
@@ -137,8 +137,48 @@ def add_cart(resid, uid, item, res_name, qty, price):
     else:
         cart["cart"][resid]["items"][item] = {
             "qty": qty,
-            "price": price
+            "price": price,
+            "item_id":item_id
         }
 
     r.set(key, json.dumps(cart))
-# delete_cart(None)
+import json
+
+def update_cart_qty(uid, item_name, change):
+    key = f"cart:{uid}"
+    
+    # 1. Get the cart from Redis
+    existing = r.get(key)
+    if not existing:
+        return {"success": False, "message": "No cart found for this user"}
+
+    cart_data = json.loads(existing)
+    found = False
+
+    # 2. Iterate through restaurants to find the item
+    # We use list(dict.keys()) because we might delete keys during the loop
+    for res_id in list(cart_data["cart"].keys()):
+        if item_name in cart_data["cart"][res_id]["items"]:
+            item_ref = cart_data["cart"][res_id]["items"][item_name]
+            
+            # 3. Update the quantity
+            item_ref["qty"] += change
+            found = True
+
+            # 4. Remove item if it hits 0
+            if item_ref["qty"] <= 0:
+                del cart_data["cart"][res_id]["items"][item_name]
+                
+                # 5. Remove restaurant if it's now empty
+                if not cart_data["cart"][res_id]["items"]:
+                    del cart_data["cart"][res_id]
+            
+            break # Stop searching once we find and update the item
+
+    if not found:
+        return {"success": False, "message": "Item not found in any restaurant in your cart"}
+
+    # 6. Save the updated cart back to Redis
+    r.set(key, json.dumps(cart_data))
+    return {"success": True, "updated_cart": cart_data}
+# delete_cart("69c6ca064793b9c47f293d18")

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seller Analytics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='analytics.css') }}">
+</head>
+
+<body>
+
+<h1>📊 Analytics Dashboard</h1>
+
+<div class="cards">
+  <div class="card">
+    <h2 id="totalSales">0</h2>
+    <p>Total Items Sold</p>
+  </div>
+
+  <div class="card">
+    <h2 id="topItem">-</h2>
+    <p>Most Sold Item</p>
+  </div>
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Initial Qty</th>
+      <th>Remaining</th>
+      <th>Sold</th>
+    </tr>
+  </thead>
+  <tbody id="analyticsBody">
+  </tbody>
+</table>
+
+<script src="{{ url_for('static', filename='analytics.js') }}"></script>
+</body>
+</html>
