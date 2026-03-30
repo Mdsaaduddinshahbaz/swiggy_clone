@@ -1,13 +1,13 @@
 from database import add_resturant_items,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics
-from flask import Flask,request,render_template
+from flask import Flask,request,render_template,redirect,url_for
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
 app=Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# @app.route("/", methods=["GET", "POST"])
-# def home():
-#     return render_template('home.html')
+@app.route("/", methods=["GET", "POST"])
+def home():
+    return redirect(url_for('landing'))
 @app.route("/user/<userid>", methods=["GET", "POST"])
 def home(userid):
     try:
