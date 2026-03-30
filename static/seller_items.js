@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const res = await fetch("/add_res_items", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ "res_id": res_id, "itm_name": item_name.value, "price": item_price.value, "itm_qty": item_qty.value })
+            body: JSON.stringify({ "res_id": res_id, "itm_name": item_name.value, "price": item_price.value, "itm_qty": item_qty.value ,"sold":0})
         })
         const data = await res.json()
         if (data.success) {
