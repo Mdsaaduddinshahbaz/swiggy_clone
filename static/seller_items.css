@@ -29,7 +29,9 @@
  .form-box h2 {
      margin-bottom: 15px;
  }
-
+.new_item_heading{
+    color: black;
+}
  input,
  textarea {
      width: 100%;
