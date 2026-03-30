@@ -7,7 +7,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route("/", methods=["GET", "POST"])
 def land():
-    return redirect(url_for('landing'))
+    return redirect(url_for('renderLanding'))
 @app.route("/user/<userid>", methods=["GET", "POST"])
 def home(userid):
     try:
