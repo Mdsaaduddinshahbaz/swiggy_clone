@@ -1,27 +1,38 @@
 document.addEventListener("DOMContentLoaded", async () => {
     const display_resturants = document.getElementById("resturants_container")
-    const cartBtn=document.getElementById("cartBtn")
-    const orderBtn=document.getElementById("orderBtn")
+    const cartBtn = document.getElementById("cartBtn")
+    const orderBtn = document.getElementById("orderBtn")
     const pathParts = window.location.pathname.split("/");
-
+    const no_results_container = document.getElementById("no-results-container")
+    const position = await getPosition();
+    userLatt = position.coords.latitude;
+    userLong = position.coords.longitude;
+    console.log("Location acquired:", userLatt, userLong);
     const userId = pathParts[pathParts.length - 1];
     console.log(userId)
     res = await fetch("/list_resturants", {
         method: "POST",
         "headers": { "Content-Type": "application/json" },
-        body: JSON.stringify({ "latt": 17.38172489515112, "long": 78.4916357577191 })
+        body: JSON.stringify({ "latt": userLatt, "long": userLong })
+        // body: JSON.stringify({ "latt": 17.38172489515112, "long": 78.4916357577191 })
     })
     const data = await res.json()
     if (data.success) {
-        console.log(data.results)
-        // Object.entries(data.results).forEach(([name, id]) => {
-        //     console.log(name, id)
-        // })
-        Object.entries(data.results).forEach(([name, detail]) => {
-            // console.log(element)
-            console.log(detail)
-            display_resturants.innerHTML +=
-                `<div class="card" id=${detail.res_id}>
+        console.log(data)
+        if (!data.results || Object.keys(data.results).length === 0) {
+            console.log("Empty");
+            no_results_container.style.display = "block";
+        }
+        else {
+            console.log(data.results)
+            // Object.entries(data.results).forEach(([name, id]) => {
+            //     console.log(name, id)
+            // })
+            Object.entries(data.results).forEach(([name, detail]) => {
+                // console.log(element)
+                console.log(detail)
+                display_resturants.innerHTML +=
+                    `<div class="card" id=${detail.res_id}>
                 <div class="card-img">
                     
                     <img src="../static/food.jpg">
@@ -34,7 +45,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <p class="area">${detail.address}</p>
                 </div>
             </div>`
-        });
+            });
+        }
     }
     else {
         alert("error loading resturants")
@@ -42,15 +54,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     display_resturants.addEventListener("click", function (e) {
 
         const card = e.target.closest(".card")
-        const res_id=card.getAttribute("id")
+        const res_id = card.getAttribute("id")
         if (card) {
             console.log("Card clicked")
             // console.log(card)
             const name = card.querySelector(".resturant_name").textContent
             const addresss = card.querySelector(".area").textContent
             console.log(name)
-            
-            window.location.href=`/menu/${name}/${addresss}/${res_id}`
+
+            window.location.href = `/menu/${name}/${addresss}/${res_id}`
         }
 
     })
@@ -60,10 +72,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(userid)
         window.location.href = `/cart/${userId}`
     })
-    orderBtn.addEventListener("click",()=>{
+    orderBtn.addEventListener("click", () => {
         console.log("clicked")
         const userid = localStorage.getItem("userId")
         console.log(userid)
         window.location.href = `/orders/${userId}`
     })
 })
+function getPosition() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject("Geolocation is not supported by your browser");
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+    });
+}

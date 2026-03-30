@@ -83,6 +83,21 @@ socket.on("new_order", () => {
     console.log("New order received → reloading...");
     loadOrders();   // 🔥 call your API again
 });
+// Add this to seller_orders.js
+socket.on("seller_order_cancelled", (data) => {
+    console.log("User cancelled order:", data.token_no);
+
+    const cards = document.querySelectorAll(".order-card");
+    cards.forEach(card => {
+        const cardToken = card.querySelector(".token-no").textContent.split(": ")[1].trim();
+        
+        if (cardToken === String(data.token_no)) {
+            // Optional: Show a "User Cancelled" overlay before removing
+            card.style.backgroundColor = "#ffebee"; 
+            setTimeout(() => card.remove(), 1500);
+        }
+    });
+});
 async function loadOrders() {
     const res = await fetch(`/seller/orders`, {
         method: "POST",
@@ -235,6 +250,7 @@ document.addEventListener("click", async (e) => {
                 order_id: orderId,
                 userid: userid,
                 token_no: tokenNo,
+                res_id:resId,
                 status: "completed"   // 🔥 send this instead
             });
             // 🔥 UPDATE UI HERE
@@ -280,6 +296,7 @@ document.addEventListener("click", async (e) => {
                 order_id: orderId,
                 userid: userid,
                 token_no: tokenNo,
+                res_id:resId,
                 status: "canceled"  // 🔥 send this instead
             });
             // 🔥 UPDATE UI HERE

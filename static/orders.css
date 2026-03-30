@@ -71,3 +71,8 @@ h1{
     border-radius: 6px;
     cursor: pointer;
 }
+.res_namesss{
+        display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}

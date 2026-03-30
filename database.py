@@ -68,7 +68,7 @@ def list_resturants(long,latt):
                     "type": "Point",
                     "coordinates": [long,latt]
                 },
-                "$maxDistance": 1000
+                "$maxDistance": 5000
             }
         }
     })

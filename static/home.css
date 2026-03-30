@@ -39,7 +39,7 @@ body {
 }
 
 .logo {
-    height: 50px;
+    height: 62px;
     transition: transform 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
@@ -198,4 +198,7 @@ body {
     .restaurant-grid {
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
+}
+#no-results-container{
+    display: none;
 }

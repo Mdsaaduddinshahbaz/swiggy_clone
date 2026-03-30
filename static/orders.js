@@ -119,8 +119,11 @@ async function loadOrders() {
         let restaurantsHTML = "";
 
         Object.entries(order.resturants).forEach(([resName, details]) => {
-
-            restaurantsHTML += `<div class="restaurant-name">${details.name}</div>`;
+            console.log(resName)
+            restaurantsHTML += `
+            
+            <div class="restaurant-name" res_id=${resName}>${details.name}</div>
+            `;
 
             Object.entries(details.items).forEach(([itemName, detail]) => {
 
@@ -178,16 +181,30 @@ document.addEventListener("click", async (e) => {
         const tokenNo = card
             .querySelector(".token-no")
             .textContent.split(": ")[1];
-
-        const res = await fetch("/update_order_user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                order_id: orderId,
-                status: "canceled",
-                user_id: userId
-            })
+        let res_ids = []
+        const reside = card.querySelectorAll(".restaurant-name")
+        // console.log(reside.getAttribute("res_id"))
+        reside.forEach(residss => {
+            console.log(residss.getAttribute("res_id"))
+            res_ids.push(residss.getAttribute("res_id"))
         })
+        console.log(res_ids)
+        socket.emit("user_cancelled_order", {
+            order_id: orderId,
+            token_no: tokenNo,
+            res_ids: res_ids, // The server uses this to target the room
+            userid: userId,
+            status: "canceled"
+        });
+        // const res = await fetch("/update_order_user", {
+        //     method: "POST",
+        //     headers: { "Content-Type": "application/json" },
+        //     body: JSON.stringify({
+        //         order_id: orderId,
+        //         status: "canceled",
+        //         user_id: userId
+        //     })
+        // })
         const data = await res.json()
         if (data.success) {
             socket.emit("user_cancelled_order", {
