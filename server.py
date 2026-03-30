@@ -6,7 +6,7 @@ app=Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route("/", methods=["GET", "POST"])
-def home():
+def land():
     return redirect(url_for('landing'))
 @app.route("/user/<userid>", methods=["GET", "POST"])
 def home(userid):
@@ -376,5 +376,5 @@ def handle_user_cancel(data):
             emit("seller_order_cancelled", data, room=res_id)
     except:
         return({"success":False})
-# if __name__ == "__main__":
-#     socketio.run(app, debug=True)
+if __name__ == "__main__":
+    socketio.run(app, debug=True)
