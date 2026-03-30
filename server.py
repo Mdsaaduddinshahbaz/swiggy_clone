@@ -376,5 +376,5 @@ def handle_user_cancel(data):
             emit("seller_order_cancelled", data, room=res_id)
     except:
         return({"success":False})
-if __name__ == "__main__":
-    socketio.run(app, debug=True)
+# if __name__ == "__main__":
+#     socketio.run(app, debug=True)
