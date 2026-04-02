@@ -2,7 +2,7 @@ const ordersList = document.getElementById("orders-list");
 const pathParts = window.location.pathname.split("/");
 const userId = pathParts[pathParts.length - 1];
 console.log(userId)
-const socket = io("http://127.0.0.1:5000");
+const socket = io("https://general-online.onrender.com");
 
 socket.on("connect", () => {
     console.log("Connected:", socket.id);

@@ -42,11 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // window.location.href = "/login";
         if (role === "user") {
           // window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
-          window.location.href = `http://127.0.0.1:5000/login/user`
+          window.location.href = `/login/user`
         }
         else {
           // window.location.href = `http://127.0.0.1:5000/seller/${data.user_id}`
-          window.location.href = `http://127.0.0.1:5000/seller/resturantSetup/${data.user_id}`
+          window.location.href = `/seller/resturantSetup/${data.user_id}`
         }
       }
       else if(!data.success){

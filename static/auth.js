@@ -58,10 +58,10 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("userId", data.user_id)
         localStorage.setItem("username", data.username)
         if (role === "user") {
-          window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
+          window.location.href = `/user/${data.user_id}`
         }
         else {
-          window.location.href = `http://127.0.0.1:5000/seller/${data.user_id}`
+          window.location.href = `/seller/${data.user_id}`
         }
       }
       else {
