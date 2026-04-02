@@ -2,7 +2,9 @@ from database import add_resturant_items,add_resturants,list_resturant_items,lis
 from flask import Flask,request,render_template,redirect,url_for
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
+from flask_cors import CORS
 app=Flask(__name__)
+CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route("/", methods=["GET", "POST"])

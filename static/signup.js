@@ -5,7 +5,7 @@
 //   console.log(BASEURL);
 //   return BASEURL
 // }
-const BASEURL="http://127.0.0.1:5000"
+// const BASEURL="http://127.0.0.1:5000"
 
 const pathParts = window.location.pathname.split("/");
 
@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const res = await fetch(`${BASEURL}/signup_user`, {
+      const res = await fetch(`/signup_user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email,username, password }),

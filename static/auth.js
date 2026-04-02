@@ -6,7 +6,7 @@
 //   return BASEURL
 // }
 // const BASEURL=loadConfig()
-const BASEURL = "http://127.0.0.1:5000"
+// const BASEURL = "http://127.0.0.1:5000"
 const pathParts = window.location.pathname.split("/");
 
 const role = pathParts[pathParts.length - 1];
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${BASEURL}/validate_user`, {
+      const res = await fetch(`/validate_user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
