@@ -169,6 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         else {
             alert("error while placing order")
+            window.location.reload()
         }
     })
     orderBtn.addEventListener("click", () => {

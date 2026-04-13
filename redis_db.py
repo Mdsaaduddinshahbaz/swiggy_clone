@@ -180,5 +180,11 @@ def update_cart_qty(uid, item_name, change):
 
     # 6. Save the updated cart back to Redis
     r.set(key, json.dumps(cart_data))
+    print("Updated Cart:")
+    for res_id, res_data in cart_data["cart"].items():
+        print(f"\nRestaurant ID: {res_id}")
+        for item, details in res_data["items"].items():
+            print(f"  Item: {item}, Qty: {details['qty']}")
     return {"success": True, "updated_cart": cart_data}
-# delete_cart("69c6ca064793b9c47f293d18")
+# delete_cart("None")
+get_cart("69dc9a0e830ee0aee697bda0")

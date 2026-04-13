@@ -9,12 +9,13 @@ function selectRole(role) {
         } // change route
       } else {
         const res_id=localStorage.getItem("res_id")
-        if (res_id){
-          window.location.href=`/seller/${res_id}`
-        }
-        else{
-          window.location.href = "/login/seller";  
-        } // change route
+        window.location.href=`/login/seller`
+        // if (res_id){
+        //   window.location.href=`/seller//${res_id}`
+        // }
+        // else{
+        //   window.location.href = "/login/seller";  
+        // } // change route
         // window.location.href = "/seller"; // change route
       }
     }

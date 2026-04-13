@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
           window.location.href = `/user/${data.user_id}`
         }
         else {
-          window.location.href = `/seller/${data.user_id}`
+          window.location.href = `/seller/${data.username}/${data.user_id}`
         }
       }
       else {

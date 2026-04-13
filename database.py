@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from bson import ObjectId
 from datetime import datetime
 import os
-from redis_db import delete_cart
+from redis_db import delete_cart,get_cart
 load_dotenv(override=True)
 api=os.getenv("MONGO_URI",None)
 client = MongoClient(api)
@@ -24,11 +24,29 @@ customer_carts=db["customer_carts"]
 orders=db["Orders"]
 seller_orders=db["seller_orders"]
 users=db["users"]
+
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
 def add_resturants(name,address,phone,owner_id,long,latt):
-    res=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
-    return str(res.inserted_id)
+    # res=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
+    with client.start_session() as session:
+        with session.start_transaction():
+
+            result=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
+            # parent_id = result.inserted_id 
+
+            # 3. Add that parent_id to every seller doc before inserting
+            owners.update_one(
+                {"_id": ObjectId(owner_id)},
+                {
+                    "$set": {
+                        "restaurant_name": name
+                    }
+                    # OR use $push if one owner can have multiple restaurants
+                },
+                session=session
+            )
+    return str(result.inserted_id )
 def add_resturant_items(resturant_id,item_name,item_qty,price):
     resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price})
 def list_resturant_items(resturant_id):
@@ -91,27 +109,58 @@ def remove_itemss(item_id):
 #     print(items)
 from datetime import datetime
 import uuid
+def normalize_cart(items):
+    print("items in normalize",items)
+    normalized = {}
 
+    for res_id, data in items.items():
+        res_name = data.get("name", "unknown")
+
+        # If items is already dict → OK
+        if isinstance(data["items"], dict):
+            normalized[res_id] = data
+
+        # If items is list → convert to dict
+        elif isinstance(data["items"], list):
+            item_dict = {}
+            for item in data["items"]:
+                item_name = item.get("name", "item")
+                item_dict[item_name] = item
+
+            normalized[res_id] = {
+                "name": res_name,
+                "items": item_dict
+            }
+
+    return normalized
 def generate_token():
     while True:
         token = str(uuid.uuid4())[:6].upper()
         
         if not orders.find_one({"token": token}):
             return token
-def store_orders(userid, items):
+def store_orders(userid):
     token = generate_token()
     # order_id = "ORD_" + str(int(datetime.utcnow().timestamp()))
 
     # ✅ 1. Insert into user_orders
-    
+    items = get_cart(userid)
+    print("items=",items)
+    if(items==None):
+        return 404
+    # ✅ normalize structure
+    # items = normalize_cart(items)
 
     # ✅ 2. Prepare seller_orders
     seller_docs = []
     res_ids=[]
     seller_inventory=[]
     current_time=datetime.utcnow()
-    print(items)
-    for res_id, data in items.items():
+    print("items in store_orders",items["cart"])
+    cart=items["cart"]
+    print("cart=",cart)
+    for res_id, data in cart.items():
+        # print(res_id,data)
         print(res_id,data)
         seller_doc = {
             # "order_id": order_id,
@@ -222,6 +271,17 @@ def check_existing_user(email,password):
         else:
             return {"success":False}
     else: return {"success":404}
+def check_existing_owner(email,password):
+    print("in existing user")
+    owner=owners.find_one({"email":email})
+    if(owner): 
+        print("in existing user if block",password)
+        if(owner["password"]==password):
+            print("in existing user if if block")
+            return ({"success":True,"userid":owner["_id"],"username":owner["username"]})
+        else:
+            return {"success":False}
+    else: return {"success":404}
 # def update_order_status_seller(order_id,status,userid):
 #     with client.start_session() as session:
 #         with session.start_transaction():
@@ -284,17 +344,21 @@ def resturant_stats(res_id):
 def return_res_analytics(res_id):
     # seller_orders.find({"restaurant_id":res_id})
     resturants_itemsss=resturants_items.find({"resturant_id":res_id})
+    print(resturants_itemsss)
     data=[]
     print(res_id)
     for items in resturants_itemsss:
-        itemss={
-            "item_name":items["item_name"],
-            "initial_qty":items["item_qty"],
-            "sold":items["sold"],
-            "remaining":items["item_qty"]
-        }
+        print("items=",items)
+        itemss = {
+        "item_name": items.get("item_name"),
+        "initial_qty": items.get("item_qty", 0),
+        "sold": items.get("sold", 0),
+        "remaining": items.get("item_qty", 0)
+    }
+        print(itemss)
         data.append(itemss)
         print(data)
+    print("data in res_analytics",data)
     return data
 
 # get_orders("69a959defa10620eb63cf31d")

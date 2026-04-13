@@ -114,28 +114,33 @@ async function loadOrders() {
 
     data.orders.forEach(order => {
         console.log(order)
+        const cart = order.resturants.cart;
+        console.log(cart)
         let total = 0;
 
         let restaurantsHTML = "";
+        
+        Object.entries(cart).forEach(([resId, blabla]) => {
+            console.log("Restaurant:", blabla);
 
-        Object.entries(order.resturants).forEach(([resName, details]) => {
-            console.log(resName)
             restaurantsHTML += `
-            
-            <div class="restaurant-name" res_id=${resName}>${details.name}</div>
-            `;
+        <div class="restaurant-name" res_id=${resId}>
+            ${blabla.name}
+        </div>
+    `;
 
-            Object.entries(details.items).forEach(([itemName, detail]) => {
+            Object.entries(blabla.items).forEach(([itemName, item]) => {
+                console.log("Item:", itemName, item);
 
-                const itemTotal = detail.price * detail.qty;
+                const itemTotal = item.price * item.qty;
                 total += itemTotal;
 
                 restaurantsHTML += `
-                    <div class="item">
-                        <span>${itemName} x ${detail.qty}</span>
-                        <span>₹${itemTotal}</span>
-                    </div>
-                `;
+            <div class="item">
+                <span>${itemName} x ${item.qty}</span>
+                <span>₹${itemTotal}</span>
+            </div>
+        `;
             });
         });
 

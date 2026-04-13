@@ -1,7 +1,8 @@
 document.addEventListener("DOMContentLoaded", async () => {
     const path = window.location.pathname
     const res_id = path.split("/")[4]
-    const resname=path.split("/")[3]
+    const ressname=path.split("/")[3]
+    const resname=decodeURIComponent(ressname);
     console.log(res_id)
     // const res_id = localStorage.getItem("res_id")
     const menu_items_container = document.getElementById("menu_container")
