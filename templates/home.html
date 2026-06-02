@@ -14,8 +14,16 @@
     <header class="navbar">
         <div class="nav-container">
             <div class="left-nav">
-                <img src="../static/logo2.png"
-                    alt="Swiggy Logo" class="logo">
+                <img src="../static/logo2.png" alt="Swiggy Logo" class="logo">
+                <div id="distancediv">
+                    <select name="distance" id="distance_options">
+                        <option value="5">5km</option>
+                        <option value="10">10km</option>
+                        <option value="20">20km</option>
+                        <option value="30">30km</option>
+                        <option value="50">50km</option>
+                    </select>
+                </div>
             </div>
             <nav class="right-nav">
                 <ul>
@@ -33,7 +41,7 @@
     <main class="container">
 
         <section class="filters">
-            <h2>Restaurants with online food delivery in Hyderabad</h2>
+            <h2 id="Note">Restaurants with online food delivery in Hyderabad</h2>
         </section>
 
         <section class="restaurant-grid" id="resturants_container">
@@ -98,6 +106,27 @@
             </button>
         </div>
     </main>
+    <div class="access_container" id="deny">
+        <div class="icon">📍</div>
+
+        <h1>Location Access Required</h1>
+
+        <p style="color: #666;
+    line-height: 1.6;
+    margin-bottom: 25px;">
+            We use your location to find nearby restaurants and provide
+            accurate distance-based results.
+        </p>
+
+        <button onclick="window.location.reload()">
+            Allow Location Access
+        </button>
+
+        <div class="help-text">
+            If you previously denied access, enable location permissions
+            in your browser settings and refresh the page.
+        </div>
+    </div>
     <script src="../static/home.js"></script>
 </body>
 

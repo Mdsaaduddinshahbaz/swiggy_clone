@@ -78,7 +78,7 @@ def update_resturant_item(item_id,name,price):
 #         res_names[r["name"]]=str(r["_id"])
 #         # res_names.append(r["name"])
 #     return res_names
-def list_resturants(long,latt):
+def list_resturants(long,latt,dist:int=5):
     restaurants = restaurants_name.find({
         "location": {
             "$near": {
@@ -86,7 +86,7 @@ def list_resturants(long,latt):
                     "type": "Point",
                     "coordinates": [long,latt]
                 },
-                "$maxDistance": 5000
+                "$maxDistance": dist*1000
             }
         }
     })

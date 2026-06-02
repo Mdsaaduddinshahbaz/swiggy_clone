@@ -61,7 +61,9 @@ def list_resturantss():
         data=request.get_json()
         latt=data["latt"]
         long=data["long"]
-        res=list_resturants(long,latt)
+        dist=data["dist"]
+        dist=int(dist)
+        res=list_resturants(long,latt,dist)
         return ({"success":True,"results":res})
     except:
         return({"success":False})
@@ -148,18 +150,17 @@ def seller_page(name,seller_id):
         return({"success":False})
 @app.post("/store_orders")
 def store_order():
-    # try:
-    data=request.get_json()
-    user_id=data["user_id"]
-    items=data["items"]
-    resids=store_orders(user_id)
-    if(resids==404):
+    try:
+        data=request.get_json()
+        user_id=data["user_id"]
+        resids=store_orders(user_id)
+        if(resids==404):
+            return({"success":False})
+        for resid in resids:
+            socketio.emit("new_order", {"msg": "refresh"}, room=resid)
+        return ({"success":True})
+    except:
         return({"success":False})
-    for resid in resids:
-        socketio.emit("new_order", {"msg": "refresh"}, room=resid)
-    return ({"success":True})
-    # except:
-    #     return({"success":False})
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:
@@ -374,7 +375,6 @@ def return_seller_stats():
         data=request.get_json()
         res_id=data["res_id"]
         stats=return_res_analytics(res_id)
-        print("stats=",stats)
         return({"success":True,"stats":stats})
     except:
         return({"success":False})

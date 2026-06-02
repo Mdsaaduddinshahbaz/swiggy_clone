@@ -13,9 +13,9 @@ const role = pathParts[pathParts.length - 1];
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector("form")
   const inputs = form.querySelectorAll("input");
-  const signupBtn=document.getElementById("signupBtn")
-  signupBtn.addEventListener("click",()=>{
-    window.location.href=`/signup/${role}`
+  const signupBtn = document.getElementById("signupBtn")
+  signupBtn.addEventListener("click", () => {
+    window.location.href = `/signup/${role}`
   })
   let formData = {};
 
@@ -42,31 +42,54 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`/validate_user`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      if (role === "user") {
+        console.log("hello")
+        const res = await fetch(`/validate_user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
 
-      const data = await res.json();
-      console.log(data.success)
-      if (data.success === "not found") {
-        alert("user credentials not found")
-      }
-      else if (data.success) {
-        alert(data.message || "Welcome!");
-        localStorage.setItem("userId", data.user_id)
-        localStorage.setItem("username", data.username)
-        if (role === "user") {
+        const data = await res.json();
+        console.log(data.success)
+        if (data.success === "not found") {
+          alert("user credentials not found")
+        }
+        else if (data.success) {
+          alert(data.message || "Welcome!");
+          localStorage.setItem("userId", data.user_id)
+          localStorage.setItem("username", data.username)
           window.location.href = `/user/${data.user_id}`
+          // else {
+          //   window.location.href = `/seller/${data.username}/${data.user_id}`
+          // }
         }
         else {
-          window.location.href = `/seller/${data.username}/${data.user_id}`
+          alert("username or password is wrong")
         }
       }
       else {
-        alert("username or password is wrong")
+        console.log("hello")
+        const res = await fetch(`/validate_owner`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+
+        const data = await res.json();
+        console.log(data.success)
+        if (data.success === "not found") {
+          alert("user credentials not found")
+        }
+        else if (data.success) {
+          alert(data.message || "Welcome!");
+          window.location.href = `/seller/${data.username}/${data.user_id}`
+        }
+        else {
+          alert("username or password is wrong")
+        }
       }
+
     } catch (err) {
       console.error("Error submitting form:", err);
       alert("Something went wrong!");
