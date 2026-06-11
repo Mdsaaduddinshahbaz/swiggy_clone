@@ -14,10 +14,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     select_options.addEventListener("change", async (e) => {
         console.log(e.target.value)
         console.log(userLocation)
+        const storedLocation = JSON.parse(
+            localStorage.getItem("userLocation")
+        );
         res = await fetch("/list_resturants", {
             method: "POST",
             "headers": { "Content-Type": "application/json" },
-            body: JSON.stringify({ "latt": userLocation.latt, "long": userLocation.long, "dist": e.target.value })
+            body: JSON.stringify({ "latt": storedLocation.latt, "long": storedLocation.long, "dist": e.target.value })
             // body: JSON.stringify({ "latt": 17.38172489515112, "long": 78.4916357577191 })
         })
         const data = await res.json()
@@ -63,7 +66,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         userLatt = position.coords.latitude;
         userLong = position.coords.longitude;
         console.log("Location acquired:", userLatt, userLong);
+        // userLocation = { latt: userLatt, long: userLong }
         userLocation = { latt: userLatt, long: userLong }
+        localStorage.setItem("userLocation", JSON.stringify(location));
         const userId = pathParts[pathParts.length - 1];
         console.log(userId)
         res = await fetch("/list_resturants", {
