@@ -17,12 +17,8 @@ body{
     align-items: center;
 }
 .right-nav{
-        margin-left: 50%;
         align-content: center;
 
-}
-.navbar{
-    display: flex;
 }
 .cart-container {
     max-width: 1100px;
@@ -172,9 +168,36 @@ body{
     cursor: pointer;
 }
 
+.nav-container{
+    display: flex;
+    justify-content: space-between;
+}
+
 /* Mobile View for Cart */
 @media (max-width: 900px) {
     .cart-container {
         flex-direction: column;
+    }
+}
+
+@media (max-width:277px) {
+    .nav-container{
+        display: block;
+    }
+
+    #orderBtn{
+        cursor: pointer;
+        align-self: center;
+        justify-self: center;
+        margin-top: 17px;
+    }
+    .cart-container{
+        margin-top: 62px;
+    }
+    .checkout-card{
+        display: block;
+    }
+    .step-header{
+        gap: unset;
     }
 }
