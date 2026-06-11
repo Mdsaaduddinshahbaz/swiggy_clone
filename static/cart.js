@@ -22,28 +22,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     let restaurants = {}
     if (data.success) {
         console.log(data.results)
-        // heading.innerText = data.results.ress_name
-        // Object.entries(data.results.cart).forEach(([name, details]) => {
-        //     console.log(name);        // biryani
-        //     console.log(details);     // {price: 40, qty: 1}
-
-        //     console.log(details.price); // 40
-        //     console.log(details.qty);   // 1
-        //     cart_items_container.innerHTML +=
-        //         `
-        //     <div class="cart-item">
-        //                 <span class="veg-icon"><i class="fa-regular fa-circle-stop"></i></span>
-        //                 <span class="item-name">${name}</span>
-        //                 <div class="quantity-control">
-        //                     <button>-</button>
-        //                     <span>${details.qty}</span>
-        //                     <button>+</button>
-        //                 </div>
-        //                 <span class="item-price">${details.price * details.qty}</span>
-        //             </div>
-        //     `
-
-        // });
         restaurants = data.results.cart;
         let total = 0;
         Object.entries(restaurants).forEach(([resName, details]) => {
@@ -87,13 +65,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             const itemId = itemRow.id; // Or itemRow.getAttribute('id')
             const itemName = itemRow.querySelector('.item-name').textContent;
             const item_qty = itemRow.querySelector('.item_qty');
-            const item_price=itemRow.querySelector('.item-price');
-            const unit_price=itemRow.querySelector('.unit-price');
+            const item_price = itemRow.querySelector('.item-price');
+            const unit_price = itemRow.querySelector('.unit-price');
             let currentQty = parseInt(item_qty.textContent);
-            let currentPrice=parseInt(item_price.textContent);
-            let unitprice=parseInt(unit_price.textContent);
-            let totalprice=parseInt(totalPrice.textContent);
-            let topay=parseInt(toPay.textContent);
+            let currentPrice = parseInt(item_price.textContent);
+            let unitprice = parseInt(unit_price.textContent);
+            let totalprice = parseInt(totalPrice.textContent);
+            let topay = parseInt(toPay.textContent);
             console.log(item_qty.textContent)
             // 3. Determine the action
             if (e.target.classList.contains('increase')) {
@@ -106,17 +84,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                 })
                 const data = await res.json()
                 if (data.success) {
-                    console.log(data,currentQty)
+                    console.log(data, currentQty)
                     item_qty.innerText = currentQty + 1;
-                    item_price.innerText=currentPrice + unitprice;
-                    totalPrice.innerText=totalprice+unitprice;
-                    toPay.innerText=topay+unitprice;
+                    item_price.innerText = currentPrice + unitprice;
+                    totalPrice.innerText = totalprice + unitprice;
+                    toPay.innerText = topay + unitprice;
                 }
                 else {
                     alert("failed adding item")
                 }
                 // Call your update function here
             } else if (e.target.classList.contains('reduce')) {
+
                 console.log(`Reducing: ${itemName} (ID: ${itemId})`);
                 // Call your update function here
                 const res = await fetch("/update_cart", {
@@ -130,13 +109,28 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (currentQty > 1) {
                         // Correctly decrement the number
                         item_qty.textContent = currentQty - 1;
-                        item_price.innerText=currentPrice - unitprice;
-                        totalPrice.innerText=totalprice-unitprice;
-                        toPay.innerText=topay-unitprice;
+                        item_price.innerText = currentPrice - unitprice;
+                        totalPrice.innerText = totalprice - unitprice;
+                        toPay.innerText = topay - unitprice;
                     }
                     else {
+                        totalPrice.innerText = totalprice - unitprice;
+                        toPay.innerText = topay - unitprice;
                         // If it hits 0, remove the element from the cart UI
+                        const prevHeading = itemRow.previousElementSibling;
+
+                        // Check if this is the last item under the heading
+                        const nextSibling = itemRow.nextElementSibling;
+
                         itemRow.remove();
+
+                        if (
+                            prevHeading &&
+                            prevHeading.tagName === "H2" &&
+                            (!nextSibling || nextSibling.tagName === "H2")
+                        ) {
+                            prevHeading.remove();
+                        }
                     }
                 }
                 else {
@@ -146,6 +140,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
     placeorder.addEventListener("click", async () => {
+        const remainingItems = document.querySelectorAll(".cart-item");
+
+        if (remainingItems.length === 0) {
+            alert("Your cart is empty");
+            return;
+        }
         console.log(restaurants)
 
         const res = await fetch("/store_orders", {

@@ -1,7 +1,7 @@
 /* Restaurant Page Specifics */
 .menu-container {
     max-width: 800px; /* Menu pages are narrower in Swiggy's design */
-    margin: 100px auto 50px;
+    margin: 62px auto 50px;
     padding: 0 20px;
 }
 
@@ -145,7 +145,12 @@ body{
     color: white;
     background-color: #3d4152;
 }
-
+#loading{
+    display: flex;
+    height: 100px;
+    align-self: center;
+    justify-self: center;
+}
 .right-nav ul {
     display: flex;
     list-style: none;
@@ -160,6 +165,35 @@ body{
     align-items: center;
 }
 
-.fa-solid{
-    margin-right: 10px;
+#cart{
+    height: 62px;
+}
+@media (max-width: 768px) {
+    .right-nav ul {
+        justify-content: space-between;
+    }
+    .right-nav li{
+        /* margin-left: 0; */
+        display: block;
+
+    }
+
+    .right-nav ul{
+        justify-content: space-between;
+    }
+}
+.nav-container{
+    display: flex;
+    justify-content: space-between;
+}
+@media (max-width:280px) {
+    .right-nav li{
+        margin-left: 0px;
+
+    }
+}
+@media (max-width:417px) {
+    .nav-container{
+        display: block;
+    }
 }

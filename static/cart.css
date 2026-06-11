@@ -5,11 +5,20 @@
     font-size: 16px;
     color: white;
 }
+.logo {
+    height: 62px;
+    transition: transform 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
 body{
     background-color: #3d4152;
 }
+.left-nav{
+    display: flex;
+    align-items: center;
+}
 .right-nav{
         margin-left: 50%;
+        align-content: center;
 
 }
 .navbar{

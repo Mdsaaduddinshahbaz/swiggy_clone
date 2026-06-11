@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const select_options = document.getElementById("distance_options")
     const access_denied_container = document.getElementById("deny")
     const Note=document.getElementById("Note")
+    const loading=document.getElementById("loading")
     let position = null
     let userLocation = null;
     userLatt = null
@@ -61,16 +62,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     })
     try {
-        position = await getPosition();
+        // position = await getPosition();
         console.log(position)
-        userLatt = position.coords.latitude;
-        userLong = position.coords.longitude;
+        const fetchlocation= JSON.parse(
+            localStorage.getItem("userLocation")
+        );
+        console.log(fetchlocation)
+        if(fetchlocation===null){
+            console.log("fetch=false")
+            position = await getPosition();
+            userLatt = position.coords.latitude;
+            userLong = position.coords.longitude;
+            console.log(userLatt,userLong)
+        }
+        else{
+            userLatt = fetchlocation.latt
+            userLong = fetchlocation.long;
+        }
+        // console.log(fetchlocation.latt)
+        console.log(userLatt,userLong)
         console.log("Location acquired:", userLatt, userLong);
         // userLocation = { latt: userLatt, long: userLong }
         userLocation = { latt: userLatt, long: userLong }
-        localStorage.setItem("userLocation", JSON.stringify(location));
+        localStorage.setItem("userLocation", JSON.stringify(userLocation));
         const userId = pathParts[pathParts.length - 1];
         console.log(userId)
+        loading.style.visibility="block"
         res = await fetch("/list_resturants", {
             method: "POST",
             "headers": { "Content-Type": "application/json" },
@@ -79,6 +96,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         })
         const data = await res.json()
         if (data.success) {
+            loading.style.display="none"
             Note.style.display="block"
             console.log(data)
             if (!data.results || Object.keys(data.results).length === 0) {
@@ -141,8 +159,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             window.location.href = `/orders/${userId}`
         })
     }
-    catch {
-        console.log("access denied", position)
+    catch (e){
+        console.log("access denied", e)
         access_denied_container.style.visibility = "visible"
         Note.style.display="none"
     }

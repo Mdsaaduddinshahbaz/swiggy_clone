@@ -113,6 +113,12 @@ body {
     align-items: center;
 }
 
+#loading{
+    display: flex;
+    height: 100px;
+    align-self: center;
+    justify-self: center;
+}
 .right-nav li i {
     margin-right: 10px;
 }

@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const heading = res_info.querySelector("h1");
     const res_location = res_info.querySelector(".res-location");
     const breadcrump= document.querySelector(".breadcrumbs")
+    const loading=document.getElementById("loading")
     breadcrump.innerText=`Home / ${addresss_decoded} / ${decoded}`
     res_location.innerText=addresss_decoded
     // const pathParts = window.location.pathname.split("/");
@@ -29,6 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const data = await res.json()
     if (data.success) {
+        loading.style.display="none"
         console.log(data)
         // res_info.closest("h1").innerText = name
         Object.entries(data.res).forEach(([name, item]) => {
