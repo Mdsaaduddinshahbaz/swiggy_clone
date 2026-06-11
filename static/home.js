@@ -6,8 +6,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const no_results_container = document.getElementById("no-results-container")
     const select_options = document.getElementById("distance_options")
     const access_denied_container = document.getElementById("deny")
-    const Note=document.getElementById("Note")
-    const loading=document.getElementById("loading")
+    const Note = document.getElementById("Note")
+    const loading = document.getElementById("loading")
+    const request_location = document.getElementById("requestlocation")
     let position = null
     let userLocation = null;
     userLatt = null
@@ -64,30 +65,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         // position = await getPosition();
         console.log(position)
-        const fetchlocation= JSON.parse(
+        const fetchlocation = JSON.parse(
             localStorage.getItem("userLocation")
         );
         console.log(fetchlocation)
-        if(fetchlocation===null){
+        if (fetchlocation === null) {
             console.log("fetch=false")
             position = await getPosition();
             userLatt = position.coords.latitude;
             userLong = position.coords.longitude;
-            console.log(userLatt,userLong)
+            console.log(userLatt, userLong)
         }
-        else{
+        else {
             userLatt = fetchlocation.latt
             userLong = fetchlocation.long;
         }
         // console.log(fetchlocation.latt)
-        console.log(userLatt,userLong)
+        console.log(userLatt, userLong)
         console.log("Location acquired:", userLatt, userLong);
         // userLocation = { latt: userLatt, long: userLong }
         userLocation = { latt: userLatt, long: userLong }
         localStorage.setItem("userLocation", JSON.stringify(userLocation));
         const userId = pathParts[pathParts.length - 1];
         console.log(userId)
-        loading.style.visibility="block"
+        loading.style.visibility = "visible"
         res = await fetch("/list_resturants", {
             method: "POST",
             "headers": { "Content-Type": "application/json" },
@@ -96,8 +97,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         })
         const data = await res.json()
         if (data.success) {
-            loading.style.display="none"
-            Note.style.display="block"
+            loading.style.display = "none"
+            Note.style.display = "block"
             console.log(data)
             if (!data.results || Object.keys(data.results).length === 0) {
                 console.log("Empty");
@@ -159,10 +160,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             window.location.href = `/orders/${userId}`
         })
     }
-    catch (e){
+    catch (e) {
         console.log("access denied", e)
         access_denied_container.style.visibility = "visible"
-        Note.style.display="none"
+        Note.style.display = "none"
     }
     // position = await getPosition();
     // userLatt = position.coords.latitude;
@@ -195,7 +196,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     //             display_resturants.innerHTML +=
     //                 `<div class="card" id=${detail.res_id}>
     //             <div class="card-img">
-                    
+
     //                 <img src="../static/food.jpg">
     //                 <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
     //             </div>
@@ -239,6 +240,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     //     console.log(userid)
     //     window.location.href = `/orders/${userId}`
     // })
+    request_location.addEventListener("click", async () => {
+        try {
+            const position = await getPosition();
+
+            const userLocation = {
+                latt: position.coords.latitude,
+                long: position.coords.longitude
+            };
+
+            localStorage.setItem(
+                "userLocation",
+                JSON.stringify(userLocation)
+            );
+
+            location.reload();
+        } catch (err) {
+            console.log(err);
+        }
+    });
 })
 function getPosition() {
     return new Promise((resolve, reject) => {
@@ -247,4 +267,15 @@ function getPosition() {
         }
         navigator.geolocation.getCurrentPosition(resolve, reject);
     });
+}
+function requestLocation() {
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            console.log(position);
+            location.reload();
+        },
+        error => {
+            console.log(error);
+        }
+    );
 }
