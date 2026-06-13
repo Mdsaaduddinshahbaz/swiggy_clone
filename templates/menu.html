@@ -17,8 +17,11 @@
                 <img src="{{ url_for('static', filename='logo2.png') }}" alt="MENU" id="cart">
             </div>
             <nav class="right-nav">
+                <div class="search-container" id="searchContainer">
+                    <input type="text" id="searchInput" placeholder="Search Resturant name...." id="search" />
+                </div>
                 <ul>
-                    <li><i class="fa-solid fa-magnifying-glass"></i> Search</li>
+                    <li id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i> Search</li>
                     <li id="orderBtn"><i class="fa-solid fa-cart-shopping" ></i> Orders</li>
                     <li id="cartBtn"><i class="fa-solid fa-cart-shopping" ></i> Cart</li>
                 </ul>

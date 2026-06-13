@@ -53,20 +53,20 @@ body {
 
 /* Header Styling */
 .navbar {
-    height: 80px;
+    /* height: 80px; */
     box-shadow: 0 15px 40px -20px rgba(40, 44, 63, .15);
-    position: fixed;
+    position: sticky;
     top: 0;
     width: 100%;
     /* background: #fff; */
     z-index: 1000;
-    display: flex;
+    /* display: flex; */
     align-items: center;
     background: dimgray;
 }
 
 .nav-container {
-    max-width: 1200px;
+    /* max-width: 1200px; */
     margin: 0 auto;
     width: 100%;
     display: flex;
@@ -138,8 +138,8 @@ body {
 
 /* Main Layout */
 .container {
-    margin-top: 100px;
-    max-width: 1200px;
+    /* margin-top: 100px; */
+    /* max-width: 1200px; */
     margin-left: auto;
     margin-right: auto;
     padding: 20px;
@@ -283,10 +283,247 @@ button:hover {
     }
 }
 
-@media (max-width:250px) {
-    
+@media (max-width: 350px) {
+    .filters{
+        display: block !important;
+        margin-bottom: 17px;
+    }
 }
 
+@media (max-width:190px) {
+    .left-nav{
+        display: block;
+    }
+}
+
+@media (max-width:245px) {
+    .right-nav ul{
+        display: block;
+    }
+    #distancediv{
+        margin-left: 0;
+    }
+}
 #no-results-container {
     display: none;
+}
+
+
+
+
+
+
+
+#searchBtn {
+    cursor: pointer;
+    list-style: none;
+}
+
+.search-container {
+    width: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    /* margin-top: 10px;
+    max-width: 500px;
+    margin: 10px auto; */
+    box-sizing: border-box;
+}
+
+.search-container.active {
+    width: 236px;
+    margin-top: 10px;
+    max-width: 500px;
+    margin: 10px auto;
+    /* padding: 12px 15px; */
+}
+
+.search-container.active input{
+    padding: 12px 15px;
+}
+
+.search-container input {
+    /* padding: 12px 15px; */
+    border: 2px solid #ddd;
+    border-radius: 30px;
+    outline: none;
+    font-size: 16px;
+    transition: 0.3s;
+}
+
+.search-container input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.2);
+}
+
+#searchBtn{
+    margin-left: 0;
+}
+
+
+
+
+.location-box {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%) scale(.95);
+    width: 100%;
+    max-width: 550px;
+
+    padding: 20px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 15px 40px rgba(0,0,0,.15);
+
+    opacity: 0;
+    visibility: hidden;
+
+    transition:
+        opacity .25s ease,
+        transform .25s ease,
+        visibility .25s;
+}
+
+.location-box.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) scale(1);
+}
+
+.location-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.location-header i {
+    color: #ff5200;
+}
+
+.location-search {
+    display: flex;
+    align-items: center;
+    border: 2px solid #eee;
+    border-radius: 12px;
+    padding: 12px 15px;
+    transition: 0.3s;
+}
+
+.location-search:focus-within {
+    border-color: #ff5200;
+}
+
+.location-search i {
+    color: #666;
+    margin-right: 10px;
+}
+
+.location-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 15px;
+}
+
+.live-location-btn {
+    width: 100%;
+    margin-top: 12px;
+    border: none;
+    padding: 12px;
+    border-radius: 12px;
+    background: #ff5200;
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.live-location-btn:hover {
+    opacity: 0.95;
+}
+
+#suggestions {
+    margin-top: 12px;
+}
+
+
+
+.suggestion-item {
+    color: black;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px;
+    cursor: pointer;
+}
+
+.suggestion-item:hover {
+    background: #f5f5f5;
+}
+
+.location-title {
+    font-weight: 600;
+    color: black;
+}
+
+.location-subtitle {
+    font-size: 14px;
+    color: #666;
+}
+
+.nav-location {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: 12px;
+    transition: all .25s ease;
+}
+
+.nav-location:hover {
+    background: #f5f5f5;
+}
+
+.location-label {
+    display: block;
+    font-size: 11px;
+    color: #888;
+}
+
+#navLocation {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.location-overlay {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0,0,0,.15);
+    backdrop-filter: blur(3px);
+
+    opacity: 0;
+    visibility: hidden;
+    transition: .25s;
+
+    z-index: 99;
+}
+
+.location-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.location-box {
+    z-index: 100;
 }

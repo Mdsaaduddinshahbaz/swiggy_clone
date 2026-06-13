@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const Note = document.getElementById("Note")
     const loading = document.getElementById("loading")
     const request_location = document.getElementById("requestlocation")
+    const currentAddress = document.getElementById("currentAddress")
     let position = null
     let userLocation = null;
     userLatt = null
@@ -65,6 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         // position = await getPosition();
         console.log(position)
+        
         const fetchlocation = JSON.parse(
             localStorage.getItem("userLocation")
         );
@@ -83,6 +85,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         // console.log(fetchlocation.latt)
         console.log(userLatt, userLong)
         console.log("Location acquired:", userLatt, userLong);
+        const address = await reverseGeocode(
+            userLatt,
+            userLong
+        );
+
+        console.log(address);
+        currentAddress.textContent = address
+
         // userLocation = { latt: userLatt, long: userLong }
         userLocation = { latt: userLatt, long: userLong }
         localStorage.setItem("userLocation", JSON.stringify(userLocation));
@@ -259,6 +269,147 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.log(err);
         }
     });
+
+
+
+
+
+    const searchBtn = document.getElementById("searchBtn");
+    const searchContainer = document.getElementById("searchContainer");
+
+    searchBtn.addEventListener("click", () => {
+        searchContainer.style.display="block"
+        searchContainer.classList.toggle("active");
+
+        if (searchContainer.classList.contains("active")) {
+            searchContainer.querySelector("input").focus();
+        }
+    });
+    const searchInput = document.getElementById("searchInput");
+
+    searchInput.addEventListener("input", () => {
+        const searchTerm = searchInput.value.toLowerCase();
+
+        const cards = document.querySelectorAll(".card");
+
+        cards.forEach(card => {
+            const restaurantName = card
+                .querySelector(".resturant_name")
+                .textContent
+                .toLowerCase();
+
+            if (restaurantName.includes(searchTerm)) {
+                card.style.display = "block";
+            } else {
+                card.style.display = "none";
+            }
+        });
+    });
+
+
+
+
+    const input = document.getElementById("addressInput");
+    const suggestions = document.getElementById("suggestions");
+
+    let timeout;
+
+    input.addEventListener("input", () => {
+        clearTimeout(timeout);
+
+        timeout = setTimeout(async () => {
+            const query = input.value.trim();
+
+            if (query.length < 3) {
+                suggestions.innerHTML = "";
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                        query + ", Hyderabad"
+                    )}&countrycodes=in&addressdetails=1&limit=5`
+                );
+
+                const results = await response.json();
+                console.log(results)
+                suggestions.innerHTML = results
+                    .map(place => {
+
+                        const displayParts = place.display_name.split(",");
+
+                        const title = displayParts[0].trim(); // Noor Masjid
+                        const subtitle = displayParts.slice(1, 3).join(", "); // Malakpet, Hyderabad
+
+                        return `
+            <div class="suggestion-item"
+                 data-lat="${place.lat}"
+                 data-lon="${place.lon}"
+                 data-address="${title + "," + subtitle}">
+                <i class="fa-solid fa-location-dot"></i>
+                <div>
+                    <div class="location-title">${title}</div>
+                    <div class="location-subtitle">${subtitle}</div>
+                </div>
+            </div>
+        `;
+                    })
+                    .join("");
+
+            } catch (err) {
+                console.error(err);
+                suggestions.innerHTML =
+                    "<div class='suggestion-item'>Unable to fetch locations</div>";
+            }
+        }, 300); // wait 300ms after typing stops
+    });
+
+
+
+
+
+
+
+
+    const trigger = document.getElementById("locationTrigger");
+    const box = document.getElementById("locationBox");
+    const overlay = document.getElementById("locationOverlay");
+
+    trigger.addEventListener("click", () => {
+        box.classList.add("show");
+        overlay.classList.add("show");
+
+        document.getElementById("addressInput").focus();
+    });
+
+    overlay.addEventListener("click", () => {
+        box.classList.remove("show");
+        overlay.classList.remove("show");
+    });
+
+
+
+    suggestions.addEventListener("click", (e) => {
+        const item = e.target.closest(".suggestion-item");
+        if (!item) return;
+
+        document.getElementById("currentAddress").textContent =
+            item.dataset.address;
+
+        localStorage.setItem(
+            "selectedAddress",
+            item.dataset.address
+        );
+
+        box.classList.remove("show");
+        overlay.classList.remove("show");
+
+        const latti = parseFloat(item.dataset.lat);
+        const longi = parseFloat(item.dataset.lon);
+        console.log(latti,longi)
+        change(latti,longi)
+    });
 })
 function getPosition() {
     return new Promise((resolve, reject) => {
@@ -278,4 +429,134 @@ function requestLocation() {
             console.log(error);
         }
     );
+}
+
+
+async function reverseGeocode(lat, lon) {
+    const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+    );
+
+    const data = await response.json();
+
+    const address = data.address;
+
+    return `${address.suburb || ""}, ${address.city || address.town || ""}`;
+}
+
+async function change(latt,long) {
+    const display_resturants = document.getElementById("resturants_container")
+    const cartBtn = document.getElementById("cartBtn")
+    const orderBtn = document.getElementById("orderBtn")
+    const pathParts = window.location.pathname.split("/");
+    const no_results_container = document.getElementById("no-results-container")
+    const select_options = document.getElementById("distance_options")
+    const access_denied_container = document.getElementById("deny")
+    const Note = document.getElementById("Note")
+    const loading = document.getElementById("loading")
+    const request_location = document.getElementById("requestlocation")
+    const currentAddress = document.getElementById("currentAddress")
+    try {
+        console.log(typeof(latt))
+        typeof(latt)
+        userLatt = latt
+        userLong = long
+        // console.log(fetchlocation.latt)
+        console.log(userLatt, userLong)
+        console.log("Location acquired:", userLatt, userLong);
+        const address = await reverseGeocode(
+            userLatt,
+            userLong
+        );
+
+        console.log(address);
+        currentAddress.textContent = address
+
+        // userLocation = { latt: userLatt, long: userLong }
+        userLocation = { latt: userLatt, long: userLong }
+        localStorage.setItem("userLocation", JSON.stringify(userLocation));
+        const userId = pathParts[pathParts.length - 1];
+        console.log(userId)
+        loading.style.visibility = "visible"
+        res = await fetch("/list_resturants", {
+            method: "POST",
+            "headers": { "Content-Type": "application/json" },
+            body: JSON.stringify({ "latt": userLatt, "long": userLong, "dist": 5 })
+            // body: JSON.stringify({ "latt": 17.38172489515112, "long": 78.4916357577191 })
+        })
+        const data = await res.json()
+        console.log(data)
+        if (data.success) {
+            loading.style.display = "none"
+            Note.style.display = "block"
+            console.log(data)
+            if (!data.results || Object.keys(data.results).length === 0) {
+                console.log("Empty");
+                no_results_container.style.display = "block";
+                display_resturants.innerHTML=""
+            }
+            else {
+                console.log(data.results)
+                // Object.entries(data.results).forEach(([name, id]) => {
+                //     console.log(name, id)
+                // })
+                display_resturants.innerHTML=""
+                no_results_container.style.display = "none";
+                Object.entries(data.results).forEach(([name, detail]) => {
+                    // console.log(element)
+                    console.log(detail)
+                    display_resturants.innerHTML +=
+                        `<div class="card" id=${detail.res_id}>
+                <div class="card-img">
+                    
+                    <img src="../static/food.jpg">
+                    <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
+                </div>
+                <div class="card-details">
+                    <h3 class="resturant_name" >${name}</h3>
+                    <p class="rating"><i class="fa-solid fa-circle-star"></i> 4.2 • 25-30 mins</p>
+                    <p class="cuisine">Burgers, American</p>
+                    <p class="area">${detail.address}</p>
+                </div>
+            </div>`
+                });
+            }
+        }
+        else {
+            alert("error loading resturants")
+        }
+        display_resturants.addEventListener("click", function (e) {
+
+            const card = e.target.closest(".card")
+            const res_id = card.getAttribute("id")
+            if (card) {
+                console.log("Card clicked")
+                // console.log(card)
+                const name = card.querySelector(".resturant_name").textContent
+                const addresss = card.querySelector(".area").textContent
+                console.log(name)
+
+                window.location.href = `/menu/${name}/${addresss}/${res_id}`
+            }
+
+        })
+        cartBtn.addEventListener("click", () => {
+            console.log("clicked")
+            const userid = localStorage.getItem("userId")
+            console.log(userid)
+            window.location.href = `/cart/${userId}`
+        })
+        orderBtn.addEventListener("click", () => {
+            console.log("clicked")
+            const userid = localStorage.getItem("userId")
+            console.log(userid)
+            window.location.href = `/orders/${userId}`
+        })
+    }
+    catch (e) {
+        console.log("access denied",e)
+        // Note.style.display = "none"
+        access_denied_container.style.visibility = "visible"
+        Note.style.display = "none"
+    }
 }

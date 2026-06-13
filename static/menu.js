@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const res_name = path.split("/")[2]
     console.log(res_name)
     const decoded = decodeURIComponent(res_name);
-    const addresss_decoded=decodeURIComponent(addresss);
+    const addresss_decoded = decodeURIComponent(addresss);
     const menu_items_container = document.getElementById("menu_container")
     const cartBtn = document.getElementById("cartBtn")
     const orderBtn = document.getElementById("orderBtn")
@@ -13,10 +13,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const res_info = document.querySelector(".res-info");
     const heading = res_info.querySelector("h1");
     const res_location = res_info.querySelector(".res-location");
-    const breadcrump= document.querySelector(".breadcrumbs")
-    const loading=document.getElementById("loading")
-    breadcrump.innerText=`Home / ${addresss_decoded} / ${decoded}`
-    res_location.innerText=addresss_decoded
+    const breadcrump = document.querySelector(".breadcrumbs")
+    const loading = document.getElementById("loading")
+    breadcrump.innerText = `Home / ${addresss_decoded} / ${decoded}`
+    res_location.innerText = addresss_decoded
     // const pathParts = window.location.pathname.split("/");
 
     // // const userId = pathParts[pathParts.length - 1];
@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const data = await res.json()
     if (data.success) {
-        loading.style.display="none"
+        loading.style.display = "none"
         console.log(data)
         // res_info.closest("h1").innerText = name
         Object.entries(data.res).forEach(([name, item]) => {
@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(userid)
         window.location.href = `/cart/${userid}`
     })
-    orderBtn.addEventListener("click",()=>{
+    orderBtn.addEventListener("click", () => {
         console.log("clicked")
         const userid = localStorage.getItem("userId")
         console.log(userid)
@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const item = e.target.closest(".menu-item");
             const names = item.querySelector("h3").innerText;
             const price = item.querySelector(".price").innerText;
-            const item_id=item.getAttribute("id")
+            const item_id = item.getAttribute("id")
             // console.log("Added:", names, price,item_id);
             const userid = localStorage.getItem("userId")
             // 👉 Here you can send to backend / Redis
@@ -80,12 +80,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    resid:res_id,
+                    resid: res_id,
                     userid: userid,
                     item: names,
-                    ress_name:decoded,
+                    ress_name: decoded,
                     qty: 1,
-                    item_id:item_id,
+                    item_id: item_id,
                     price: parseInt(price)   // 🔥 important
                 })
             })
@@ -95,5 +95,62 @@ document.addEventListener("DOMContentLoaded", async () => {
                 alert(`${names} added to cart`)
             }
         }
+    });
+
+    const searchBtn = document.getElementById("searchBtn");
+    const searchContainer = document.getElementById("searchContainer");
+
+    searchBtn.addEventListener("click", () => {
+        searchContainer.classList.toggle("active");
+
+        if (searchContainer.classList.contains("active")) {
+            searchContainer.querySelector("input").focus();
+        }
+    });
+    const searchInput = document.getElementById("searchInput");
+
+    searchInput.addEventListener("input", () => {
+        const searchTerm = searchInput.value.toLowerCase();
+
+        const menuItems = document.querySelectorAll(".menu-item");
+
+        // menuItems.forEach(item => {
+        //     const itemName = item
+        //         .querySelector(".item-details h3")
+        //         .textContent
+        //         .toLowerCase();
+
+        //     if (itemName.includes(searchTerm)) {
+        //         item.style.display = "flex"; // your menu-item uses flex
+        //     } else {
+        //         item.style.display = "none";
+
+        //     }
+        // });
+
+        menuItems.forEach(item => {
+            const itemName = item
+                .querySelector(".item-details h3")
+                .textContent
+                .toLowerCase();
+
+            const divider = item.nextElementSibling; // the <hr>
+
+            if (itemName.includes(searchTerm)) {
+                item.style.display = "flex";
+
+                if (divider && divider.classList.contains("item-divider")) {
+                    divider.style.display = "block";
+                }
+            } else {
+                item.style.display = "none";
+
+                if (divider && divider.classList.contains("item-divider")) {
+                    divider.style.display = "none";
+                }
+            }
+        });
+
+
     });
 })
