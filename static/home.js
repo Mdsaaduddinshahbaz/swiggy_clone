@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const loading = document.getElementById("loading")
     const request_location = document.getElementById("requestlocation")
     const currentAddress = document.getElementById("currentAddress")
+    const livelocationBtn = document.getElementById("liveLocationBtn")
     let position = null
     let userLocation = null;
     userLatt = null
@@ -66,7 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         // position = await getPosition();
         console.log(position)
-        
+
         const fetchlocation = JSON.parse(
             localStorage.getItem("userLocation")
         );
@@ -278,7 +279,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchContainer = document.getElementById("searchContainer");
 
     searchBtn.addEventListener("click", () => {
-        searchContainer.style.display="block"
+        searchContainer.style.display = "block"
         searchContainer.classList.toggle("active");
 
         if (searchContainer.classList.contains("active")) {
@@ -407,9 +408,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const latti = parseFloat(item.dataset.lat);
         const longi = parseFloat(item.dataset.lon);
-        console.log(latti,longi)
-        change(latti,longi)
+        console.log(latti, longi)
+        change(latti, longi)
     });
+
+    livelocationBtn.addEventListener("click", async () => {
+        console.log("livelctn button clicked")
+        const livelctn = await getPosition();
+
+        const userLocation = {
+            latt: livelctn.coords.latitude,
+            long: livelctn.coords.longitude
+        };
+        localStorage.setItem(
+                "userLocation",
+                JSON.stringify(userLocation)
+            );
+        change(livelctn.coords.latitude,livelctn.coords.longitude)
+
+        box.classList.remove("show");
+        overlay.classList.remove("show");
+    })
 })
 function getPosition() {
     return new Promise((resolve, reject) => {
@@ -444,7 +463,7 @@ async function reverseGeocode(lat, lon) {
     return `${address.suburb || ""}, ${address.city || address.town || ""}`;
 }
 
-async function change(latt,long) {
+async function change(latt, long) {
     const display_resturants = document.getElementById("resturants_container")
     const cartBtn = document.getElementById("cartBtn")
     const orderBtn = document.getElementById("orderBtn")
@@ -457,8 +476,8 @@ async function change(latt,long) {
     const request_location = document.getElementById("requestlocation")
     const currentAddress = document.getElementById("currentAddress")
     try {
-        console.log(typeof(latt))
-        typeof(latt)
+        console.log(typeof (latt))
+        typeof (latt)
         userLatt = latt
         userLong = long
         // console.log(fetchlocation.latt)
@@ -493,14 +512,14 @@ async function change(latt,long) {
             if (!data.results || Object.keys(data.results).length === 0) {
                 console.log("Empty");
                 no_results_container.style.display = "block";
-                display_resturants.innerHTML=""
+                display_resturants.innerHTML = ""
             }
             else {
                 console.log(data.results)
                 // Object.entries(data.results).forEach(([name, id]) => {
                 //     console.log(name, id)
                 // })
-                display_resturants.innerHTML=""
+                display_resturants.innerHTML = ""
                 no_results_container.style.display = "none";
                 Object.entries(data.results).forEach(([name, detail]) => {
                     // console.log(element)
@@ -554,7 +573,7 @@ async function change(latt,long) {
         })
     }
     catch (e) {
-        console.log("access denied",e)
+        console.log("access denied", e)
         // Note.style.display = "none"
         access_denied_container.style.visibility = "visible"
         Note.style.display = "none"
