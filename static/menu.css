@@ -261,3 +261,35 @@ body{
 #searchBtn{
     margin-left: 0;
 }
+
+
+.quantity-control button {
+    border: none;
+    background: none;
+    color: #bebfc5;
+    cursor: pointer;
+    width: 58px;
+    font-size: larger;
+}
+
+.quantity-control{
+    display: flex;
+    justify-content: space-between;
+        position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 36px;
+    background: white;
+    color: #60b246;
+    border: 1px solid #d4d5d9;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 3px 8px #e9e9eb;
+}
+
+.item_qty{
+    align-self: center;
+}

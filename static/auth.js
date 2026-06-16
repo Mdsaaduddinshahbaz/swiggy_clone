@@ -56,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
           alert("user credentials not found")
         }
         else if (data.success) {
+          console.log(data)
           alert(data.message || "Welcome!");
           localStorage.setItem("userId", data.user_id)
           localStorage.setItem("username", data.username)

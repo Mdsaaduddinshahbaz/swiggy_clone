@@ -111,7 +111,86 @@ def delete_cart(uid):
 #         }
 
 #     r.set(key, json.dumps(cart))
-def add_cart(resid, uid, item, res_name,item_id, qty, price):
+# def add_cart(resid, uid, item, res_name,item_id, qty, price):
+#     key = f"cart:{uid}"
+
+#     existing = r.get(key)
+
+#     if existing:
+#         cart = json.loads(existing)
+#     else:
+#         cart = {
+#             "uid": uid,
+#             "cart": {}
+#         }
+
+#     # Ensure restaurant exists using resid
+#     if resid not in cart["cart"]:
+#         cart["cart"][resid] = {
+#             "name": res_name,   # store name for UI
+#             "items": {}
+#         }
+
+#     # Add/update item
+#     if item in cart["cart"][resid]["items"]:
+#         cart["cart"][resid]["items"][item]["qty"] += qty
+#     else:
+#         cart["cart"][resid]["items"][item] = {
+#             "qty": qty,
+#             "price": price,
+#             "item_id":item_id
+#         }
+
+#     r.set(key, json.dumps(cart))
+import json
+
+# def update_cart_qty(uid, item_name, change):
+#     key = f"cart:{uid}"
+    
+#     # 1. Get the cart from Redis
+#     existing = r.get(key)
+#     if not existing:
+#         return {"success": False, "message": "No cart found for this user"}
+
+#     cart_data = json.loads(existing)
+#     found = False
+
+#     # 2. Iterate through restaurants to find the item
+#     # We use list(dict.keys()) because we might delete keys during the loop
+#     for res_id in list(cart_data["cart"].keys()):
+#         if item_name in cart_data["cart"][res_id]["items"]:
+#             print("cart_Data=",cart_data["cart"][res_id]["items"])
+#             item_ref = cart_data["cart"][res_id]["items"][item_name]
+            
+#             # 3. Update the quantity
+#             item_ref["qty"] += change
+#             found = True
+
+#             # 4. Remove item if it hits 0
+#             if item_ref["qty"] <= 0:
+#                 del cart_data["cart"][res_id]["items"][item_name]
+                
+#                 # 5. Remove restaurant if it's now empty
+#                 if not cart_data["cart"][res_id]["items"]:
+#                     del cart_data["cart"][res_id]
+            
+#             break # Stop searching once we find and update the item
+
+#     if not found:
+#         return {"success": False, "message": "Item not found in any restaurant in your cart"}
+
+#     # 6. Save the updated cart back to Redis
+#     r.set(key, json.dumps(cart_data))
+#     print("Updated Cart:")
+#     for res_id, res_data in cart_data["cart"].items():
+#         print(f"\nRestaurant ID: {res_id}")
+#         for item, details in res_data["items"].items():
+#             print(f"  Item: {item}, Qty: {details['qty']}")
+#     return {"success": True, "updated_cart": cart_data}
+# delete_cart("None")
+get_cart("69dc9a0e830ee0aee697bda0")
+
+def add_cart(resid, uid, item_name, res_name, item_id, qty, price):
     key = f"cart:{uid}"
 
     existing = r.get(key)
@@ -124,67 +203,62 @@ def add_cart(resid, uid, item, res_name,item_id, qty, price):
             "cart": {}
         }
 
-    # Ensure restaurant exists using resid
+    # Ensure restaurant exists
     if resid not in cart["cart"]:
         cart["cart"][resid] = {
-            "name": res_name,   # store name for UI
+            "name": res_name,
             "items": {}
         }
 
-    # Add/update item
-    if item in cart["cart"][resid]["items"]:
-        cart["cart"][resid]["items"][item]["qty"] += qty
+    items = cart["cart"][resid]["items"]
+
+    # Add/update item using item_id as key
+    if item_id in items:
+        items[item_id]["qty"] += qty
     else:
-        cart["cart"][resid]["items"][item] = {
+        items[item_id] = {
+            "name": item_name,
             "qty": qty,
-            "price": price,
-            "item_id":item_id
+            "price": price
         }
 
     r.set(key, json.dumps(cart))
-import json
 
-def update_cart_qty(uid, item_name, change):
+
+def update_cart_qty(uid, item_id, change):
     key = f"cart:{uid}"
-    
-    # 1. Get the cart from Redis
+
     existing = r.get(key)
     if not existing:
-        return {"success": False, "message": "No cart found for this user"}
+        return {
+            "success": False,
+            "message": "No cart found for this user"
+        }
 
     cart_data = json.loads(existing)
-    found = False
 
-    # 2. Iterate through restaurants to find the item
-    # We use list(dict.keys()) because we might delete keys during the loop
     for res_id in list(cart_data["cart"].keys()):
-        if item_name in cart_data["cart"][res_id]["items"]:
-            item_ref = cart_data["cart"][res_id]["items"][item_name]
-            
-            # 3. Update the quantity
-            item_ref["qty"] += change
-            found = True
+        items = cart_data["cart"][res_id]["items"]
 
-            # 4. Remove item if it hits 0
-            if item_ref["qty"] <= 0:
-                del cart_data["cart"][res_id]["items"][item_name]
-                
-                # 5. Remove restaurant if it's now empty
-                if not cart_data["cart"][res_id]["items"]:
+        if item_id in items:
+            items[item_id]["qty"] += change
+
+            if items[item_id]["qty"] <= 0:
+                del items[item_id]
+
+                # Remove restaurant if empty
+                if not items:
                     del cart_data["cart"][res_id]
-            
-            break # Stop searching once we find and update the item
 
-    if not found:
-        return {"success": False, "message": "Item not found in any restaurant in your cart"}
+            r.set(key, json.dumps(cart_data))
+            return {
+                "success": True,
+                "updated_cart": cart_data
+            }
 
-    # 6. Save the updated cart back to Redis
-    r.set(key, json.dumps(cart_data))
-    print("Updated Cart:")
-    for res_id, res_data in cart_data["cart"].items():
-        print(f"\nRestaurant ID: {res_id}")
-        for item, details in res_data["items"].items():
-            print(f"  Item: {item}, Qty: {details['qty']}")
-    return {"success": True, "updated_cart": cart_data}
-# delete_cart("None")
-get_cart("69dc9a0e830ee0aee697bda0")
+    return {
+        "success": False,
+        "message": "Item not found in cart"
+    }
+
+# delete_cart("6a30e1bccfbdcefd495d5246")

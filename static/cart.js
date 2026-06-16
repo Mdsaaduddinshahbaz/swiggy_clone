@@ -29,12 +29,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             // Optional: show restaurant name
             cart_items_container.innerHTML += `<h2>${details.name}</h2>`;
 
-            Object.entries(details.items).forEach(([name, detail]) => {
+            Object.entries(details.items).forEach(([item_id, detail]) => {
 
                 cart_items_container.innerHTML += `
-            <div class="cart-item" id=${detail.item_id}>
+            <div class="cart-item" id=${item_id}>
                 <span class="veg-icon"><i class="fa-regular fa-circle-stop"></i></span>
-                <span class="item-name">${name}</span>
+                <span class="item-name">${detail.name}</span>
                 <div class="quantity-control">
                     <button class="qty-btn reduce">-</button>
                     <span class="item_qty">${detail.qty}</span>
@@ -63,6 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             // 2. Extract the data
             const itemId = itemRow.id; // Or itemRow.getAttribute('id')
+            console.log(itemId)
             const itemName = itemRow.querySelector('.item-name').textContent;
             const item_qty = itemRow.querySelector('.item_qty');
             const item_price = itemRow.querySelector('.item-price');
@@ -80,7 +81,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const res = await fetch("/update_cart", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ "user_id": userId, "item_name": itemName, "qty": 1 })
+                    body: JSON.stringify({ "user_id": userId, "item_id": itemId, "qty": 1 })
                 })
                 const data = await res.json()
                 if (data.success) {
@@ -101,7 +102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const res = await fetch("/update_cart", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ "user_id": userId, "item_name": itemName, "qty": -1 })
+                    body: JSON.stringify({ "user_id": userId, "item_id": itemId, "qty": -1 })
                 })
                 const data = await res.json()
                 console.log(data)

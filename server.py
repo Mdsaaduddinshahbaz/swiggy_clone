@@ -101,8 +101,8 @@ def carts():
     except:
         return({"success":False})
 
-@app.get("/menu/<name>/<address>/<res_id>")
-def list_items(name,address,res_id):
+@app.get("/menu/<name>/<address>/<res_id>/<user_id>")
+def list_items(name,address,res_id,user_id):
     try:
         # data=request.get_json()
         # res_id=data["res_id"]
@@ -383,9 +383,9 @@ def update_cart():
     try:
         data=request.get_json()
         userid=data["user_id"]
-        item_name=data["item_name"]
+        item_id=data["item_id"]
         qty=data["qty"]
-        update_cart_qty(userid,item_name,qty)
+        update_cart_qty(userid,item_id,qty)
         return ({"success":True})
     except:
         return({"success":False})

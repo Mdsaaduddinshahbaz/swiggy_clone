@@ -154,7 +154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const addresss = card.querySelector(".area").textContent
                 console.log(name)
 
-                window.location.href = `/menu/${name}/${addresss}/${res_id}`
+                window.location.href = `/menu/${name}/${addresss}/${res_id}/${userId}`
             }
 
         })
@@ -554,8 +554,8 @@ async function change(latt, long) {
                 const name = card.querySelector(".resturant_name").textContent
                 const addresss = card.querySelector(".area").textContent
                 console.log(name)
-
-                window.location.href = `/menu/${name}/${addresss}/${res_id}`
+                console.log(userId)
+                window.location.href = `/menu/${name}/${addresss}/${res_id}/${userId}`
             }
 
         })
