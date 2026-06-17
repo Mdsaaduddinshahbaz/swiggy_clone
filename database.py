@@ -175,12 +175,12 @@ def store_orders(userid):
             "time": current_time
         }
         res_ids.append(res_id)
-        for item in data["items"].values():
+        for item_id,item in data["items"].items():
             print(item)
             seller_inventory.append(
                 UpdateOne(
                     {
-                        "_id": ObjectId(item["item_id"])
+                        "_id": ObjectId(item_id)
                         # "restaurant_id": res_id   # ✅ safer
                     },
                     {

@@ -9,8 +9,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const orderBtn = document.getElementById("orderBtn")
     const totalPrice = document.getElementById("totalPrice")
     const toPay = document.getElementById("toPay")
+    const addressChgBtn= document.getElementById("ChangeAdrs")
+    const deliveryAdrs=document.getElementById("Deliveryaddress")
+    const livelocationBtn = document.getElementById("liveLocationBtn")
+    const loading_container=document.getElementById("loading_container")
+    const typeaddrs=document.getElementById("type")
     heading.innerText = "Order List";
-
+    const curr_addr=localStorage.getItem("currentAddress")
+    deliveryAdrs.textContent=curr_addr
     console.log(userId);  // 45xaddsa
     const res = await fetch("/get_cart_items", {
         method: "POST",
@@ -155,6 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             body: JSON.stringify({ "user_id": userId, "items": restaurants })
         })
         const data = await res.json()
+        console.log(data)
         if (data.success) {
             alert("order placed")
             window.location.href = `/orders/${userId}`
@@ -179,4 +186,77 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(userid)
         window.location.href = `/orders/${userId}`
     })
+
+    const box = document.getElementById("addressOptions");
+    const overlay = document.getElementById("locationOverlay");
+    addressChgBtn.addEventListener("click",()=>{
+        console.log("adrschng")
+        box.classList.add("show");
+        document.querySelector(".address-text").textContent = curr_addr
+        overlay.classList.add("show");
+
+        // document.getElementById("addressInput").focus();
+    })
+
+    overlay.addEventListener("click", () => {
+        box.classList.remove("show");
+        overlay.classList.remove("show");
+    });
+
+    const address_container=document.getElementById("addressOptions");
+    address_container.addEventListener("click",(e)=>{
+        const selected_option=e.target.closest(".address-option")
+        const spans = selected_option.querySelectorAll("span");
+        typeaddrs.innerText=spans[0].textContent +" -"
+        console.log(spans[0].textContent)
+        deliveryAdrs.textContent=spans[1].textContent  
+        address_container.classList.remove("show")
+        overlay.classList.remove("show");
+    })
+
+    livelocationBtn.addEventListener("click", async () => {
+        console.log("livelctn button clicked")
+        box.classList.remove("show");
+        loading_container.classList.add("show");
+        const livelctn = await getPosition();
+        const userLocation = {
+            latt: livelctn.coords.latitude,
+            long: livelctn.coords.longitude
+        };
+        localStorage.setItem(
+            "userLocation",
+            JSON.stringify(userLocation)
+        );
+        const address = await reverseGeocode(
+            userLocation.latt,
+            userLocation.long
+        );
+        
+        console.log(address);
+        deliveryAdrs.textContent = address
+        loading_container.classList.remove("show");
+        // box.classList.remove("show");
+        overlay.classList.remove("show");
+    })
 })
+
+function getPosition() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject("Geolocation is not supported by your browser");
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+    });
+}
+
+async function reverseGeocode(lat, lon) {
+    const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+    );
+
+    const data = await response.json();
+
+    const address = data.address;
+
+    return `${address.suburb || ""}, ${address.city || address.town || ""}`;
+}

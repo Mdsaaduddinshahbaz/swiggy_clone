@@ -94,6 +94,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(address);
         currentAddress.textContent = address
 
+        localStorage.setItem("currentAddress", address)
+
         // userLocation = { latt: userLatt, long: userLong }
         userLocation = { latt: userLatt, long: userLong }
         localStorage.setItem("userLocation", JSON.stringify(userLocation));
@@ -402,7 +404,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             "selectedAddress",
             item.dataset.address
         );
-
+        document.getElementById("addressTagModal")
+            .classList.add("show");
         box.classList.remove("show");
         overlay.classList.remove("show");
 
@@ -411,6 +414,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(latti, longi)
         change(latti, longi)
     });
+    document.querySelectorAll(".tag-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const addressType = btn.dataset.tag;
+
+        console.log(addressType); // Home / Work / Other
+
+        document.getElementById("addressTagModal")
+            .classList.remove("show");
+
+        // Save to backend here
+    });
+});
 
     livelocationBtn.addEventListener("click", async () => {
         console.log("livelctn button clicked")
@@ -421,10 +436,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             long: livelctn.coords.longitude
         };
         localStorage.setItem(
-                "userLocation",
-                JSON.stringify(userLocation)
-            );
-        change(livelctn.coords.latitude,livelctn.coords.longitude)
+            "userLocation",
+            JSON.stringify(userLocation)
+        );
+        change(livelctn.coords.latitude, livelctn.coords.longitude)
 
         box.classList.remove("show");
         overlay.classList.remove("show");

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,9 @@
     <link rel="stylesheet" href="../static/cart.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body > <header class="navbar">
+
+<body>
+    <header class="navbar">
         <div class="nav-container">
             <div class="left-nav">
                 <img src="../static/logo2.png" alt="Swiggy Logo" class="logo">
@@ -26,10 +29,53 @@
                     <i class="fa-solid fa-location-dot"></i>
                     <div>
                         <h3>Delivery Address</h3>
-                        <p>Home - Madhapur, Hyderabad, Telangana 500081</p>
+                        <p id="type" >Home -</p>
+                        <p id="Deliveryaddress">Home - Madhapur, Hyderabad, Telangana 500081</p>
                     </div>
                 </div>
-                <button class="change-btn">CHANGE</button>
+                <button class="change-btn" id="ChangeAdrs">CHANGE</button>
+                <div class="location-overlay" id="locationOverlay"></div>
+                <div id="loading_container">
+                    <h1>fetching location...</h1>
+                    <img src="../static/loading-spinner.svg" alt="Loading" id="loading" class="show">
+                </div>
+                <div id="addressOptions" class="address-options">
+                    <!-- <label class="payment-option">
+                        <input type="radio" name="payment" value="cash" checked>
+                        <span>💵 Cash on Delivery</span>
+                    </label>
+
+                    <label class="payment-option">
+                        <input type="radio" name="payment" value="upi">
+                        <span>📱 UPI</span>
+                    </label>
+
+                    <label class="payment-option">
+                        <input type="radio" name="payment" value="card">
+                        <span>💳 Card</span>
+                    </label> -->
+                    
+                    <button id="liveLocationBtn" class="live-location-btn">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                        Use Current Location
+                    </button>
+                    <h2>Saved Location</h2>
+                    <div class="address-option">
+                        <span class="address-type">Home</span>
+                        <span class="address-text">mallepally,Hyderabad,Telangana</span>
+                    </div>
+                    <div class="address-option">
+                        <span class="address-type">Others</span>
+                        <span  name="payment" value="card">📱 UPI</span>
+                    </div>
+                    <div class="address-option">
+                        <span class="address-type">Others</span>
+                        <span  name="payment" value="card">💳 Card</span>
+                    </div>
+                    <!-- <button  name="payment" value="card" class="payment-option">💵 Cash on Delivery</button>
+                    <button  name="payment" value="card" class="payment-option">📱 UPI</button>
+                    <button  name="payment" value="card" class="payment-option">💳 Card</button> -->
+                </div>
             </div>
 
             <div class="checkout-card">
@@ -40,13 +86,34 @@
                     </div>
                 </div>
                 <p class="payment-hint">Select your payment method after reviewing the items.</p>
+                <!-- <select>
+                    <option value="cash">Cash on Delivery</option>
+                </select> -->
+
+                <div id="paymentOptions" class="payment-options">
+                    <label class="payment-option">
+                        <input type="radio" name="payment" value="cash" checked>
+                        <span>💵 Cash on Delivery</span>
+                    </label>
+
+                    <label class="payment-option">
+                        <input type="radio" name="payment" value="upi">
+                        <span>📱 UPI</span>
+                    </label>
+
+                    <label class="payment-option">
+                        <input type="radio" name="payment" value="card">
+                        <span>💳 Card</span>
+                    </label>
+                </div>
             </div>
         </div>
 
         <div class="cart-right">
             <div class="order-summary-card">
                 <div class="res-mini-header">
-                    <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80" alt="Res">
+                    <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80"
+                        alt="Res">
                     <div class="res-info">
                         <h4>Burger King</h4>
                         <!-- <p>Banjara Hills</p> -->
@@ -54,21 +121,21 @@
                 </div>
 
                 <div class="cart-items" id="cart_items">
-                    </div>
                 </div>
+            </div>
 
-                <div class="coupon-box">
-                    <i class="fa-solid fa-percent"></i>
-                    <input type="text" placeholder="Apply Coupon">
+            <div class="coupon-box">
+                <i class="fa-solid fa-percent"></i>
+                <input type="text" placeholder="Apply Coupon">
+            </div>
+
+            <div class="bill-details">
+                <h5>Bill Details</h5>
+                <div class="bill-row">
+                    <span>Item Total</span>
+                    <span id="totalPrice">₹0</span>
                 </div>
-
-                <div class="bill-details">
-                    <h5>Bill Details</h5>
-                    <div class="bill-row">
-                        <span>Item Total</span>
-                        <span id="totalPrice">₹0</span>
-                    </div>
-                    <!-- <div class="bill-row">
+                <!-- <div class="bill-row">
                         <span>Delivery Fee | 2.5 kms</span>
                         <span>₹30</span>
                     </div>
@@ -76,17 +143,18 @@
                         <span>Govt Taxes & Restaurant Charges</span>
                         <span>₹18</span>
                     </div> -->
-                    <hr>
-                    <div class="bill-row total">
-                        <span>TO PAY</span>
-                        <span id="toPay">₹0</span>
-                    </div>
+                <hr>
+                <div class="bill-row total">
+                    <span>TO PAY</span>
+                    <span id="toPay">₹0</span>
                 </div>
-                
-                <button id="placeorder" class="pay-btn">Place Order</button>
             </div>
+
+            <button id="placeorder" class="pay-btn">Place Order</button>
+        </div>
         </div>
     </main>
-<script src="../static/cart.js"></script>
+    <script src="../static/cart.js"></script>
 </body>
+
 </html>

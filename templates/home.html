@@ -61,10 +61,24 @@
     </header>
 
     <main class="container">
+        <div id="addressTagModal" class="modal">
+            <div class="modal-content">
+                <h3>Save Address As</h3>
 
+                <div class="tag-options">
+                    <button class="tag-btn" data-tag="Home">🏠 Home</button>
+                    <button class="tag-btn" data-tag="Work">💼 Work</button>
+                    <button class="tag-btn" data-tag="Other">📍 Other</button>
+                </div>
+
+                <button id="closeModal" class="cancel-btn">
+                    Cancel
+                </button>
+            </div>
+        </div>
         <section class="filters" style="display: flex;justify-content: space-between;">
             <h2 id="Note">Restaurants with online food delivery in Hyderabad</h2>
-            <div id="distancediv" >
+            <div id="distancediv">
                 <select name="distance" id="distance_options">
                     <option value="5">5km</option>
                     <option value="10">10km</option>

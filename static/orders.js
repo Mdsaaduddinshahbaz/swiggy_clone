@@ -129,15 +129,15 @@ async function loadOrders() {
         </div>
     `;
 
-            Object.entries(blabla.items).forEach(([itemName, item]) => {
-                console.log("Item:", itemName, item);
+            Object.entries(blabla.items).forEach(([itemid, item]) => {
+                // console.log("Item:", itemName, item);
 
                 const itemTotal = item.price * item.qty;
                 total += itemTotal;
 
                 restaurantsHTML += `
-            <div class="item">
-                <span>${itemName} x ${item.qty}</span>
+            <div class="item" item_id=${itemid}>
+                <span>${item.name} x ${item.qty}</span>
                 <span>₹${itemTotal}</span>
             </div>
         `;
@@ -194,27 +194,21 @@ document.addEventListener("click", async (e) => {
             res_ids.push(residss.getAttribute("res_id"))
         })
         console.log(res_ids)
-        socket.emit("user_cancelled_order", {
-            order_id: orderId,
-            token_no: tokenNo,
-            res_ids: res_ids, // The server uses this to target the room
-            userid: userId,
-            status: "canceled"
-        });
-        // const res = await fetch("/update_order_user", {
-        //     method: "POST",
-        //     headers: { "Content-Type": "application/json" },
-        //     body: JSON.stringify({
-        //         order_id: orderId,
-        //         status: "canceled",
-        //         user_id: userId
-        //     })
-        // })
+        const res = await fetch("/update_order_user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                order_id: orderId,
+                status: "canceled",
+                user_id: userId
+            })
+        })
         const data = await res.json()
         if (data.success) {
             socket.emit("user_cancelled_order", {
                 order_id: orderId,
                 token_no: tokenNo,
+                res_ids: res_ids,
                 user_id: userId,
                 status: "canceled"
             });
@@ -225,9 +219,11 @@ document.addEventListener("click", async (e) => {
             statusSpan.className = "order-status status-canceled";
 
             // optional UX improvement
-            // e.target.disabled = true;
+            e.target.style.display ="none";
             // e.target.innerText = "Done ✔";
-            card.remove();
+            // card.remove();
+            
+            window.location.reload()
             console.log("Completed sent:", orderId, tokenNo);
         }
         else {
