@@ -1,11 +1,79 @@
-from database import add_resturant_items,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
+from database import add_resturant_items,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
 from flask import Flask,request,render_template,redirect,url_for
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
 from flask_cors import CORS
+from flask_mail import Mail
+from dotenv import load_dotenv
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Message
+import os
+load_dotenv(override=True)
+mail_sever_name=os.getenv("Mail_server")
+mail_port=int(os.getenv("Mail_port"))
+mail_use_tls = os.getenv("Mail_use_tls", "True").lower() == "true"
+mail_username=os.getenv("Mail")
+mail_password=os.getenv("Mail_password")
+secret_key=os.getenv("Mail_secret_key")
+
 app=Flask(__name__)
 CORS(app)
+
+app.config["MAIL_SERVER"] = mail_sever_name
+app.config["MAIL_PORT"] = mail_port
+app.config["MAIL_USE_TLS"] = mail_use_tls
+app.config["MAIL_USERNAME"] = mail_username
+app.config["MAIL_PASSWORD"] = mail_password
+app.config["SECRET_KEY"]=secret_key
 socketio = SocketIO(app, cors_allowed_origins="*")
+mail=Mail(app)
+
+from itsdangerous import URLSafeTimedSerializer
+
+serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
+
+def generate_verification_token(email):
+    return serializer.dumps(email, salt="email-verification")
+
+def send_verification_email(user_email):
+    print("in send varification")
+    token = generate_verification_token(user_email)
+
+    verify_url = url_for(
+        "verify_email",
+        token=token,
+        _external=True
+    )
+
+    msg = Message(
+        subject="Verify Your Email",
+        sender=app.config["MAIL_USERNAME"],
+        recipients=[user_email]
+    )
+
+    msg.body = f"""
+    Welcome!
+
+    Click the link below to verify your email:
+
+    {verify_url}
+    """
+    print("email sent",user_email)
+    mail.send(msg)
+
+# send_verification_email("saad778964321@gmail.com")
+# with app.app_context():
+#     msg = Message(
+#         subject="Test Email",
+#         sender=app.config["MAIL_USERNAME"],
+#         recipients=["saad778964321@gmail.com"]
+#     )
+
+#     msg.body = "If you received this, Flask-Mail works."
+
+#     mail.send(msg)
+
+print("Email sent")
 
 @app.route("/", methods=["GET", "POST"])
 def land():
@@ -257,11 +325,15 @@ def validate():
         res=check_existing_user(data["email"],data["password"])
         print("res",res)
         if(res["success"]==False): return({"success":False})
-        elif(res["success"]==True): 
-            userid=str(res["userid"])
-            username=res["username"]
-            print(userid)
-            return ({"success":True,"user_id":userid,"username":username})
+        elif(res["success"]==True):
+            if(res["is_verified"]): 
+                userid=str(res["userid"])
+                username=res["username"]
+                print(userid)
+                return ({"success":True,"user_id":userid,"username":username})
+            else:
+                send_verification_email(data["email"])
+                return({"success":"Not_verified"})
         else: return({"success":"Not_found"})
     except:
         return({"success":False})
@@ -293,14 +365,44 @@ def signup_user():
         username=data["username"]
         password=data["password"]
         # print(email)
+        print("mail sent")
         res=create_new_user(email,username,password)
+        # if(verify)
         print(res)
         if(res["success"]):
+            # send_verification_email(email)
+            send_verification_email(email)
             return ({"success":True,"user_id":res["id"]})
         else:
             return ({"success":False})
     except:
         return({"success":False})
+
+@app.route("/verify/<token>")
+def verify_email(token):
+    try:
+        email = serializer.loads(
+            token,
+            salt="email-verification",
+            max_age=3600  # 1 hour
+        )
+    except Exception:
+        return "Invalid or expired link."
+
+    userid=set_verified(email)
+
+    return  """
+    <h1>Email verified successfully ✅</h1>
+    <p>Redirecting to login page in 3 seconds...</p>
+
+    <script>
+    setTimeout(() => {
+        window.location.href = "/login/user";
+    }, 3000);
+    </script>
+    """
+
+
 @app.get("/seller/resturantSetup/<seller_id>")
 def renderSetup(seller_id):
     try:

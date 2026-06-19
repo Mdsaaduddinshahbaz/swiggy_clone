@@ -47,11 +47,6 @@ body{
     align-items: flex-start;
     flex-direction: column;
 }
-#paymentOptions{
-    /* display: flex;
-    flex-direction: column;
-    width: 100%; */
-}
 
 label{
         width: 100%;

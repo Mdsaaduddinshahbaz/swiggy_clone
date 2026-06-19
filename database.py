@@ -254,7 +254,8 @@ def create_new_user(email,username, password):
         result =users.insert_one({
             "email": email,
             "username":username,
-            "password": password
+            "password": password,
+            "is_verified":False
         })
         return ({"success":True,"id":str(result.inserted_id)})
     else:
@@ -267,7 +268,7 @@ def check_existing_user(email,password):
         print("in existing user if block",password)
         if(user["password"]==password):
             print("in existing user if if block")
-            return ({"success":True,"userid":user["_id"],"username":user["username"]})
+            return ({"success":True,"userid":user["_id"],"username":user["username"],"is_verified":user["is_verified"]})
         else:
             return {"success":False}
     else: return {"success":404}
@@ -385,7 +386,13 @@ def fetch_address(uid):
     user=users.find_one(ObjectId(uid))
 
     if(user):
-        return {"success":True,"address":user["addresses"]}
+        # print("addd",user["addresses"])
+        if "addresses" in user:
+            return {"success":True,"address":user["addresses"]}
+        else:
+            return {"success":False,"address":"not_found"}
     else:
         return {"success":False}
-    
+
+def set_verified(email):
+    users.find_one_and_update({"email":email},{"$set":{"is_verified":True}})

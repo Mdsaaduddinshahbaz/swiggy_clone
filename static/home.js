@@ -113,7 +113,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             else{
                 console.log("adrs not found");
-                
+                position = await getPosition();
+                userLatt = position.coords.latitude;
+                userLong = position.coords.longitude;
+                console.log(userLatt, userLong)
             }
         }
         // else {
@@ -129,7 +132,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
         console.log(address);
-        // currentAddress.textContent = address
+        currentAddress.textContent = address
 
         localStorage.setItem("currentAddress", address)
 
@@ -562,7 +565,7 @@ async function change(latt, long) {
     const Note = document.getElementById("Note")
     const loading = document.getElementById("loading")
     const request_location = document.getElementById("requestlocation")
-    const currentAddress = document.getElementById("currentAddress")
+    let currentAddress = document.getElementById("currentAddress")
     try {
         console.log(typeof (latt))
         typeof (latt)

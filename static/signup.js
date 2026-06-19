@@ -41,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         alert(data.message || "Signup successful! Please login.");
         // window.location.href = "/login";
         if (role === "user") {
+          alert("An Email is sent to you, please verify your Account and Login")
           // window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
           window.location.href = `/login/user`
         }
