@@ -26,7 +26,7 @@
                 <div class="location-box visible" id="locationBox">
                     <div class="location-header">
                         <i class="fa-solid fa-location-dot"></i>
-                        <span id="currentAddress">
+                        <span id="currentAddresss">
                             Select delivery location
                         </span>
                     </div>
@@ -35,7 +35,14 @@
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="text" id="addressInput" placeholder="Search for area, street, city...">
                     </div>
-
+                    <div id="savedAddress">
+                        <h2 style="color: black;
+    top: 10px;
+    font-size: 22px;
+    left: 5px;
+    margin: ne;
+    position: relative;">Saved Address</h2>
+                    </div>
                     <button id="liveLocationBtn" class="live-location-btn">
                         <i class="fa-solid fa-location-crosshairs"></i>
                         Use Current Location
@@ -61,6 +68,10 @@
     </header>
 
     <main class="container">
+        <div id="loading_container">
+            <h1>fetching location...</h1>
+            <img src="../static/loading-spinner.svg" alt="Loading" id="loading_fetch" class="show">
+        </div>
         <div id="addressTagModal" class="modal">
             <div class="modal-content">
                 <h3>Save Address As</h3>

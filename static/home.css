@@ -160,7 +160,9 @@ button {
     cursor: pointer;
     font-size: 16px;
 }
-
+#currentAddresss{
+    color: black;
+}
 .filter-buttons {
     display: flex;
     gap: 10px;
@@ -227,7 +229,24 @@ button:hover {
     font-size: 20px;
     text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.5);
 }
-
+.address{
+    color: black;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    padding-left: 11px;
+    margin-top: 16px;
+    border: 2px solid black;
+}
+.address:hover{
+    background: #85ae9b;
+}
+.type{
+    font-weight: bold;
+    font-size: large;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
 .card-details {
     padding-top: 12px;
 }
@@ -552,6 +571,7 @@ button:hover {
     padding: 24px;
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    color: black;
 }
 
 .modal-content h3 {
@@ -573,6 +593,7 @@ button:hover {
     cursor: pointer;
     font-size: 15px;
     transition: all .2s;
+    color: black;
 }
 
 .tag-btn:hover {
@@ -585,6 +606,42 @@ button:hover {
     padding: 12px;
     border: none;
     border-radius: 10px;
-    background: #f3f4f6;
+    background: #eb0000;
     cursor: pointer;
+}
+
+
+#loading_container.show{
+    z-index: 2213 !important;
+    justify-self: center;
+    top: 50%;
+    position: fixed;
+    opacity: 1;
+    visibility: visible;
+    z-index: 100;
+    align-self: center;
+    align-items: center;
+    border-radius: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: opacity .25s ease, transform .25s ease, visibility .25s;
+}
+#loading_container{
+    visibility: hidden;
+    position: fixed;
+    transition: opacity .25s ease, transform .25s ease, visibility .25s;
+}
+#loading_fetch{
+        width: 70px;
+}
+
+#savedAddress{
+    visibility: hidden;
+    position: absolute;
+}
+
+#savedAddress.show{
+    visibility: visible;
+    position: relative;
 }

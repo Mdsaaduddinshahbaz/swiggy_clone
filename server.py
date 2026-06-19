@@ -1,4 +1,4 @@
-from database import add_resturant_items,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner
+from database import add_resturant_items,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
 from flask import Flask,request,render_template,redirect,url_for
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
@@ -398,6 +398,27 @@ def handle_user_cancel(data):
         for res_id in res_list:
             emit("seller_order_cancelled", data, room=res_id)
     except:
+        return({"success":False})
+@app.post("/save_address")
+def save_address_type():
+    data=request.get_json()
+    address=data["address"]
+    types=data["address_type"]
+    uid=data["userId"]
+    cordinates=data["cordinates"]
+    result=save_address(address,types,uid,cordinates)
+    if(result["success"]):
+        return ({"success":True})
+    else:
+        return ({"success":False})
+@app.post("/fetch_address")
+def fetch_addresss():
+    data=request.get_json()
+    uid=data["user_id"]
+    address=fetch_address(uid)
+    if(address["success"]):
+        return({"success":True,"address":address["address"]})
+    else:
         return({"success":False})
 if __name__ == "__main__":
     socketio.run(app, debug=True)

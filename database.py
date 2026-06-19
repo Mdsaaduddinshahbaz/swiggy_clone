@@ -362,3 +362,30 @@ def return_res_analytics(res_id):
     return data
 
 # get_orders("69a959defa10620eb63cf31d")
+def save_address(address,type,uid,cordinates):
+    user=users.find_one(ObjectId(uid))
+    if user :
+        result = users.update_one(
+        {"_id": ObjectId(uid)},
+        {
+            "$push": {
+                "addresses": {
+                    "address": address,
+                    "adrs_type": type,
+                    "coordinates": cordinates
+                }
+            }
+        }
+    )
+        return ({"success":True})
+    else:
+        return ({"success":False})
+    
+def fetch_address(uid):
+    user=users.find_one(ObjectId(uid))
+
+    if(user):
+        return {"success":True,"address":user["addresses"]}
+    else:
+        return {"success":False}
+    

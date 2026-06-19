@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const livelocationBtn = document.getElementById("liveLocationBtn")
     const loading_container=document.getElementById("loading_container")
     const typeaddrs=document.getElementById("type")
+    const address_container=document.getElementById("addressOptions");
     heading.innerText = "Order List";
     const curr_addr=localStorage.getItem("currentAddress")
     deliveryAdrs.textContent=curr_addr
@@ -57,6 +58,34 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         });
     }
+    const address=await fetch("/fetch_address", {
+            method: "POST",
+            "headers": { "Content-Type": "application/json" },
+            body: JSON.stringify({ "user_id":userId})
+            })
+            const datas=await address.json()
+            if(datas.success){
+                console.log("in fetch address")
+                console.log(datas)
+                deliveryAdrs.textContent =datas.address[0].adrs_type+ " - "+ datas.address[0].address 
+                deliveryAdrs.dataset.long=datas.address[0].coordinates.long
+                deliveryAdrs.dataset.lat=datas.address[0].coordinates.latt
+                
+                // userLatt = parseFloat(data.address[0].coordinates.latt)
+                // userLong = parseFloat(data.address[0].coordinates.long)
+                datas.address.forEach((addr) => {
+                    address_container.innerHTML+=`
+                        <div class="address-option" data-long=${addr.coordinates.long} data-latt=${addr.coordinates.latt}>
+                        <span class="address-type">${addr.adrs_type}</span>
+                        <span  name="payment" value="card">${addr.address}</span>
+                    </div>
+                    `
+                });
+            }
+            else{
+                console.log("adrs not found");
+                
+            }
     // Assume 'cartContainer' is the div holding all your .cart-item elements
     const cartContainer = document.querySelector('.cart-container');
 
@@ -189,12 +218,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const box = document.getElementById("addressOptions");
     const overlay = document.getElementById("locationOverlay");
-    addressChgBtn.addEventListener("click",()=>{
+    addressChgBtn.addEventListener("click",async()=>{
         console.log("adrschng")
         box.classList.add("show");
-        document.querySelector(".address-text").textContent = curr_addr
+        
         overlay.classList.add("show");
-
+        
         // document.getElementById("addressInput").focus();
     })
 
@@ -203,7 +232,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         overlay.classList.remove("show");
     });
 
-    const address_container=document.getElementById("addressOptions");
+    
     address_container.addEventListener("click",(e)=>{
         const selected_option=e.target.closest(".address-option")
         const spans = selected_option.querySelectorAll("span");

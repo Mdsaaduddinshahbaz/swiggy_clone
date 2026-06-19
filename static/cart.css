@@ -48,9 +48,9 @@ body{
     flex-direction: column;
 }
 #paymentOptions{
-    display: flex;
+    /* display: flex;
     flex-direction: column;
-    width: 100%;
+    width: 100%; */
 }
 
 label{
@@ -198,7 +198,7 @@ label:hover{
 
 
 .payment-options {
-    display: flex;
+    /* display: flex; */
     flex-direction: column;
     gap: 12px;
     margin-top: 15px;
@@ -210,7 +210,7 @@ label:hover{
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
-    padding: 14px 17px;
+    /* padding: 14px 17px; */
     /* padding-left: 19px; */
     border: 2px solid #e5e7eb;
     border-radius: 12px;
@@ -259,34 +259,27 @@ label:hover{
 
 
 .payment-options {
-    position: fixed;
+        /* position: fixed; */
     left: 50%;
-    transform: translateX(-50%) scale(.95);
+    /* transform: translateX(-50%) scale(.95); */
     width: 100%;
-    max-width: 550px;
-
-    padding: 20px;
+    /* max-width: 550px; */
+    /* padding: 20px; */
     background: #fff;
     border-radius: 16px;
-    box-shadow: 0 15px 40px rgba(0,0,0,.15);
-
+    /* box-shadow: 0 15px 40px rgba(0, 0, 0, .15); */
     opacity: 0;
     visibility: hidden;
-
-    transition:
-        opacity .25s ease,
-        transform .25s ease,
-        visibility .25s;
+    transition: opacity .25s ease, transform .25s ease, visibility .25s;
 }
 
-#paymentOptions.show {
+#paymentOptions {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) scale(1);
-        z-index: 100;
-    /* width: max-content
-     */
-     width: 51%;
+    /* transform: translateX(-50%) scale(1); */
+    /* z-index: 100; */
+    /* width: max-content; */
+    /* width: 51%;*/
 }
 .location-overlay.show {
     opacity: 1;

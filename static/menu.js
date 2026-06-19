@@ -197,20 +197,25 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
                 else {
                     // If it hits 0, remove the element from the cart UI
-                    const prevHeading = itemRow.previousElementSibling;
+                    // const prevHeading = itemRow.previousElementSibling;
+                    const qtyControl = e.target.closest('.quantity-control');
+
+                    qtyControl.outerHTML = `
+                        <button class="add-btn" id="${itemId}">ADD</button>
+                    `;
 
                     // Check if this is the last item under the heading
                     const nextSibling = itemRow.nextElementSibling;
 
-                    itemRow.remove();
+                    // itemRow.remove();
 
-                    if (
-                        prevHeading &&
-                        prevHeading.tagName === "H2" &&
-                        (!nextSibling || nextSibling.tagName === "H2")
-                    ) {
-                        prevHeading.remove();
-                    }
+                    // if (
+                    //     prevHeading &&
+                    //     prevHeading.tagName === "H2" &&
+                    //     (!nextSibling || nextSibling.tagName === "H2")
+                    // ) {
+                    //     prevHeading.remove();
+                    // }
                 }
             }
             else {
