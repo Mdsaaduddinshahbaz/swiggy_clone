@@ -1,4 +1,4 @@
-from database import add_resturant_items,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
+from database import add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
 from flask import Flask,request,render_template,redirect,url_for
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
@@ -32,12 +32,15 @@ from itsdangerous import URLSafeTimedSerializer
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
-def generate_verification_token(email):
-    return serializer.dumps(email, salt="email-verification")
+def generate_verification_token(email,role):
+    return serializer.dumps({
+            "email": email,
+            "role": role
+        }, salt="email-verification")
 
-def send_verification_email(user_email):
+def send_verification_email(user_email,role):
     print("in send varification")
-    token = generate_verification_token(user_email)
+    token = generate_verification_token(user_email,role)
 
     verify_url = url_for(
         "verify_email",
@@ -332,7 +335,7 @@ def validate():
                 print(userid)
                 return ({"success":True,"user_id":userid,"username":username})
             else:
-                send_verification_email(data["email"])
+                send_verification_email(data["email"],"user")
                 return({"success":"Not_verified"})
         else: return({"success":"Not_found"})
     except:
@@ -344,17 +347,24 @@ def validate_owner():
         if not data:
             return ({"success":False})
         print("data in login",data)
-        res=check_existing_user(data["email"],data["password"])
+        res=check_existing_owner(data["email"],data["password"])
         print("res",res)
         if(res["success"]==False): return({"success":False})
-        elif(res["success"]==True): 
-            userid=str(res["userid"])
-            username=res["username"]
-            print(userid)
-            return ({"success":True,"user_id":userid,"username":username})
+        elif(res["success"]==True):
+            if(res["is_verified"]): 
+                userid=str(res["userid"])
+                username=res["username"]
+                is_setup=res["is_setup"]
+                print(userid)
+                return ({"success":True,"user_id":userid,"username":username,"is_setup":is_setup})
+            else:
+                send_verification_email(data["email"],"owner")
+                return({"success":"not_verified"})
         else: return({"success":"Not_found"})
-    except:
-        return({"success":False})
+    except Exception as e:
+        print("in exception validate owner")
+        print(e)
+        return {"success": False}
 @app.post("/signup_user")
 def signup_user():
     try:
@@ -364,43 +374,52 @@ def signup_user():
         email=data["email"]
         username=data["username"]
         password=data["password"]
+        role=data["role"]
         # print(email)
-        print("mail sent")
-        res=create_new_user(email,username,password)
+        print("mail sent",role)
+        res=create_new_user(email,username,password,role)
         # if(verify)
         print(res)
         if(res["success"]):
             # send_verification_email(email)
-            send_verification_email(email)
+            send_verification_email(email,role)
             return ({"success":True,"user_id":res["id"]})
         else:
             return ({"success":False})
-    except:
+    except :
+        print("in exception signup user")
         return({"success":False})
 
 @app.route("/verify/<token>")
 def verify_email(token):
     try:
-        email = serializer.loads(
-            token,
-            salt="email-verification",
-            max_age=3600  # 1 hour
-        )
+        data = serializer.loads(
+        token,
+        salt="email-verification",
+        max_age=3600
+    )
+        email = data["email"]
+        role = data["role"]
     except Exception:
         return "Invalid or expired link."
 
-    userid=set_verified(email)
+    userid=set_verified(email,role)
 
-    return  """
-    <h1>Email verified successfully ✅</h1>
-    <p>Redirecting to login page in 3 seconds...</p>
+    return f"""
+        <h1>Email verified successfully ✅</h1>
+        <p>Redirecting to login page in 3 seconds...</p>
 
-    <script>
-    setTimeout(() => {
-        window.location.href = "/login/user";
-    }, 3000);
-    </script>
-    """
+        <script>
+        const role = "{role}";
+
+        setTimeout(() => {{
+            if(role === "user")
+                window.location.href = "/login/user";
+            else
+                window.location.href = "/login/seller";
+        }}, 3000);
+        </script>
+        """
 
 
 @app.get("/seller/resturantSetup/<seller_id>")

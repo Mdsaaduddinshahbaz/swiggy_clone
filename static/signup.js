@@ -33,21 +33,24 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`/signup_user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email,username, password }),
+        body: JSON.stringify({ email,username, password,role }),
       });
 
       const data = await res.json();
+      console.log("in signup",data)
       if (data.success) {
         alert(data.message || "Signup successful! Please login.");
         // window.location.href = "/login";
         if (role === "user") {
-          alert("An Email is sent to you, please verify your Account and Login")
+          alert("An Email is sent to you, please Check Your Inbox or spam Folder")
           // window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
           window.location.href = `/login/user`
         }
         else {
           // window.location.href = `http://127.0.0.1:5000/seller/${data.user_id}`
-          window.location.href = `/seller/resturantSetup/${data.user_id}`
+          alert("An Email is sent to you, please Check Your Inbox or spam Folder")
+          // window.location.href = `/seller/resturantSetup/${data.user_id}`
+          window.location.href=`/login/seller`
         }
       }
       else if(!data.success){

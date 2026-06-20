@@ -40,6 +40,7 @@ def add_resturants(name,address,phone,owner_id,long,latt):
                 {"_id": ObjectId(owner_id)},
                 {
                     "$set": {
+                        "is_setup":True,
                         "restaurant_name": name
                     }
                     # OR use $push if one owner can have multiple restaurants
@@ -246,20 +247,37 @@ def get_seller_ordes(res_id):
         }
         final_orders.append(data)
     return final_orders
-def create_new_user(email,username, password):
+def create_new_user(email,username, password,role):
     print("in create user")
-    user = users.find_one({"email": email})
-    print(user)
-    if user is None:
-        result =users.insert_one({
-            "email": email,
-            "username":username,
-            "password": password,
-            "is_verified":False
-        })
-        return ({"success":True,"id":str(result.inserted_id)})
+    if(role=="seller"):
+        owner=owners.find_one({"email":email})
+        if owner is None:
+            result =owners.insert_one({
+                    "email": email,
+                    "username":username,
+                    "password": password,
+                    "role":role,
+                    "is_setup":False,
+                    "is_verified":False
+                })
+            return ({"success":True,"id":str(result.inserted_id)})
+        else:
+            print(owner)
+            return ({"success":False})
     else:
-        return ({"success":False})
+        user = users.find_one({"email": email})
+        if user is None:
+            result =users.insert_one({
+                    "email": email,
+                    "username":username,
+                    "password": password,
+                    "role":role,
+                    "is_verified":False
+                })
+            return ({"success":True,"id":str(result.inserted_id)})
+        else:
+            return ({"success":False})
+    # return({"success":False})
 def check_existing_user(email,password):
     print("in existing user")
     user=users.find_one({"email":email})
@@ -267,8 +285,11 @@ def check_existing_user(email,password):
     if(user): 
         print("in existing user if block",password)
         if(user["password"]==password):
-            print("in existing user if if block")
-            return ({"success":True,"userid":user["_id"],"username":user["username"],"is_verified":user["is_verified"]})
+            if(user["role"]=="seller"):
+                return ({"success":True,"userid":user["_id"],"username":user["username"],"is_verified":user["is_verified"],"is_setup":user["is_setup"]})
+            else:
+                print("in existing user if if block")
+                return ({"success":True,"userid":user["_id"],"username":user["username"],"is_verified":user["is_verified"]})
         else:
             return {"success":False}
     else: return {"success":404}
@@ -279,7 +300,7 @@ def check_existing_owner(email,password):
         print("in existing user if block",password)
         if(owner["password"]==password):
             print("in existing user if if block")
-            return ({"success":True,"userid":owner["_id"],"username":owner["username"]})
+            return ({"success":True,"userid":owner["_id"],"username":owner["username"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
         else:
             return {"success":False}
     else: return {"success":404}
@@ -394,5 +415,8 @@ def fetch_address(uid):
     else:
         return {"success":False}
 
-def set_verified(email):
-    users.find_one_and_update({"email":email},{"$set":{"is_verified":True}})
+def set_verified(email,role):
+    if(role=="user"):
+        users.find_one_and_update({"email":email},{"$set":{"is_verified":True}})
+    else:
+        owners.find_one_and_update({"email":email},{"$set":{"is_verified":True}})
