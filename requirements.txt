@@ -7,3 +7,5 @@ redis==7.4.0
 gunicorn==23.0.0
 eventlet==0.41.0
 flask-cors
+flask_mail==0.10.0
+itsdangerouse==2.2.0
