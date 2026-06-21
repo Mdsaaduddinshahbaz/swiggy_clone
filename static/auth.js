@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const data = await res.json();
         console.log(data.success)
-        if (data.success === "not found") {
+        if (data.success === "Not_found") {
           alert("user credentials not found")
         }
         else if(data.success==="Not_verified"){

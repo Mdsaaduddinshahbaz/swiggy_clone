@@ -1,6 +1,8 @@
 const ordersList = document.getElementById("orders-list");
 const pathParts = window.location.pathname.split("/");
 const userId = pathParts[pathParts.length - 1];
+const no_order_container = document.getElementById("No_orders_container")
+const filterDropdown = document.getElementById("filterDropdown");
 console.log(userId)
 const socket = io("https://general-online.onrender.com");
 
@@ -38,10 +40,10 @@ socket.on("order_status_updated", (data) => {
     });
 });
 async function applyFiter() {
-    const filterDropdown = document.getElementById("filterDropdown");
+    no_order_container.classList.remove("show");
     console.log(filterDropdown.value.toLowerCase());
     const cards = document.querySelectorAll(".order-card");
-
+    let visibleCardss = 0;
     cards.forEach(card => {
         console.log("hello")
         const statusText = card
@@ -54,15 +56,22 @@ async function applyFiter() {
             console.log(true)
 
             card.style.display = "block";
+            visibleCardss++;
         } else {
             card.style.display = "none";
         }
     });
+    if (visibleCardss !== 0) {
+            no_order_container.classList.remove("show");
+        } else {
+            no_order_container.classList.add("show");
+        }
     filterDropdown.addEventListener("change", () => {
         const selected = filterDropdown.value.toLowerCase();
         console.log(selected)
         const cards = document.querySelectorAll(".order-card");
-
+        let visibleCards = 0;
+        no_order_container.classList.remove("show");
         cards.forEach(card => {
             const statusText = card
                 .querySelector(".order-status")
@@ -93,10 +102,16 @@ async function applyFiter() {
                     });
                 }
                 card.style.display = "block";
+                visibleCards++;
             } else {
                 card.style.display = "none";
             }
         });
+        if (visibleCards !== 0) {
+            no_order_container.classList.remove("show");
+        } else {
+            no_order_container.classList.add("show");
+        }
     });
 }
 async function loadOrders() {
@@ -105,11 +120,17 @@ async function loadOrders() {
     });
     const data = await res.json();
     console.log(data)
+    console.log(data.orders.length)
     if (!data.success) {
         ordersList.innerHTML = "<p>Error loading orders</p>";
         return;
     }
-
+    if (!data.orders || data.orders.length === 0) {
+        no_order_container.classList.add("show");
+    }
+    else {
+        no_order_container.classList.remove("show");
+    }
     ordersList.innerHTML = "";
 
     data.orders.forEach(order => {
@@ -119,7 +140,7 @@ async function loadOrders() {
         let total = 0;
 
         let restaurantsHTML = "";
-        
+
         Object.entries(cart).forEach(([resId, blabla]) => {
             console.log("Restaurant:", blabla);
 
@@ -219,10 +240,10 @@ document.addEventListener("click", async (e) => {
             statusSpan.className = "order-status status-canceled";
 
             // optional UX improvement
-            e.target.style.display ="none";
+            e.target.style.display = "none";
             // e.target.innerText = "Done ✔";
             // card.remove();
-            
+
             window.location.reload()
             console.log("Completed sent:", orderId, tokenNo);
         }
@@ -230,4 +251,11 @@ document.addEventListener("click", async (e) => {
             alert("failed updating status")
         }
     }
+});
+
+document.getElementById("shopBtn").addEventListener("click", () => {
+    // alert("Redirecting to products page...");
+    
+    // Example:
+    window.location.href = `/user/${userId}`;
 });
