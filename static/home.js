@@ -81,6 +81,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (fetchlocation === null) {
             console.log("fetch=false")
             position = await getPosition();
+            console.log(position)
             userLatt = position.coords.latitude;
             userLong = position.coords.longitude;
             console.log(userLatt, userLong)
@@ -519,6 +520,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
 })
 function getPosition() {
+    console.log("in getPosition");
+    
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             reject("Geolocation is not supported by your browser");
