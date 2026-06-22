@@ -766,4 +766,4 @@ async function getLocation () {
 
 
 }
-getLocation()
+await getLocation()
