@@ -105,8 +105,8 @@ def send_verification_email(user_email,role):
         }
     )
 
-    print(response.status_code)
-    print(response.text)
+    print(response.status_code,flush=True)
+    print(response.text,flush=True)
     print("done sending email")
 
 # send_verification_email("saad778964321@gmail.com")
