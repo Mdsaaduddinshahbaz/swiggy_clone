@@ -11,3 +11,4 @@ flask_mail==0.10.0
 itsdangerous==2.2.0
 gevent
 gevent-websocket
+requests
