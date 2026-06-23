@@ -40,14 +40,15 @@ def generate_verification_token(email,role):
 
 def send_verification_email(user_email,role):
     print("in send varification")
+    print("generating token")
     token = generate_verification_token(user_email,role)
-
+    print("verify url")
     verify_url = url_for(
         "verify_email",
         token=token,
         _external=True
     )
-
+    print("msg")
     msg = Message(
         subject="Verify Your Email",
         sender=app.config["MAIL_USERNAME"],
@@ -323,6 +324,7 @@ def validate():
     try:
         data=request.get_json()
         if not data:
+            print("data not recieved")
             return ({"success":False,"res":res})    
         print("data in login",data)
         res=check_existing_user(data["email"],data["password"])
