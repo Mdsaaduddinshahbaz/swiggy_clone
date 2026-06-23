@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from flask_mail import Message
+import requests
 import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
@@ -15,7 +15,7 @@ mail_use_tls = os.getenv("Mail_use_tls", "True").lower() == "true"
 mail_username=os.getenv("Mail")
 mail_password=os.getenv("Mail_password")
 secret_key=os.getenv("Mail_secret_key")
-
+brevo_api=os.getenv("brevo_api_email")
 app=Flask(__name__)
 CORS(app)
 
@@ -27,6 +27,7 @@ app.config["MAIL_PASSWORD"] = mail_password
 app.config["SECRET_KEY"]=secret_key
 socketio = SocketIO(app, cors_allowed_origins="*")
 mail=Mail(app)
+
 
 from itsdangerous import URLSafeTimedSerializer
 
@@ -48,33 +49,32 @@ def send_verification_email(user_email,role):
         _external=True
     )
 
-    msg = Message(
-        subject="Verify Your Email",
-        sender=app.config["MAIL_USERNAME"],
-        recipients=[user_email]
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "accept": "application/json",
+            "api-key": brevo_api,
+            "content-type": "application/json"
+        },
+        json={
+            "sender": {"email": "dummy.mail.saad@gmail.com"},
+            "to": [{"email": user_email}],
+            "subject": "Verify Email",
+            "htmlContent": f"""
+            <p>Click below to verify:</p>
+            <a href="{verify_url}">{verify_url}</a>
+            """
+        }
     )
+    print(response.status_code,flush=True)
+    print(response.text,flush=True)
+    if(response.status_code==201):
+        print("done sending email")
+        return 1
+    else:
+        return 0
 
-    msg.body = f"""
-    Welcome!
 
-    Click the link below to verify your email:
-
-    {verify_url}
-    """
-    print("email sent",user_email)
-    mail.send(msg)
-
-# send_verification_email("saad778964321@gmail.com")
-# with app.app_context():
-#     msg = Message(
-#         subject="Test Email",
-#         sender=app.config["MAIL_USERNAME"],
-#         recipients=["saad778964321@gmail.com"]
-#     )
-
-#     msg.body = "If you received this, Flask-Mail works."
-
-#     mail.send(msg)
 
 print("Email sent")
 
@@ -335,9 +335,10 @@ def validate():
                 print(userid)
                 return ({"success":True,"user_id":userid,"username":username})
             else:
-                send_verification_email(data["email"],"user")
-                return({"success":"Not_verified"})
-        else: return({"success":"Not_found"})
+                res_email=send_verification_email(data["email"],"user")
+                if(res_email == 1): return({"success":False,"msg":"Not_verified"})
+                else: return ({"success":False,"msg":"Internal Server occured Please Try Again"})
+        else: return({"success":False,"msg":"Not_found"})
     except:
         return({"success":False})
 @app.post("/validate_owner")
@@ -358,9 +359,10 @@ def validate_owner():
                 print(userid)
                 return ({"success":True,"user_id":userid,"username":username,"is_setup":is_setup})
             else:
-                send_verification_email(data["email"],"owner")
-                return({"success":"not_verified"})
-        else: return({"success":"Not_found"})
+                res_email=send_verification_email(data["email"],"owner")
+                if(res_email==1): return({"success":False,"msg":"not_verified"})
+                else: return({"success":False,"msg":"Internal Server occured Please Try again"})
+        else: return({"success":False,"msg":"Not_found"})
     except Exception as e:
         print("in exception validate owner")
         print(e)
@@ -381,14 +383,14 @@ def signup_user():
         # if(verify)
         print(res)
         if(res["success"]):
-            # send_verification_email(email)
-            send_verification_email(email,role)
-            return ({"success":True,"user_id":res["id"]})
+            res_email=send_verification_email(email,role)
+            if (res_email==1):return ({"success":True,"user_id":res["id"]})
+            else: return({"success":False,"msg":"Internal Server Occured Please Try Again"})
         else:
-            return ({"success":False})
+            return ({"success":False,"msg":"user already exists!"})
     except :
         print("in exception signup user")
-        return({"success":False})
+        return({"success":False,"msg":"Internal Error occured Please Try Again"})
 
 @app.route("/verify/<token>")
 def verify_email(token):
