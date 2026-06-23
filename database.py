@@ -286,10 +286,10 @@ def check_existing_user(email,password):
         print("in existing user if block",password)
         if(user["password"]==password):
             if(user["role"]=="seller"):
-                return ({"success":True,"userid":user["_id"],"username":user["username"],"is_verified":user["is_verified"],"is_setup":user["is_setup"]})
+                return ({"success":True,"userid":str(user["_id"]),"username":user["username"],"is_verified":user["is_verified"],"is_setup":user["is_setup"]})
             else:
                 print("in existing user if if block")
-                return ({"success":True,"userid":user["_id"],"username":user["username"],"is_verified":user["is_verified"]})
+                return ({"success":True,"userid":str(user["_id"]),"username":user["username"],"is_verified":user["is_verified"]})
         else:
             return {"success":False}
     else: return {"success":404}
