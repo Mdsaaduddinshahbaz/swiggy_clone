@@ -323,7 +323,7 @@ def validate():
     try:
         data=request.get_json()
         if not data:
-            return ({"success":False})
+            return ({"success":False,"res":res})
         print("data in login",data)
         res=check_existing_user(data["email"],data["password"])
         print("res",res)
@@ -341,7 +341,7 @@ def validate():
     except Exception as e:
         print("in exception validate owner")
         print("error=",e)
-        return {"success": False} 
+        return {"success": False,"res":res} 
 @app.post("/validate_owner")
 def validate_owner():
     try:
