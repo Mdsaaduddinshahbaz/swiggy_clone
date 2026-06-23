@@ -7,6 +7,7 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Message
+import socket
 import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
@@ -34,6 +35,18 @@ print("TLS:", mail_use_tls, flush=True)
 print("SSL:", mail_use_ssl, flush=True)
 print("USER:", mail_username, flush=True)
 print("PASS EXISTS:", bool(mail_password), flush=True)
+
+try:
+    socket.create_connection(("smtp.gmail.com", 465), timeout=10)
+    print("SMTP 465 reachable", flush=True)
+except Exception as e:
+    print("SMTP 465 failed:", repr(e), flush=True)
+
+try:
+    socket.create_connection(("smtp.gmail.com", 587), timeout=10)
+    print("SMTP 587 reachable", flush=True)
+except Exception as e:
+    print("SMTP 587 failed:", repr(e), flush=True)
 socketio = SocketIO(app, cors_allowed_origins="*")
 mail=Mail(app)
 
