@@ -6,8 +6,10 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
+import requests
 from flask_mail import Message
-import socket
+# import socket
+import resend
 import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
@@ -36,19 +38,9 @@ print("SSL:", mail_use_ssl, flush=True)
 print("USER:", mail_username, flush=True)
 print("PASS EXISTS:", bool(mail_password), flush=True)
 
-try:
-    socket.create_connection(("smtp.gmail.com", 465), timeout=10)
-    print("SMTP 465 reachable", flush=True)
-except Exception as e:
-    print("SMTP 465 failed:", repr(e), flush=True)
-
-try:
-    socket.create_connection(("smtp.gmail.com", 587), timeout=10)
-    print("SMTP 587 reachable", flush=True)
-except Exception as e:
-    print("SMTP 587 failed:", repr(e), flush=True)
+brevo_api=os.getenv("brevo_api_email")
 socketio = SocketIO(app, cors_allowed_origins="*")
-mail=Mail(app)
+# mail=Mail(app)
 
 from itsdangerous import URLSafeTimedSerializer
 
@@ -71,27 +63,50 @@ def send_verification_email(user_email,role):
         _external=True
     )
     print("msg")
-    msg = Message(
-        subject="Verify Your Email",
-        sender=app.config["MAIL_USERNAME"],
-        recipients=[user_email]
-    )
+    # msg = Message(
+    #     subject="Verify Your Email",
+    #     sender=app.config["MAIL_USERNAME"],
+    #     recipients=[user_email]
+    # )
 
-    msg.body = f"""
-    Welcome!
+    # msg.body = f"""
+    # Welcome!
 
-    Click the link below to verify your email:
+    # Click the link below to verify your email:
 
-    {verify_url}
-    """
+    # {verify_url}
+    # """
     print("email sending",user_email)
     try:
-        mail.send(msg)
+        # mail.send(msg)
         print("MAIL SENT")
     except Exception as e:
         print("SMTP ERROR:", repr(e))
         raise
     # mail.send(msg)
+
+    # import requests
+
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "accept": "application/json",
+            "api-key": brevo_api,
+            "content-type": "application/json"
+        },
+        json={
+            "sender": {"email": "dummy.mail.saad@gmail.com"},
+            "to": [{"email": user_email}],
+            "subject": "Verify Email",
+            "htmlContent": f"""
+            <p>Click below to verify:</p>
+            <a href="{verify_url}">{verify_url}</a>
+            """
+        }
+    )
+
+    print(response.status_code)
+    print(response.text)
     print("done sending email")
 
 # send_verification_email("saad778964321@gmail.com")
