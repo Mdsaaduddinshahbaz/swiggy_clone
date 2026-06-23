@@ -1,3 +1,6 @@
+let map;
+let marker;
+
 document.addEventListener("DOMContentLoaded", async () => {
     const display_resturants = document.getElementById("resturants_container")
     const cartBtn = document.getElementById("cartBtn")
@@ -11,17 +14,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const request_location = document.getElementById("requestlocation")
     const currentAddress = document.getElementById("currentAddress")
     const livelocationBtn = document.getElementById("liveLocationBtn")
-    const loading_container=document.getElementById("loading_container")
-    const savedAddress=document.getElementById("savedAddress")
-    const userId=pathParts[pathParts.length - 1];
+    const loading_container = document.getElementById("loading_container")
+    const savedAddress = document.getElementById("savedAddress")
+    const userId = pathParts[pathParts.length - 1];
+    const maps_btn = document.getElementById("map_btn")
     console.log(userId)
     let position = null
     let userLocation = null;
     userLatt = null
     userLong = null
     select_options.addEventListener("change", async (e) => {
-        
-        
+
+
         console.log(e.target.value)
         console.log(userLocation)
         const storedLocation = JSON.parse(
@@ -86,25 +90,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             userLong = position.coords.longitude;
             console.log(userLatt, userLong)
         }
-        if(fetchlocation !== null) {
+        if (fetchlocation !== null) {
             console.log(userId)
-            const address=await fetch("/fetch_address", {
-            method: "POST",
-            "headers": { "Content-Type": "application/json" },
-            body: JSON.stringify({ "user_id":userId})
+            const address = await fetch("/fetch_address", {
+                method: "POST",
+                "headers": { "Content-Type": "application/json" },
+                body: JSON.stringify({ "user_id": userId })
             })
-            const data=await address.json()
-            if(data.success){
+            const data = await address.json()
+            if (data.success) {
                 console.log("in fetch address")
                 console.log(data)
-                currentAddress.textContent =data.address[0].adrs_type+ " - "+ data.address[0].address 
-                currentAddress.dataset.long=data.address[0].coordinates.long
-                currentAddress.dataset.lat=data.address[0].coordinates.latt
-                
+                currentAddress.textContent = data.address[0].adrs_type + " - " + data.address[0].address
+                currentAddress.dataset.long = data.address[0].coordinates.long
+                currentAddress.dataset.lat = data.address[0].coordinates.latt
+
                 userLatt = parseFloat(data.address[0].coordinates.latt)
                 userLong = parseFloat(data.address[0].coordinates.long)
                 data.address.forEach((addr) => {
-                    savedAddress.innerHTML+=`
+                    savedAddress.innerHTML += `
                         <div class="address" data-latt=${addr.coordinates.latt} data-long=${addr.coordinates.long}>
                             <span class="type">${addr.adrs_type}</span>
                             <span class="address-text">${addr.address}</span>
@@ -112,9 +116,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     `
                 });
             }
-            else{
+            else {
                 console.log("adrs not found");
-                
+                position = await getPosition();
+                userLatt = position.coords.latitude;
+                userLong = position.coords.longitude;
+                console.log(userLatt, userLong)
             }
         }
         // else {
@@ -130,7 +137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
         console.log(address);
-        // currentAddress.textContent = address
+        currentAddress.textContent = address
 
         localStorage.setItem("currentAddress", address)
 
@@ -291,18 +298,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     //     console.log(userid)
     //     window.location.href = `/orders/${userId}`
     // })
-    savedAddress.addEventListener("click",async(e)=>{
-        const selected_address=e.target.closest(".address")
-        const latt=parseFloat(selected_address.dataset.latt)
-        const long=parseFloat(selected_address.dataset.long)
-        change(latt,long)
+    savedAddress.addEventListener("click", async (e) => {
+        const selected_address = e.target.closest(".address")
+        const latt = parseFloat(selected_address.dataset.latt)
+        const long = parseFloat(selected_address.dataset.long)
+        change(latt, long)
         const addressType =
             selected_address.querySelector(".type").textContent;
 
         const addressText =
             selected_address.querySelector(".address-text").textContent;
 
-        currentAddress.textContent=addressType +" - " + addressText
+        currentAddress.textContent = addressType + " - " + addressText
         box.classList.remove("show")
         overlay.classList.remove("show")
     })
@@ -446,12 +453,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         overlay.classList.remove("show");
     });
 
-    const save_as_box=document.getElementById("addressTagModel")
+    const save_as_box = document.getElementById("addressTagModel")
     // save_as_box.addEventListener("click",async(e)=>{
     //     const selected_tag=e.target.closest(".tag-btn")
     //     const tag=selected_tag.dataset.tag.textContent
     //     console.log(tag);
-        
+
     // })
     suggestions.addEventListener("click", (e) => {
         const item = e.target.closest(".suggestion-item");
@@ -475,29 +482,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         change(latti, longi)
     });
     document.querySelectorAll(".tag-btn").forEach(btn => {
-    btn.addEventListener("click", async() => {
-        const addressType = btn.dataset.tag;
+        btn.addEventListener("click", async () => {
+            const addressType = btn.dataset.tag;
 
-        console.log(addressType); // Home / Work / Other
-        const address=document.getElementById("currentAddress").textContent
-        const address_latt=document.getElementById("currentAddress").dataset.lat
-        const address_long=document.getElementById("currentAddress").dataset.long
-        const cordinates = {
-            latt: address_latt,
-            long: address_long
-        };
-        document.getElementById("addressTagModal")
-            .classList.remove("show");
-        console.log(userId)
-        res = await fetch("/save_address", {
-            method: "POST",
-            "headers": { "Content-Type": "application/json" },
-            body: JSON.stringify({ "address":address,"address_type":addressType,"userId":userId,"cordinates":cordinates })
-        })
-        // Save to backend here
-        currentAddress = addressType +" - " + address
+            console.log(addressType); // Home / Work / Other
+            const address = document.getElementById("currentAddress").textContent
+            const address_latt = document.getElementById("currentAddress").dataset.lat
+            const address_long = document.getElementById("currentAddress").dataset.long
+            const cordinates = {
+                latt: address_latt,
+                long: address_long
+            };
+            document.getElementById("addressTagModal")
+                .classList.remove("show");
+            console.log(userId)
+            res = await fetch("/save_address", {
+                method: "POST",
+                "headers": { "Content-Type": "application/json" },
+                body: JSON.stringify({ "address": address, "address_type": addressType, "userId": userId, "cordinates": cordinates })
+            })
+            // Save to backend here
+            currentAddress = addressType + " - " + address
+        });
     });
-});
 
     livelocationBtn.addEventListener("click", async () => {
         console.log("livelctn button clicked")
@@ -517,6 +524,50 @@ document.addEventListener("DOMContentLoaded", async () => {
         loading_container.classList.remove("show");
         // box.classList.remove("show");
         overlay.classList.remove("show");
+    })
+
+
+    /*map*/
+
+    map = L.map('map').setView([17.3850, 78.4867], 13); // default (Hyderabad)
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+
+
+    // Click on map to select location
+    map.on('click', async (e) => {
+        const { lat, lng } = e.latlng;
+
+        // document.getElementById("lat").value = lat;
+        // document.getElementById("lng").value = lng;
+        const address = await reverseGeocode(
+            lat,
+            lng
+        );
+
+        console.log(address);
+        currentAddress.dataset.long = userLong
+        currentAddress.dataset.lat = userLatt
+        currentAddress.textContent = address
+
+        change(lat,lng)
+        if (marker) {
+            marker.setLatLng(e.latlng);
+        } else {
+            marker = L.marker(e.latlng).addTo(map);
+        }
+        setTimeout(() => {
+            box.classList.remove("show")
+            overlay.classList.remove("show")
+        }, 1000);
+    });
+    const map_container = document.getElementById("map_container");
+    maps_btn.addEventListener("click", async (e) => {
+        await getLocation()
+        map_container.style.display = "block"
     })
 })
 function getPosition() {
@@ -565,7 +616,7 @@ async function change(latt, long) {
     const Note = document.getElementById("Note")
     const loading = document.getElementById("loading")
     const request_location = document.getElementById("requestlocation")
-    const currentAddress = document.getElementById("currentAddress")
+    let currentAddress = document.getElementById("currentAddress")
     try {
         console.log(typeof (latt))
         typeof (latt)
@@ -580,8 +631,8 @@ async function change(latt, long) {
         );
 
         console.log(address);
-        currentAddress.dataset.long=userLong
-        currentAddress.dataset.lat=userLatt
+        currentAddress.dataset.long = userLong
+        currentAddress.dataset.lat = userLatt
         // currentAddress.textContent = address
 
 
@@ -673,3 +724,49 @@ async function change(latt, long) {
         Note.style.display = "none"
     }
 }
+
+
+async function getLocation () {
+    // const maps = document.getElementById("map_container");
+    const currentAddress = document.getElementById("currentAddress")
+    // maps.classList.add("show");
+
+    // setTimeout(() => {
+    //     if (map) {
+    //         map.invalidateSize();
+    //     }
+    // }, 100);
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async(position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                // document.getElementById("lat").value = lat;
+                // document.getElementById("lng").value = lng;
+                const address = await reverseGeocode(
+                    lat,
+                    lng
+                );
+
+                console.log(address);
+                currentAddress.dataset.long = userLong
+                currentAddress.dataset.lat = userLatt
+                currentAddress.textContent = address
+
+                // 🔥 update map
+                map.setView([lat, lng], 15);
+
+                if (marker) {
+                    marker.setLatLng([lat, lng]);
+                } else {
+                    marker = L.marker([lat, lng]).addTo(map);
+                }
+            },
+            () => alert("Location access denied")
+        );
+    }
+
+
+}
+getLocation()

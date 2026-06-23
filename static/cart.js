@@ -9,15 +9,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const orderBtn = document.getElementById("orderBtn")
     const totalPrice = document.getElementById("totalPrice")
     const toPay = document.getElementById("toPay")
-    const addressChgBtn= document.getElementById("ChangeAdrs")
-    const deliveryAdrs=document.getElementById("Deliveryaddress")
+    const addressChgBtn = document.getElementById("ChangeAdrs")
+    const deliveryAdrs = document.getElementById("Deliveryaddress")
     const livelocationBtn = document.getElementById("liveLocationBtn")
-    const loading_container=document.getElementById("loading_container")
-    const typeaddrs=document.getElementById("type")
-    const address_container=document.getElementById("addressOptions");
+    const loading_container = document.getElementById("loading_container")
+    const typeaddrs = document.getElementById("type")
+    const address_container = document.getElementById("addressOptions");
+    const no_order_container = document.getElementById("No_orders_container")
+    const cartContainer = document.querySelector('.cart-container');
+    document.get
     heading.innerText = "Order List";
-    const curr_addr=localStorage.getItem("currentAddress")
-    deliveryAdrs.textContent=curr_addr
+    const curr_addr = localStorage.getItem("currentAddress")
+    deliveryAdrs.textContent = curr_addr
     console.log(userId);  // 45xaddsa
     const res = await fetch("/get_cart_items", {
         method: "POST",
@@ -26,6 +29,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     const data = await res.json()
     console.log(data)
+    console.log(Object.keys(data.results.cart).length)
+    console.log(data.results.cart || Object.keys(data.results.cart).length === 0)
+    if (data.results === null || Object.keys(data.results.cart).length === 0) {
+        cartContainer.querySelector(".cart-left").outerHTML = ""
+        cartContainer.querySelector(".cart-right").outerHTML = ""
+        cartContainer.style.display = "block"
+        no_order_container.classList.add("show")
+    }
+    else {
+        no_order_container.classList.remove("show")
+    }
+
+    document.getElementById("shopBtn").addEventListener("click", () => {
+        // alert("Redirecting to products page...");
+
+        // Example:
+        window.location.href = `/user/${userId}`;
+    });
     let restaurants = {}
     if (data.success) {
         console.log(data.results)
@@ -58,36 +79,36 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         });
     }
-    const address=await fetch("/fetch_address", {
-            method: "POST",
-            "headers": { "Content-Type": "application/json" },
-            body: JSON.stringify({ "user_id":userId})
-            })
-            const datas=await address.json()
-            if(datas.success){
-                console.log("in fetch address")
-                console.log(datas)
-                deliveryAdrs.textContent =datas.address[0].adrs_type+ " - "+ datas.address[0].address 
-                deliveryAdrs.dataset.long=datas.address[0].coordinates.long
-                deliveryAdrs.dataset.lat=datas.address[0].coordinates.latt
-                
-                // userLatt = parseFloat(data.address[0].coordinates.latt)
-                // userLong = parseFloat(data.address[0].coordinates.long)
-                datas.address.forEach((addr) => {
-                    address_container.innerHTML+=`
+    const address = await fetch("/fetch_address", {
+        method: "POST",
+        "headers": { "Content-Type": "application/json" },
+        body: JSON.stringify({ "user_id": userId })
+    })
+    const datas = await address.json()
+    if (datas.success) {
+        console.log("in fetch address")
+        console.log(datas)
+        deliveryAdrs.textContent = datas.address[0].adrs_type + " - " + datas.address[0].address
+        deliveryAdrs.dataset.long = datas.address[0].coordinates.long
+        deliveryAdrs.dataset.lat = datas.address[0].coordinates.latt
+
+        // userLatt = parseFloat(data.address[0].coordinates.latt)
+        // userLong = parseFloat(data.address[0].coordinates.long)
+        datas.address.forEach((addr) => {
+            address_container.innerHTML += `
                         <div class="address-option" data-long=${addr.coordinates.long} data-latt=${addr.coordinates.latt}>
                         <span class="address-type">${addr.adrs_type}</span>
                         <span  name="payment" value="card">${addr.address}</span>
                     </div>
                     `
-                });
-            }
-            else{
-                console.log("adrs not found");
-                
-            }
+        });
+    }
+    else {
+        console.log("adrs not found");
+
+    }
     // Assume 'cartContainer' is the div holding all your .cart-item elements
-    const cartContainer = document.querySelector('.cart-container');
+
 
     cartContainer.addEventListener('click', async (e) => {
         // Check if a quantity button was clicked
@@ -167,6 +188,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ) {
                             prevHeading.remove();
                         }
+
+                        if (document.querySelectorAll(".cart-item").length === 0) {
+                            cartContainer.querySelector(".cart-left").outerHTML = ""
+                            cartContainer.querySelector(".cart-right").outerHTML = ""
+                            cartContainer.style.display = "block"
+                            no_order_container.classList.add("show");
+                        }
                     }
                 }
                 else {
@@ -218,12 +246,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const box = document.getElementById("addressOptions");
     const overlay = document.getElementById("locationOverlay");
-    addressChgBtn.addEventListener("click",async()=>{
+    addressChgBtn.addEventListener("click", async () => {
         console.log("adrschng")
         box.classList.add("show");
-        
+
         overlay.classList.add("show");
-        
+
         // document.getElementById("addressInput").focus();
     })
 
@@ -232,13 +260,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         overlay.classList.remove("show");
     });
 
-    
-    address_container.addEventListener("click",(e)=>{
-        const selected_option=e.target.closest(".address-option")
+
+    address_container.addEventListener("click", (e) => {
+        const selected_option = e.target.closest(".address-option")
         const spans = selected_option.querySelectorAll("span");
-        typeaddrs.innerText=spans[0].textContent +" -"
+        typeaddrs.innerText = spans[0].textContent + " -"
         console.log(spans[0].textContent)
-        deliveryAdrs.textContent=spans[1].textContent  
+        deliveryAdrs.textContent = spans[1].textContent
         address_container.classList.remove("show")
         overlay.classList.remove("show");
     })
@@ -260,13 +288,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             userLocation.latt,
             userLocation.long
         );
-        
+
         console.log(address);
         deliveryAdrs.textContent = address
         loading_container.classList.remove("show");
         // box.classList.remove("show");
         overlay.classList.remove("show");
     })
+
+
 })
 
 function getPosition() {

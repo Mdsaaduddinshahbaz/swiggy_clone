@@ -52,8 +52,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const data = await res.json();
         console.log(data.success)
-        if (data.success === "not found") {
+        if (data.success === "Not_found") {
           alert("user credentials not found")
+        }
+        else if(data.success==="Not_verified"){
+          alert("Not verified \n An Email is Sent to You please click the link to verify your mail")
         }
         else if (data.success) {
           console.log(data)
@@ -78,11 +81,19 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const data = await res.json();
+        console.log(data)
         console.log(data.success)
         if (data.success === "not found") {
           alert("user credentials not found")
         }
-        else if (data.success) {
+        else if (data.success === "not_verified"){
+          alert("An Email is sent to you please click the Link to verify Your Account")
+          window.location.href=`/login/seller`
+        }
+        else if(!data.is_setup){
+          window.location.href = `/seller/resturantSetup/${data.user_id}`
+        }
+        else if (data.success && data.is_setup) {
           alert(data.message || "Welcome!");
           window.location.href = `/seller/${data.username}/${data.user_id}`
         }

@@ -73,7 +73,21 @@ body {
     justify-content: space-between;
     padding: 0 20px;
 }
+/* #map_container{
+    display: none;
+    position: absolute;
+    height: 250px;
+    border-radius: 15px;
+    margin-top: 10px;
+}
+#map_container.show{
+    display: block;
+}
 
+#map{
+        position: relative;
+    top: 70%;
+} */
 .left-nav {
     display: flex;
     align-items: center;
