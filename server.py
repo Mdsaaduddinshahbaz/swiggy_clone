@@ -64,6 +64,7 @@ def send_verification_email(user_email,role):
     """
     print("email sent",user_email)
     mail.send(msg)
+    print("done sending email")
 
 # send_verification_email("saad778964321@gmail.com")
 # with app.app_context():
