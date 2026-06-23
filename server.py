@@ -11,7 +11,8 @@ import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
 mail_port=int(os.getenv("Mail_port"))
-mail_use_tls = os.getenv("Mail_use_tls", "True").lower() == "true"
+mail_use_tls = os.getenv("Mail_use_tls", "False").lower() == "false"
+mail_use_ssl = os.getenv("Mail_use_ssl", "True").lower() == "true"
 mail_username=os.getenv("Mail")
 mail_password=os.getenv("Mail_password")
 secret_key=os.getenv("Mail_secret_key")
@@ -22,9 +23,17 @@ CORS(app)
 app.config["MAIL_SERVER"] = mail_sever_name
 app.config["MAIL_PORT"] = mail_port
 app.config["MAIL_USE_TLS"] = mail_use_tls
+app.config["MAIL_USE_SSL"]=mail_use_ssl
 app.config["MAIL_USERNAME"] = mail_username
 app.config["MAIL_PASSWORD"] = mail_password
 app.config["SECRET_KEY"]=secret_key
+
+print("SERVER:", mail_sever_name, flush=True)
+print("PORT:", mail_port, flush=True)
+print("TLS:", mail_use_tls, flush=True)
+print("SSL:", mail_use_ssl, flush=True)
+print("USER:", mail_username, flush=True)
+print("PASS EXISTS:", bool(mail_password), flush=True)
 socketio = SocketIO(app, cors_allowed_origins="*")
 mail=Mail(app)
 
