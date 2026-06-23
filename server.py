@@ -84,7 +84,7 @@ def send_verification_email(user_email,role):
 
 #     mail.send(msg)
 
-print("Email sent")
+# print("Email sent")
 
 @app.route("/", methods=["GET", "POST"])
 def land():
