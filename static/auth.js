@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const data = await res.json();
-        console.log(data.success)
+        console.log(data)
         if (data.success === "Not_found") {
           alert("user credentials not found")
         }
