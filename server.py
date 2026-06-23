@@ -7,9 +7,6 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 import requests
-# from flask_mail import Message
-# import socket
-# import resend
 import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
@@ -19,7 +16,7 @@ mail_use_ssl = os.getenv("Mail_use_ssl", "True").lower() == "true"
 mail_username=os.getenv("Mail")
 mail_password=os.getenv("Mail_password")
 secret_key=os.getenv("Mail_secret_key")
-
+brevo_api=os.getenv("brevo_api_email")
 app=Flask(__name__)
 CORS(app)
 
@@ -41,6 +38,7 @@ print("PASS EXISTS:", bool(mail_password), flush=True)
 brevo_api=os.getenv("brevo_api_email")
 socketio = SocketIO(app, cors_allowed_origins="*")
 # mail=Mail(app)
+
 
 from itsdangerous import URLSafeTimedSerializer
 
@@ -69,24 +67,6 @@ def send_verification_email(user_email,role):
     #     recipients=[user_email]
     # )
 
-    # msg.body = f"""
-    # Welcome!
-
-    # Click the link below to verify your email:
-
-    # {verify_url}
-    # """
-    print("email sending",user_email)
-    try:
-        # mail.send(msg)
-        print("MAIL SENT")
-    except Exception as e:
-        print("SMTP ERROR:", repr(e))
-        raise
-    # mail.send(msg)
-
-    # import requests
-
     response = requests.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={
@@ -104,22 +84,14 @@ def send_verification_email(user_email,role):
             """
         }
     )
-
     print(response.status_code,flush=True)
     print(response.text,flush=True)
-    print("done sending email")
+    if(response.status_code==201):
+        print("done sending email")
+        return 1
+    else:
+        return 0
 
-# send_verification_email("saad778964321@gmail.com")
-# with app.app_context():
-#     msg = Message(
-#         subject="Test Email",
-#         sender=app.config["MAIL_USERNAME"],
-#         recipients=["saad778964321@gmail.com"]
-#     )
-
-#     msg.body = "If you received this, Flask-Mail works."
-
-#     mail.send(msg)
 
 # print("Email sent")
 
@@ -373,30 +345,27 @@ def handle_order_completed(data):
         return({"success":False})
 @app.post("/validate_user")
 def validate():
-    print("in validate user")
-    data=request.get_json()
-    if not data:
-        print("data not recieved")
-        return ({"success":False,"res":res})    
-    print("data in login",data)
-    res=check_existing_user(data["email"],data["password"])
-    print("res",res)
-    if(res["success"]==False): return({"success":False,"res":res})
-    elif(res["success"]==True):
-        if(res["is_verified"]): 
-            userid=str(res["userid"])
-            username=res["username"]
-            print(userid)
-            return ({"success":True,"user_id":userid,"username":username,"res":res})
-        else:
-            send_verification_email(data["email"],"user")
-            return({"success":"Not_verified","res":res})
-    else: return({"success":"Not_found","res":res})
-    # try:
-    # except Exception as e:
-    #     print("in exception validate owner")
-    #     print("error=",e)
-    #     return {"success": False,"res":res} 
+    try:
+        data=request.get_json()
+        if not data:
+            return ({"success":False})
+        print("data in login",data)
+        res=check_existing_user(data["email"],data["password"])
+        print("res",res)
+        if(res["success"]==False): return({"success":False})
+        elif(res["success"]==True):
+            if(res["is_verified"]): 
+                userid=str(res["userid"])
+                username=res["username"]
+                print(userid)
+                return ({"success":True,"user_id":userid,"username":username})
+            else:
+                res_email=send_verification_email(data["email"],"user")
+                if(res_email == 1): return({"success":False,"msg":"Not_verified"})
+                else: return ({"success":False,"msg":"Internal Server occured Please Try Again"})
+        else: return({"success":False,"msg":"Not_found"})
+    except:
+        return({"success":False})
 @app.post("/validate_owner")
 def validate_owner():
     try:
@@ -415,9 +384,10 @@ def validate_owner():
                 print(userid)
                 return ({"success":True,"user_id":userid,"username":username,"is_setup":is_setup})
             else:
-                send_verification_email(data["email"],"owner")
-                return({"success":"not_verified"})
-        else: return({"success":"Not_found"})
+                res_email=send_verification_email(data["email"],"owner")
+                if(res_email==1): return({"success":False,"msg":"not_verified"})
+                else: return({"success":False,"msg":"Internal Server occured Please Try again"})
+        else: return({"success":False,"msg":"Not_found"})
     except Exception as e:
         print("in exception validate owner")
         print(e)
@@ -438,14 +408,14 @@ def signup_user():
         # if(verify)
         print(res)
         if(res["success"]):
-            # send_verification_email(email)
-            send_verification_email(email,role)
-            return ({"success":True,"user_id":res["id"]})
+            res_email=send_verification_email(email,role)
+            if (res_email==1):return ({"success":True,"user_id":res["id"]})
+            else: return({"success":False,"msg":"Internal Server Occured Please Try Again"})
         else:
-            return ({"success":False})
+            return ({"success":False,"msg":"user already exists!"})
     except :
         print("in exception signup user")
-        return({"success":False})
+        return({"success":False,"msg":"Internal Error occured Please Try Again"})
 
 @app.route("/verify/<token>")
 def verify_email(token):

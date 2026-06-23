@@ -9,6 +9,10 @@ eventlet==0.41.0
 flask-cors
 flask_mail==0.10.0
 itsdangerous==2.2.0
+<<<<<<< HEAD
 gevent
 gevent-websocket
 requests
+=======
+requests
+>>>>>>> 9b441ff (mail working version)

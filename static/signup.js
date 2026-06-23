@@ -54,10 +54,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       else if(!data.success){
-        alert(data.message || "User already exists");
+        alert(data.msg || "User already exists");
       }
        else {
-        alert(data.message || "Signup failed, try again.");
+        alert(data.msg || "Signup failed, try again.");
       }
     } catch (err) {
       console.error("Signup error:", err);
