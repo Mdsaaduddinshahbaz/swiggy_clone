@@ -7,9 +7,9 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 import requests
-from flask_mail import Message
+# from flask_mail import Message
 # import socket
-import resend
+# import resend
 import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
