@@ -337,30 +337,30 @@ def handle_order_completed(data):
         return({"success":False})
 @app.post("/validate_user")
 def validate():
-    try:
-        print("in validate user")
-        data=request.get_json()
-        if not data:
-            print("data not recieved")
-            return ({"success":False,"res":res})    
-        print("data in login",data)
-        res=check_existing_user(data["email"],data["password"])
-        print("res",res)
-        if(res["success"]==False): return({"success":False,"res":res})
-        elif(res["success"]==True):
-            if(res["is_verified"]): 
-                userid=str(res["userid"])
-                username=res["username"]
-                print(userid)
-                return ({"success":True,"user_id":userid,"username":username,"res":res})
-            else:
-                send_verification_email(data["email"],"user")
-                return({"success":"Not_verified","res":res})
-        else: return({"success":"Not_found","res":res})
-    except Exception as e:
-        print("in exception validate owner")
-        print("error=",e)
-        return {"success": False,"res":res} 
+    print("in validate user")
+    data=request.get_json()
+    if not data:
+        print("data not recieved")
+        return ({"success":False,"res":res})    
+    print("data in login",data)
+    res=check_existing_user(data["email"],data["password"])
+    print("res",res)
+    if(res["success"]==False): return({"success":False,"res":res})
+    elif(res["success"]==True):
+        if(res["is_verified"]): 
+            userid=str(res["userid"])
+            username=res["username"]
+            print(userid)
+            return ({"success":True,"user_id":userid,"username":username,"res":res})
+        else:
+            send_verification_email(data["email"],"user")
+            return({"success":"Not_verified","res":res})
+    else: return({"success":"Not_found","res":res})
+    # try:
+    # except Exception as e:
+    #     print("in exception validate owner")
+    #     print("error=",e)
+    #     return {"success": False,"res":res} 
 @app.post("/validate_owner")
 def validate_owner():
     try:
