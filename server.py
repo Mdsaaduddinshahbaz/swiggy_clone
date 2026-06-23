@@ -11,7 +11,7 @@ import os
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
 mail_port=int(os.getenv("Mail_port"))
-mail_use_tls = os.getenv("Mail_use_tls", "False").lower() == "false"
+mail_use_tls = os.getenv("Mail_use_tls", "False").lower() == "true"
 mail_use_ssl = os.getenv("Mail_use_ssl", "True").lower() == "true"
 mail_username=os.getenv("Mail")
 mail_password=os.getenv("Mail_password")
@@ -338,6 +338,7 @@ def handle_order_completed(data):
 @app.post("/validate_user")
 def validate():
     try:
+        print("in validate user")
         data=request.get_json()
         if not data:
             print("data not recieved")
