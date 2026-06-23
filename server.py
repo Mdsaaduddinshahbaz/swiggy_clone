@@ -62,8 +62,14 @@ def send_verification_email(user_email,role):
 
     {verify_url}
     """
-    print("email sent",user_email)
-    mail.send(msg)
+    print("email sending",user_email)
+    try:
+        mail.send(msg)
+        print("MAIL SENT")
+    except Exception as e:
+        print("SMTP ERROR:", repr(e))
+        raise
+    # mail.send(msg)
     print("done sending email")
 
 # send_verification_email("saad778964321@gmail.com")
