@@ -81,6 +81,14 @@ print("Email sent")
 @app.route("/", methods=["GET", "POST"])
 def land():
     return redirect(url_for('renderLanding'))
+import os
+from flask import send_from_directory
+
+@app.route("/.well-known/assetlinks.json", methods=["GET"])
+def serve_asset_links_file():
+    # Assumes your assetlinks.json file is inside your 'static' folder
+    static_file_dir = os.path.join(app.root_path, 'static')
+    return send_from_directory(static_file_dir, 'assetlinks.json', mimetype='application/json')
 @app.route("/user/<userid>", methods=["GET", "POST"])
 def home(userid):
     try:
