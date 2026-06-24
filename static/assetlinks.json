@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.clone",
+      "sha256_cert_fingerprints": [
+        "38:B9:58:53:65:0D:7F:61:70:B6:E0:67:C2:FC:FC:C7:51:40:AD:F1:17:06:FF:27:E1:81:56:98:11:88:BA:C5"
+      ]
+    }
+  }
+]
