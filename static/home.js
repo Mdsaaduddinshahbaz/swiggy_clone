@@ -18,11 +18,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const savedAddress = document.getElementById("savedAddress")
     const userId = pathParts[pathParts.length - 1];
     const maps_btn = document.getElementById("map_btn")
+    const cancelbtn=document.getElementById("closeModal")
     console.log(userId)
     let position = null
     let userLocation = null;
     userLatt = null
     userLong = null
+    map = await L.map('map').setView([17.3850, 78.4867], 13); // default (Hyderabad)
+    console.log("map initialized");
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
     select_options.addEventListener("change", async (e) => {
 
 
@@ -297,6 +304,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     //     console.log(userid)
     //     window.location.href = `/orders/${userId}`
     // })
+    cancelbtn.addEventListener("click",()=>{
+        document.getElementById("addressTagModal")
+            .classList.remove("show");
+    })
     savedAddress.addEventListener("click", async (e) => {
         const selected_address = e.target.closest(".address")
         const latt = parseFloat(selected_address.dataset.latt)
@@ -528,7 +539,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     /*map*/
 
-    map = L.map('map').setView([17.3850, 78.4867], 13); // default (Hyderabad)
+    // map = await L.map('map').setView([17.3850, 78.4867], 13); // default (Hyderabad)
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
@@ -565,8 +576,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     const map_container = document.getElementById("map_container");
     maps_btn.addEventListener("click", async (e) => {
-        await getLocation()
-        map_container.style.display = "block"
+        // await getLocation()
+        if(maps_btn.getAttribute("is_active")==="false"){
+                maps_btn.setAttribute("is_active",true)
+                map_container.style.display = "block"
+                map_container.style.position="relative"
+                setTimeout(() => {
+                map.invalidateSize();
+                }, 100);
+
+            await getLocation();
+        }
+        else{
+            maps_btn.setAttribute("is_active",false)
+            map_container.style.display = "none"
+            map_container.style.position="absolute"
+        }
     })
 })
 function getPosition() {
