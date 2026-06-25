@@ -47,7 +47,7 @@ h1 {
 }
 
 body {
-    background-color: #3d4152;
+    background-color: black;
     color: white;
 }
 
@@ -62,7 +62,10 @@ body {
     z-index: 1000;
     /* display: flex; */
     align-items: center;
-    background: dimgray;
+    background: #391a46;
+    border-bottom-right-radius: 30px;
+    border-bottom-left-radius: 30px;
+    border-bottom: 2px solid white;
 }
 
 .nav-container {
@@ -125,6 +128,9 @@ body {
     cursor: pointer;
     display: flex;
     align-items: center;
+    border:2px solid white;
+    padding: 10px;
+    border-radius: 10px;
 }
 
 #loading{
@@ -659,3 +665,30 @@ button:hover {
     visibility: visible;
     position: relative;
 }
+
+@media (max-width:330px) {
+    /* .right-nav ul{
+        display: block;
+        width: fit-content;
+    } */
+    .right-nav li{
+        padding: 0;
+    }
+}
+
+@media (max-width:270px) {
+    /* .right-nav ul{
+        display: block;
+        width: fit-content;
+    } */
+    .right-nav ul{
+        display: block;
+    }
+    .right-nav li{
+        width: 50%;
+    }
+}
+
+
+
+
