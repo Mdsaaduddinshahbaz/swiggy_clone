@@ -10,7 +10,7 @@
     transition: transform 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 body{
-    background-color: #3d4152;
+    background-color: #341c44;
 }
 .left-nav{
     display: flex;

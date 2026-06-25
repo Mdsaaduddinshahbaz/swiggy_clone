@@ -5,7 +5,7 @@
     font-family: Arial, sans-serif;
 }
 body{
-        background: #3d4152;
+        background: #381042;
 }
 .order-card {
     border: 1px solid #ddd;
@@ -27,12 +27,15 @@ body{
 
 .order-id {
     font-weight: bold;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .order-status {
     padding: 4px 10px;
     border-radius: 8px;
     font-size: 12px;
+    height: fit-content;
 }
 
 .status-placed { background: orange; color: white; }
@@ -169,5 +172,15 @@ p{
 
     h1{
         font-size:24px;
+    }
+}
+@media (max-width:595px) {
+    body{
+        overflow-x: clip;
+    }
+}
+@media (max-width:240px) {
+    .header{
+        display: block;
     }
 }
