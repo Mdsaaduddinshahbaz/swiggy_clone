@@ -12,7 +12,7 @@ function goToOrders() {
 //   window.location.href = `/seller/menu/${resname}/${resId}`;
 // }
 function goToMenu() {
-  window.location.href = `/menu/sel/${resId}`
+  window.location.href = `/seller/menu/${resname}/${resId}`;
 }
 
 function goToAnalytics() {
