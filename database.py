@@ -52,26 +52,36 @@ def add_resturants(name,address,phone,owner_id,long,latt):
 def add_resturant_items(resturant_id,item_name,item_qty,price,sub_id,desc,unit,lowat,available,sold=0):
     ret=resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price,"sub_id":sub_id,"desc":desc,"unit":unit,"lowat":lowat,"available":available,"sold":sold})
     return str(ret.inserted_id)
-def list_resturant_items(resturant_id):
-    res=resturants_items.find({"resturant_id":resturant_id})
-    cat=categories.find_one({"restaurant_id":resturant_id}, {"_id": 0})
-    for c in cat:
-        print("c=",c)
-    # print("cat",cat)
-    item_name={}
-    for r in res:
-       item_name[ r["item_name"]]={
-            "price": r["price"],
-            "id": str(r["_id"]),   # convert ObjectId to string
-            "item_qty":r["item_qty"],
-            "sold":r["sold"],
-            "sub_id":r["sub_id"],
-            "desc":r["desc"],
-            "unit":r["unit"],
-            "lowat":r["lowat"],
-            "available":r["available"]
-        }
-    return ({"item_name":item_name,"categories":cat})
+def list_resturant_items(resturant_id,types):
+    if(types=="seller"):
+        res=resturants_items.find({"resturant_id":resturant_id})
+        cat=categories.find_one({"restaurant_id":resturant_id}, {"_id": 0})
+        for c in cat:
+            print("c=",c)
+        # print("cat",cat)
+        item_name={}
+        for r in res:
+            item_name[ r["item_name"]]={
+                    "price": r["price"],
+                    "id": str(r["_id"]),   # convert ObjectId to string
+                    "item_qty":r["item_qty"],
+                    "sold":r["sold"],
+                    "sub_id":r["sub_id"],
+                    "desc":r["desc"],
+                    "unit":r["unit"],
+                    "lowat":r["lowat"],
+                    "available":r["available"]
+                }
+        return ({"item_name":item_name,"categories":cat})
+    else:
+        res=resturants_items.find({"resturant_id":resturant_id})
+        item_name={}
+        for r in res:
+            item_name[ r["item_name"]]={
+                    "price": r["price"],
+                    "id": str(r["_id"])
+                }
+        return ({"item_name":item_name})
 def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available):
     resturants_items.find_one_and_update({"_id":ObjectId(item_id)},{"$set":
                                                                     {"item_name":name,

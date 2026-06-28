@@ -33,10 +33,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const res = await fetch("/list_items", {
         method: "POST",
         "headers": { "Content-Type": "application/json" },
-        body: JSON.stringify({ "res_id": res_id })
+        body: JSON.stringify({ "res_id": res_id , "type":"user" })
     })
 
     const data = await res.json()
+    console.log(data)
     if (data.success) {
         const mergedd = mergeMenuWithCart(data, datas,
             res_id)
