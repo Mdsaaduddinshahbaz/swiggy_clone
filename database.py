@@ -24,6 +24,7 @@ customer_carts=db["customer_carts"]
 orders=db["Orders"]
 seller_orders=db["seller_orders"]
 users=db["users"]
+categories=db["categories"]
 
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
@@ -48,19 +49,38 @@ def add_resturants(name,address,phone,owner_id,long,latt):
                 session=session
             )
     return str(result.inserted_id )
-def add_resturant_items(resturant_id,item_name,item_qty,price):
-    resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price})
+def add_resturant_items(resturant_id,item_name,item_qty,price,sub_id,desc,unit,lowat,available,sold=0):
+    ret=resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price,"sub_id":sub_id,"desc":desc,"unit":unit,"lowat":lowat,"available":available,"sold":sold})
+    return str(ret.inserted_id)
 def list_resturant_items(resturant_id):
     res=resturants_items.find({"resturant_id":resturant_id})
+    cat=categories.find_one({"restaurant_id":resturant_id}, {"_id": 0})
+    for c in cat:
+        print("c=",c)
+    # print("cat",cat)
     item_name={}
     for r in res:
        item_name[ r["item_name"]]={
             "price": r["price"],
-            "id": str(r["_id"])   # convert ObjectId to string
+            "id": str(r["_id"]),   # convert ObjectId to string
+            "item_qty":r["item_qty"],
+            "sold":r["sold"],
+            "sub_id":r["sub_id"],
+            "desc":r["desc"],
+            "unit":r["unit"],
+            "lowat":r["lowat"],
+            "available":r["available"]
         }
-    return item_name
-def update_resturant_item(item_id,name,price):
-    resturants_items.find_one_and_update({"_id":ObjectId(item_id)},{"$set":{"item_name":name,"price":int(price)}})
+    return ({"item_name":item_name,"categories":cat})
+def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available):
+    resturants_items.find_one_and_update({"_id":ObjectId(item_id)},{"$set":
+                                                                    {"item_name":name,
+                                                                     "price":int(price),
+                                                                     "unit":unit,"lowAt":lowAt,
+                                                                     "desc":desc,
+                                                                     "subId":subId,
+                                                                     "stock":stock,
+                                                                     "available":available}})
 # def list_resturants(long,latt):
 #     restaurants = restaurants_name.find({
 #         "location": {
@@ -420,3 +440,60 @@ def set_verified(email,role):
         users.find_one_and_update({"email":email},{"$set":{"is_verified":True}})
     else:
         owners.find_one_and_update({"email":email},{"$set":{"is_verified":True}})
+
+from pymongo import ReturnDocument
+
+def save_category(res_id, category, subcats):
+    try:
+        # Reserve IDs atomically
+        doc = categories.find_one_and_update(
+            {"restaurant_id": res_id},
+            {
+                "$inc": {
+                    "next_category_id": 1,
+                    "next_subcat_id": len(subcats)
+                }
+            },
+            upsert=True,
+            return_document=ReturnDocument.BEFORE
+        )
+
+        # First document case
+        if doc is None:
+            cat_id = 1
+            first_sub_id = 1
+        else:
+            cat_id = doc.get("next_category_id", 1)
+            first_sub_id = doc.get("next_subcat_id", 0)+1
+
+        category_data = {
+            "_id": cat_id,
+            "name": category,
+            "subcategories": [
+                {
+                    "_id": first_sub_id + i,
+                    "name": subcat
+                }
+                for i, subcat in enumerate(subcats)
+            ]
+        }
+
+        categories.update_one(
+            {"restaurant_id": res_id},
+            {
+                "$push": {
+                    "categories": category_data
+                },
+                "$setOnInsert": {
+                "restaurant_id": res_id
+                }
+            }
+        )
+
+        return {"success": True,"category_data": category_data}
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }

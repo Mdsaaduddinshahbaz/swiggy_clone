@@ -24,8 +24,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
 
     const data = await res.json()
+    console.log(data)
     if (data.success) {
-        console.log(data)
         resname_html.innerText=resname
         resname_heading.innerText=resname
         // res_info.closest("h1").innerText = name

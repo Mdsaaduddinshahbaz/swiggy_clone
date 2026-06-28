@@ -54,4 +54,14 @@ h1 {
 
 .table tr {
   border-bottom: 1px solid rgba(255,255,255,0.1);
+  word-break:break-word;
+}
+
+@media (max-width:240px) {
+  h1{
+    word-break: break-word;
+  }
+  .card{
+    min-width: min-content;
+  }
 }

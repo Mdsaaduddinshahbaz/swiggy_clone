@@ -1,4 +1,4 @@
-from database import add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
+from database import save_category,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
 from flask import Flask,request,render_template,redirect,url_for
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
@@ -104,9 +104,15 @@ def add_itemss():
         itm_name=data["itm_name"]
         itm_qty=data["itm_qty"]
         price=data["price"]
+        sub_id=data["sub_id"]
+        desc=data["description"]
+        unit=data["unit"]
+        lowat=data["lowAt"]
+        available=data["available"]
+
         # print(res_id,itm)
-        add_resturant_items(res_id,itm_name,itm_qty,price)
-        return ({"success":True})
+        res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
+        return ({"success":True,"id":res})
     except:
         return({"success":False})
 
@@ -153,8 +159,9 @@ def list_item():
         data=request.get_json()
         res_id=data["res_id"]
         res=list_resturant_items(res_id)
-        return ({"success":True,"res":res})
-    except:
+        return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
+    except Exception as e:
+        print(e)
         return({"success":False})
 @app.post("/update_item_details")
 def update_items():
@@ -164,7 +171,13 @@ def update_items():
         item_id=data["item_id"]
         item_name=data["name"]
         item_price=data["price"]
-        update_resturant_item(item_id,item_name,item_price)
+        unit=data["unit"]
+        lowAt=data["lowAt"]
+        desc=data["desc"]
+        subId=data["subId"]
+        stock=data["stock"],
+        available=data["available"]
+        update_resturant_item(item_id,item_name,item_price,unit,lowAt,desc,subId,stock,available)
         return ({"success":True})
     except:
         return({"success":False})
@@ -190,7 +203,13 @@ def list_items(name,address,res_id,user_id):
         return render_template("menu.html")
     except:
         return({"success":False})
-
+@app.get("/menu/sel/<id>")
+def s_me(id):
+    print("running s_me")
+    try:
+        return render_template("menu_seller.html")
+    except:
+        return({"success":False})
 @app.get("/cart/<userid>")
 def cartss(userid):
     try:
@@ -551,5 +570,19 @@ def fetch_addresss():
         return({"success":True,"address":address["address"]})
     else:
         return({"success":False})
+    
+@app.post("/save_categories")
+def sve_cate():
+    data=request.get_json()
+    res_id=data["res_id"]
+    cat_name=data["cat_name"]
+    sub_cats=data["subcats"]
+    res=save_category(res_id,cat_name,sub_cats)
+    if(res["success"]):
+        print(res)
+        return({"success":True,"category":res["category_data"]})
+    else:
+        print(res)
+        return({"success":False,"error":res["error"]})
 if __name__ == "__main__":
     socketio.run(app, debug=True)
