@@ -8,8 +8,11 @@ function goToOrders() {
   window.location.href = `/seller/orders/${resId}`;
 }
 
+// function goToMenu() {
+//   window.location.href = `/seller/menu/${resname}/${resId}`;
+// }
 function goToMenu() {
-  window.location.href = `/seller/menu/${resname}/${resId}`;
+  window.location.href = `/menu/sel/${resId}`
 }
 
 function goToAnalytics() {

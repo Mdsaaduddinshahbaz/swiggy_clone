@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Seller Store Inventory</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+  <!-- <link rel="stylesheet" href="../static/menu_seller.css"> -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='menu_seller.css') }}">
+</head>
+<body>
+
+<div class="app">
+  <div
+  id="sidebarOverlay"
+  class="sidebar-overlay hidden"
+></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="sidebar-header">
+      <button id="hideCategoryBtn">+</button>
+      <h2>Catalogue</h2>
+      <button id="addCategoryBtn">+</button>
+    </div>
+
+    <button class="all-items-btn active" id="allItemsBtn">
+      All items
+    </button>
+
+    <div id="categoryTree" class="tree"></div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <section class="hero">
+      <button
+  id="menuToggle"
+  class="menu-toggle"
+>
+  ☰
+</button>
+      <div>
+        <span class="breadcrumb" id="breadcrumb">
+          Every category
+        </span>
+
+        <h1 id="headerTitle">
+          All items
+        </h1>
+      </div>
+
+      <button id="addItemBtn" class="primary-btn">
+        + Add item
+      </button>
+
+    </section>
+
+    <section class="stats">
+
+      <div class="stat">
+        <span>Total items</span>
+        <h2 id="totalItems">0</h2>
+      </div>
+
+      <div class="stat">
+        <span>Listed</span>
+        <h2 class="green" id="listedItems">0</h2>
+      </div>
+
+      <div class="stat">
+        <span>Low stock</span>
+        <h2 class="amber" id="lowItems">0</h2>
+      </div>
+
+      <div class="stat">
+        <span>Out of stock</span>
+        <h2 class="red" id="outItems">0</h2>
+      </div>
+
+    </section>
+
+    <section class="toolbar">
+
+      <select id="stockFilter">
+        <option value="all">All stock levels</option>
+        <option value="low">Low stock</option>
+        <option value="out">Out of stock</option>
+      </select>
+
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search name or SKU"
+      />
+
+    </section>
+
+    <section id="itemsGrid" class="grid"></section>
+
+  </main>
+
+</div>
+<div
+  id="itemDrawer"
+  class="drawer-overlay hidden"
+>
+
+  <div class="drawer">
+
+    <div class="drawer-header">
+      <h2 id="drawerTitle">
+        Add Item
+      </h2>
+
+      <button
+        id="closeDrawer"
+      >
+        ✕
+      </button>
+    </div>
+
+    <input
+      id="itemName"
+      placeholder="Item name"
+    >
+
+    <textarea
+      id="itemDesc"
+      placeholder="Description"
+    ></textarea>
+
+    <input
+      id="itemUnit"
+      placeholder="Pack size"
+    >
+
+    <input
+      id="itemPrice"
+      type="number"
+      placeholder="Price"
+    >
+
+    <input
+      id="itemStock"
+      type="number"
+      placeholder="Stock"
+    >
+
+    <input
+      id="itemLow"
+      type="number"
+      placeholder="Low stock at"
+      value="10"
+    >
+
+    <select id="itemSub"></select>
+
+    <label>
+
+      <input
+        id="itemListed"
+        type="checkbox"
+        checked
+      >
+
+      Listed for customers
+
+    </label>
+
+    <button
+      id="saveItemBtn"
+      class="primary-btn"
+    >
+      Save
+    </button>
+
+  </div>
+
+</div>
+<div
+  id="categoryDrawer"
+  class="drawer-overlay hidden"
+>
+
+  <div class="drawer">
+
+    <div class="drawer-header">
+      <h2>
+        New Category
+      </h2>
+
+      <button
+        id="closeCategoryDrawer"
+      >
+        ✕
+      </button>
+    </div>
+
+    <input
+      id="catName"
+      placeholder="Category name"
+    >
+
+    <textarea
+      id="subNames"
+      placeholder="
+Rice
+Atta
+Pulses
+"
+    ></textarea>
+
+    <button
+      id="saveCategoryBtn"
+      class="primary-btn"
+    >
+      Create Category
+    </button>
+
+  </div>
+
+</div>
+<script src="{{ url_for('static', filename='menu_seller.js') }}"></script>
+<!-- <script src="../static/menu_seller.js"></script> -->
+</body>
+</html>

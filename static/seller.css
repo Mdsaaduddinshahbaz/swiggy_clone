@@ -125,3 +125,23 @@ body {
   opacity: 0.7;
   margin-top: 5px;
 }
+
+@media (max-width:450px) {
+    body{
+      display: block;
+    }
+    .sidebar{
+      width: 100%;
+    }
+    .actions{
+      display: flex;
+      flex-direction: column;
+    }
+    .cards{
+      display: flex !important;
+      flex-direction: column;
+    }
+    .header{
+      display: block;
+    }
+}
