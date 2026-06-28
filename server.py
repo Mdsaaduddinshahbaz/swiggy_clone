@@ -243,7 +243,7 @@ def addToCart():
 @app.get("/seller/menu/<name>/<seller_id>")
 def seller_page(name,seller_id):
     try:
-        return render_template("seller_items.html")
+        return render_template("menu_seller.html")
     except:
         return({"success":False})
 @app.post("/store_orders")
