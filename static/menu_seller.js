@@ -1,11 +1,14 @@
 const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
+const type=pathParts[pathParts.length - 4];
+console.log(type);
+
 document.addEventListener("DOMContentLoaded", async () => {
   const res = await fetch("/list_items", {
     method: "POST",
     "headers": { "Content-Type": "application/json" },
-    body: JSON.stringify({ "res_id": resId })
+    body: JSON.stringify({ "res_id": resId ,"type":type})
   })
   const data = await res.json()
   console.log(data)

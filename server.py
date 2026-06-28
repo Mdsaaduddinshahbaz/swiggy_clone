@@ -175,8 +175,12 @@ def list_item():
     try:
         data=request.get_json()
         res_id=data["res_id"]
-        res=list_resturant_items(res_id)
-        return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
+        types=data["type"]
+        res=list_resturant_items(res_id,types)
+        if(types=="seller"):
+            return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
+        else:
+            return ({"success":True,"res":res["item_name"]})
     except Exception as e:
         print(e)
         return({"success":False})
