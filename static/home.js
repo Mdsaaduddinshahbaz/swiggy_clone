@@ -104,6 +104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 body: JSON.stringify({ "user_id": userId })
             })
             const data = await address.json()
+            console.log(data)
             if (data.success) {
                 console.log("in fetch address")
                 console.log(data)
