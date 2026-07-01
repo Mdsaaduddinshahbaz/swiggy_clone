@@ -1,5 +1,5 @@
 from database import save_category,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address
-from flask import Flask,request,render_template,redirect,url_for
+from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
 from flask_cors import CORS
@@ -7,6 +7,9 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 from verify import upload_image
+from functools import wraps
+import jwt
+from datetime import datetime,timedelta
 import requests
 import os
 load_dotenv(override=True)
@@ -44,7 +47,29 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 from itsdangerous import URLSafeTimedSerializer
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        token = request.cookies.get("token")
 
+        if not token:
+            return jsonify({"success": False}), 401
+
+        try:
+            payload = jwt.decode(
+                token,
+                app.config["SECRET_KEY"],
+                algorithms=["HS256"]
+            )
+
+            g.user_id = payload["user_id"]
+
+        except jwt.InvalidTokenError:
+            return jsonify({"success": False}), 401
+
+        return f(*args, **kwargs)
+
+    return wrapper
 def generate_verification_token(email,role):
     return serializer.dumps({
             "email": email,
@@ -133,21 +158,6 @@ def add_itemss():
         return ({"success":True,"id":res})
     except:
         return({"success":False})
-
-# @app.post("/add_resturant")
-# def add_resturant():
-#     try:
-#         data=request.get_json()
-#         name=data["name"]
-#         address=data["address"]
-#         phone=data["phone"]
-#         latt = round(float(data["lat"]), 4)
-#         long = round(float(data["lng"]), 4)
-#         owner_id=data["owner_id"]
-#         id=add_resturants(name,address,phone,owner_id,long,latt)
-#         return ({"success":True,"res_id":id})
-#     except:
-#         return({"success":False})
 
 @app.post("/add_resturant")
 def add_resturant():
@@ -270,10 +280,11 @@ def list_cart_items():
     except:
         return({"success":False})
 @app.post("/add_to_cart")
+@login_required
 def addToCart():
     try:
         data=request.get_json()
-        userid=data["userid"]
+        userid=g.user_id
         resid=data["resid"]
         name=data["item"]
         qty=data["qty"]
@@ -291,10 +302,11 @@ def seller_page(name,seller_id):
     except:
         return({"success":False})
 @app.post("/store_orders")
+@login_required
 def store_order():
     try:
         data=request.get_json()
-        user_id=data["user_id"]
+        user_id=g.user_id
         resids=store_orders(user_id)
         if(resids==404):
             return({"success":False})
@@ -310,8 +322,10 @@ def renderOrders(userid):
     except:
         return({"success":False})
 @app.post("/get_orders/<userid>")
+@login_required
 def getOrders(userid):
     try:
+        userid=g.user_id
         orders=get_orders(userid)
         print("oorders in server",orders)
         return({"success":True,"orders":orders})
@@ -404,7 +418,25 @@ def validate():
                 userid=str(res["userid"])
                 username=res["username"]
                 print(userid)
-                return ({"success":True,"user_id":userid,"username":username})
+                token = jwt.encode(
+                    {
+                        "user_id": str(userid),
+                        "username":username,
+                        "exp": datetime.utcnow() + timedelta(days=7)
+                    },
+                    app.config["SECRET_KEY"],
+                    algorithm="HS256"
+                )
+                response=jsonify({"success":True,"user_id":userid,"username":username})
+                response.set_cookie(
+                    "token",
+                    token,
+                    httponly=True,
+                    secure=False,      # True in production with HTTPS
+                    samesite="Lax",
+                    max_age=7 * 24 * 60 * 60
+                )
+                return response
             else:
                 res_email=send_verification_email(data["email"],"user")
                 if(res_email == 1): return({"success":False,"msg":"Not_verified"})
@@ -573,10 +605,12 @@ def return_seller_stats():
     except:
         return({"success":False})
 @app.post("/update_cart")
+@login_required
 def update_cart():
     try:
         data=request.get_json()
-        userid=data["user_id"]
+        # userid=data["user_id"]
+        userid=g.user_id
         item_id=data["item_id"]
         qty=data["qty"]
         update_cart_qty(userid,item_id,qty)
