@@ -9,17 +9,35 @@ async function setupRestaurant() {
 
     // const sellerId = localStorage.getItem("seller_id");
     console.log(name, address, phone, lat, lng)
+    // const res = await fetch("/add_resturant", {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //         name,
+    //         address,
+    //         phone,
+    //         lat,
+    //         lng,
+    //         owner_id: sellerId
+    //     })
+    // });
+    const formData = new FormData();
+
+    formData.append("name", name);
+    formData.append("address", address);
+    formData.append("phone", phone);
+    formData.append("lat", lat);
+    formData.append("lng", lng);
+    formData.append("owner_id", sellerId);
+
+    const file = document.getElementById("photo").files[0];
+    if (file) {
+        formData.append("photo", file);
+    }
+
     const res = await fetch("/add_resturant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            name,
-            address,
-            phone,
-            lat,
-            lng,
-            owner_id: sellerId
-        })
+        body: formData
     });
 
     const data = await res.json();
@@ -60,6 +78,16 @@ let map;
 let marker;
 document.addEventListener("DOMContentLoaded", async () => {
     const createBtn = document.getElementById("createBtn")
+    const photoInput = document.getElementById('photo');
+    const preview = document.getElementById('preview');
+
+    photoInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    });
     createBtn.addEventListener("click", () => {
         setupRestaurant()
     })

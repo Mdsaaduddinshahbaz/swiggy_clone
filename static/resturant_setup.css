@@ -68,3 +68,12 @@ button {
 button:hover {
   background: #0ea5e9;
 }
+
+#photo::file-selector-button {
+  background: #40bff5;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+}

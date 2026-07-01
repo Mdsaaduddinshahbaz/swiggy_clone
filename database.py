@@ -28,12 +28,12 @@ categories=db["categories"]
 
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
-def add_resturants(name,address,phone,owner_id,long,latt):
+def add_resturants(name,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
     # res=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
     with client.start_session() as session:
         with session.start_transaction():
 
-            result=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
+            result=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]},"file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"})
             # parent_id = result.inserted_id 
 
             # 3. Add that parent_id to every seller doc before inserting
@@ -124,7 +124,7 @@ def list_resturants(long,latt,dist:int=5):
     res_names={}
     for r in restaurants:
         print(r["name"])
-        res_names[r["name"]]={"res_id":str(r["_id"]),"address":r["address"]}
+        res_names[r["name"]]={"res_id":str(r["_id"]),"address":r["address"],"file_url":r["file_url"]}
         # res_names.append(r["name"])
     return res_names
 def add_new_customer(username,password):
