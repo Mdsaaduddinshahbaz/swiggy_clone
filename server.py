@@ -6,6 +6,7 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
+from verify import upload_image
 import requests
 import os
 load_dotenv(override=True)
@@ -133,19 +134,41 @@ def add_itemss():
     except:
         return({"success":False})
 
+# @app.post("/add_resturant")
+# def add_resturant():
+#     try:
+#         data=request.get_json()
+#         name=data["name"]
+#         address=data["address"]
+#         phone=data["phone"]
+#         latt = round(float(data["lat"]), 4)
+#         long = round(float(data["lng"]), 4)
+#         owner_id=data["owner_id"]
+#         id=add_resturants(name,address,phone,owner_id,long,latt)
+#         return ({"success":True,"res_id":id})
+#     except:
+#         return({"success":False})
+
 @app.post("/add_resturant")
 def add_resturant():
     try:
-        data=request.get_json()
-        name=data["name"]
-        address=data["address"]
-        phone=data["phone"]
-        latt = round(float(data["lat"]), 4)
-        long = round(float(data["lng"]), 4)
-        owner_id=data["owner_id"]
-        id=add_resturants(name,address,phone,owner_id,long,latt)
-        return ({"success":True,"res_id":id})
-    except:
+        name = request.form.get("name")
+        address = request.form.get("address")
+        phone = request.form.get("phone")
+        latt = round(float(request.form.get("lat")),4)
+        long = round(float(request.form.get("lng")),4)
+        owner_id = request.form.get("owner_id")
+        photo = request.files.get("photo")
+        if (photo):
+            file_id=upload_image(photo)
+            print(file_id)
+            id=add_resturants(name,address,phone,owner_id,long,latt,file_id)
+            return ({"success":True,"res_id":id})
+        else:
+            id=add_resturants(name,address,phone,owner_id,long,latt)
+            return ({"success":True,"res_id":id})
+    except Exception as e:
+        print(e)
         return({"success":False})
 @app.post("/remove_items")
 def remove_item():

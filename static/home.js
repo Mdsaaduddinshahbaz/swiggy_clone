@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         `<div class="card" id=${detail.res_id}>
                 <div class="card-img">
                     
-                    <img src="../static/food.jpg">
+                    <img src=${detail.file_url} alt="Food">
                     <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
                 </div>
                 <div class="card-details">
@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         `<div class="card" id=${detail.res_id}>
                 <div class="card-img">
                     
-                    <img src="../static/food.jpg">
+                    <img src=${detail.file_url} alt="Food">
                     <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
                 </div>
                 <div class="card-details">
@@ -574,6 +574,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         setTimeout(() => {
             box.classList.remove("show")
             overlay.classList.remove("show")
+            maps_btn.setAttribute("is_active",false)
+            map_container.style.display = "none"
+            map_container.style.position="absolute"
         }, 1000);
     });
     const map_container = document.getElementById("map_container");
@@ -583,6 +586,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 maps_btn.setAttribute("is_active",true)
                 map_container.style.display = "block"
                 map_container.style.position="relative"
+                savedAddress.classList.remove("show")
                 setTimeout(() => {
                 map.invalidateSize();
                 }, 100);
@@ -699,7 +703,7 @@ async function change(latt, long) {
                         `<div class="card" id=${detail.res_id}>
                 <div class="card-img">
                     
-                    <img src="../static/food.jpg">
+                    <img src=${detail.file_url} alt="Food">
                     <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
                 </div>
                 <div class="card-details">

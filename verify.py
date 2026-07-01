@@ -82,7 +82,7 @@ drive_service = build(
     credentials=creds
 )
 
-def upload_image(filepath):
+def upload_images(filepath):
     ext = filepath.rsplit(".", 1)[1].lower()
     filename = f"{uuid.uuid4()}.{ext}"
 
@@ -102,6 +102,13 @@ def upload_image(filepath):
         fields="id"
     ).execute()
 
+    drive_service.permissions().create(
+    fileId=file["id"],
+    body={
+        "type": "anyone",
+        "role": "reader"
+    }
+    ).execute()
     file_id = file["id"]
 
     print("✅ Uploaded successfully!")
@@ -110,3 +117,39 @@ def upload_image(filepath):
     return file["id"]
 
 # upload_image("food.jpg")
+
+import io
+import pickle
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+def upload_image(photo):
+    ext = photo.filename.rsplit(".", 1)[1].lower()
+    filename = f"{uuid.uuid4()}.{ext}"
+
+    metadata = {
+        "name": filename,
+        "parents": [FOLDER_ID]
+    }
+
+    media = MediaIoBaseUpload(
+        io.BytesIO(photo.read()),
+        mimetype=photo.content_type
+    )
+
+    file = drive_service.files().create(
+        body=metadata,
+        media_body=media,
+        fields="id"
+    ).execute()
+
+    drive_service.permissions().create(
+        fileId=file["id"],
+        body={
+            "type": "anyone",
+            "role": "reader"
+        }
+    ).execute()
+
+    return file["id"]
