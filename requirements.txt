@@ -6,7 +6,6 @@ google_api_python_client==2.43.0
 google_auth_oauthlib==0.5.3
 itsdangerous==2.2.0
 protobuf==7.35.1
-PyJWT==2.10.1
 PyJWT==2.13.0
 pymongo==4.16.0
 python-dotenv==1.2.2
