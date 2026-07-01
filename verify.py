@@ -53,29 +53,50 @@ FOLDER_ID = "1NR8WPfiRUDqjwDKvNFWxGPNAZ2NivOte"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # ==========================
 
-creds = None
+# creds = None
 
-# Load saved token if it exists
-if os.path.exists("token.pickle"):
-    with open("token.pickle", "rb") as token:
+# # Load saved token if it exists
+# if os.path.exists("token.pickle"):
+#     with open("token.pickle", "rb") as token:
+#         creds = pickle.load(token)
+
+# # Login if needed
+# if not creds or not creds.valid:
+#     if creds and creds.expired and creds.refresh_token:
+#         creds.refresh(Request())
+#     else:
+#         flow = InstalledAppFlow.from_client_config(
+#             google_oauth,
+#             SCOPES
+#         )
+#         creds = flow.run_local_server(port=0)
+
+#     # Save token for future runs
+#     with open("token.pickle", "wb") as token:
+#         pickle.dump(creds, token)
+
+# # Build Drive service
+# drive_service = build(
+#     "drive",
+#     "v3",
+#     credentials=creds
+# )
+
+creds = None
+TOKEN_FILE = "/etc/secrets/token.pickle"
+
+if os.path.exists(TOKEN_FILE):
+    with open(TOKEN_FILE, "rb") as token:
         creds = pickle.load(token)
 
-# Login if needed
-if not creds or not creds.valid:
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    else:
-        flow = InstalledAppFlow.from_client_config(
-            google_oauth,
-            SCOPES
-        )
-        creds = flow.run_local_server(port=0)
+if not creds:
+    raise Exception(
+        "token.pickle not found. Generate it locally and upload it as a Render Secret File."
+    )
 
-    # Save token for future runs
-    with open("token.pickle", "wb") as token:
-        pickle.dump(creds, token)
+if creds.expired and creds.refresh_token:
+    creds.refresh(Request())
 
-# Build Drive service
 drive_service = build(
     "drive",
     "v3",
