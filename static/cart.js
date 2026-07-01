@@ -29,8 +29,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     const data = await res.json()
     console.log(data)
-    console.log(Object.keys(data.results.cart).length)
-    console.log(data.results.cart || Object.keys(data.results.cart).length === 0)
+    // console.log(Object.keys(data.results.cart).length)
+    // console.log(data.results.cart || Object.keys(data.results.cart).length === 0)
     if (data.results === null || Object.keys(data.results.cart).length === 0) {
         cartContainer.querySelector(".cart-left").outerHTML = ""
         cartContainer.querySelector(".cart-right").outerHTML = ""
