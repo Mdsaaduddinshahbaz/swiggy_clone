@@ -45,7 +45,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-
+import os
 # ========= CONFIG =========
 CREDENTIALS_FILE = "credentials.json"
 TEST_IMAGE = "./static/logo.png"
@@ -53,9 +53,9 @@ FOLDER_ID = "1NR8WPfiRUDqjwDKvNFWxGPNAZ2NivOte"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # ==========================
 
-# creds = None
+creds = None
 
-# # Load saved token if it exists
+# Load saved token if it exists
 # if os.path.exists("token.pickle"):
 #     with open("token.pickle", "rb") as token:
 #         creds = pickle.load(token)
@@ -72,8 +72,10 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 #         creds = flow.run_local_server(port=0)
 
 #     # Save token for future runs
-#     with open("token.pickle", "wb") as token:
-#         pickle.dump(creds, token)
+#     # with open("token.pickle", "wb") as token:
+#     #     pickle.dump(creds, token)
+#     with open("token.json", "w") as f:
+#             f.write(creds.to_json())
 
 # # Build Drive service
 # drive_service = build(
@@ -81,13 +83,18 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 #     "v3",
 #     credentials=creds
 # )
-
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 creds = None
-TOKEN_FILE = "/etc/secrets/token.pickle"
+# TOKEN_FILE = "/etc/secrets/token.pickle"
 
-if os.path.exists(TOKEN_FILE):
-    with open(TOKEN_FILE, "rb") as token:
-        creds = pickle.load(token)
+# if os.path.exists(TOKEN_FILE):
+#     with open(TOKEN_FILE, "rb") as token:
+#         creds = pickle.load(token)
+creds=Credentials.from_authorized_user_file(
+    "/etc/secrets/token.json",
+    SCOPES
+)
 
 if not creds:
     raise Exception(
