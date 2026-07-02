@@ -6,3 +6,5 @@ clone/
 credentials.json
 token.pickle
 integrated-hawk-500906-n1-1588620a5eb1.json
+images/
+pexel_download.py
