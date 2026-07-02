@@ -103,7 +103,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.location.href = `/orders/${userid}`
     })
 
-
+    const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
+    hidecartorderBtn.addEventListener("click",()=>{
+        console.log("clicked")
+        const cartorderContainer=document.getElementById("CartOrderContainer")
+        if(cartorderContainer.classList.contains("hide")){
+            cartorderContainer.classList.replace("hide","show")
+        }
+        else{
+            cartorderContainer.classList.replace("show","hide")
+        }
+    })
     menu_items_container.addEventListener("click", async (e) => {
         if (e.target.classList.contains("add-btn")) {
 

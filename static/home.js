@@ -306,6 +306,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     //     console.log(userid)
     //     window.location.href = `/orders/${userId}`
     // })
+    const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
+    hidecartorderBtn.addEventListener("click",()=>{
+        console.log("clicked")
+        const cartorderContainer=document.getElementById("CartOrderContainer")
+        if(cartorderContainer.classList.contains("hide")){
+            cartorderContainer.classList.replace("hide","show")
+        }
+        else{
+            cartorderContainer.classList.replace("show","hide")
+        }
+    })
     cancelbtn.addEventListener("click",()=>{
         document.getElementById("addressTagModal")
             .classList.remove("show");
