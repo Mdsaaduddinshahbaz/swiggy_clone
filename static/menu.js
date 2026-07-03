@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(data)
         // res_info.closest("h1").innerText = name
         Object.entries(mergedd).forEach(([name, item]) => {
-            console.log(name, item.id, item.price, item.qty)
+            console.log(name, item.id, item.price, item.qty,item.file_url)
             if (item.qty === 0) {
                 menu_items_container.innerHTML +=
                     `
@@ -55,8 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 <p class="price">${item.price}</p>
                             </div>
                             <div class="item-img-wrapper">
-                                <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=300&q=80"
-                                    alt="Burger">
+                                <img src=${item.file_url} alt="Burger">
                                 <button class="add-btn" id=${item.id}>ADD</button>
                                 <p class="customisable">Customisable</p>
                             </div>
@@ -74,7 +73,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             <p class="price">${item.price}</p>
                         </div>
                         <div class="item-img-wrapper">
-                            <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=300&q=80"
+                            <img src="${item.file_url}"
                                 alt="Burger">
                             <div class="quantity-control">
                                 <button class="qty-btn reduce">-</button>
@@ -324,6 +323,7 @@ function mergeMenuWithCart(data, datas, res_id) {
         acc[name] = {
             id: item.id,
             price: item.price,
+            file_url:item.file_url,
             qty: restaurantCart[item.id]?.qty || 0
         };
 
