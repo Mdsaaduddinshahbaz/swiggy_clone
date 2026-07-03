@@ -235,7 +235,15 @@ body {
 
   z-index: 100;
 }
-
+#subcategoryDrawer{
+  display: none;
+}
+#subcategoryDrawer.open{
+  display: flex;
+}
+#subcategoryDrawer.close{
+  display: none;
+}
 .drawer {
   width: 420px;
   max-width: 100%;
@@ -468,4 +476,35 @@ body {
 
 #hideCategoryBtn{
   transform: rotate(45deg);
+}
+
+.tree-add-sub {
+  width: 100%;
+  padding: 10px 20px 10px 42px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: #2E6F4E;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tree-add-sub:hover {
+  background: #F5F2EA;
+}
+.drawer-actions{
+  margin-top: 10px;
+}
+#cancelSubBtn,#saveSubBtn{
+  padding: 5px,15px;
+}
+#cancelSubBtn{
+  background: transparent;
+  border-radius: 10px;
+  color: red;
+}
+#saveSubBtn{
+  background: transparent;
+  border-radius: 10px;
+  color: green;
 }

@@ -1,14 +1,14 @@
 const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
-const type=pathParts[pathParts.length - 4];
+const type = pathParts[pathParts.length - 4];
 console.log(type);
 
 document.addEventListener("DOMContentLoaded", async () => {
   const res = await fetch("/list_items", {
     method: "POST",
     "headers": { "Content-Type": "application/json" },
-    body: JSON.stringify({ "res_id": resId ,"type":type})
+    body: JSON.stringify({ "res_id": resId, "type": type })
   })
   const data = await res.json()
   console.log(data)
@@ -29,38 +29,38 @@ document.addEventListener("DOMContentLoaded", async () => {
         })
       );
     state.items =
-  Object.entries(data.res)
-    .map(([name, item]) => ({
-      id: item.id,
-      name,
+      Object.entries(data.res)
+        .map(([name, item]) => ({
+          id: item.id,
+          name,
 
-      desc:
-        item.desc || "",
+          desc:
+            item.desc || "",
 
-      unit:
-        item.unit || "",
+          unit:
+            item.unit || "",
 
-      price:
-        Number(
-          item.price
-        ),
+          price:
+            Number(
+              item.price
+            ),
 
-      stock:
-        Number(
-          item.item_qty
-        ),
+          stock:
+            Number(
+              item.item_qty
+            ),
 
-      lowAt:
-        Number(
-          item.lowat
-        ),
+          lowAt:
+            Number(
+              item.lowat
+            ),
 
-      available:
-        item.available,
+          available:
+            item.available,
 
-      subId:
-        String(item.sub_id)
-    }));
+          subId:
+            String(item.sub_id)
+        }));
     render();
   }
 
@@ -148,8 +148,56 @@ const state = {
 
   editingItem: null,
   drawerOpen: false,
+  subcategoryDrawerOpen: false,
+  activeCategory: null,
   categoryDrawerOpen: false
 };
+function openSubcategoryDrawer(cat) {
+  state.activeCategory = cat.id;
+  state.subcategoryDrawerOpen = true;
+
+  const overlay =
+    document.getElementById(
+      "subcategoryDrawer"
+    );
+
+  overlay.classList.add(
+    "open"
+  );
+
+  const input =
+    overlay.querySelector(
+      "#subcatName"
+    );
+
+  input.value = "";
+
+  input.focus();
+
+  const title =
+    overlay.querySelector(
+      "#subDrawerTitle"
+    );
+
+  title.textContent =
+    `Add subcategory to ${cat.name}`;
+}
+function closeSubcategoryDrawer() {
+  console.log("in closeSubcategory")
+  state.subcategoryDrawerOpen =
+    false;
+
+  state.activeCategory =
+    null;
+
+  document
+    .getElementById(
+      "subcategoryDrawer"
+    )
+    .classList.remove(
+      "open"
+    );
+}
 function openItemDrawer(
   item = null
 ) {
@@ -379,7 +427,7 @@ async function saveItem() {
     const data = await res.json()
     if (data.success) {
       console.log(data)
-      item.id=data.id
+      item.id = data.id
       state.items.unshift(
         item
       );
@@ -468,9 +516,7 @@ function renderTree() {
 
       wrapper.appendChild(btn);
 
-      if (
-        state.expanded[cat.id]
-      ) {
+      if (state.expanded[cat.id]) {
         cat.subcategories.forEach(
           sub => {
 
@@ -535,6 +581,30 @@ function renderTree() {
             );
           }
         );
+        // Add Subcategory button
+        const addBtn =
+          document.createElement("button");
+
+        addBtn.style.cssText = `
+                width:100%;
+                border:none;
+                background:transparent;
+                cursor:pointer;
+                padding:10px 20px 10px 42px;
+                text-align:left;
+                color:#2E6F4E;
+                font-weight:600;
+              `;
+        addBtn.className =
+          "tree-add-sub";
+        addBtn.innerHTML =
+          "+ Add subcategory";
+
+        addBtn.onclick = () => {
+          openSubcategoryDrawer(cat);
+        };
+
+        wrapper.appendChild(addBtn);
       }
 
       tree.appendChild(wrapper);
@@ -970,7 +1040,12 @@ document
   .onclick =
   () =>
     openItemDrawer();
-
+document
+  .getElementById(
+    "cancelSubBtn"
+  )
+  .onclick =
+  closeSubcategoryDrawer;
 document
   .getElementById(
     "closeDrawer"
@@ -1063,9 +1138,9 @@ saveCategoryBtn.addEventListener("click", async () => {
     .split("\n")
     .map(item => item.trim())
     .filter(item => item !== "");
-    console.log(catName);
-    console.log(subNames);
-    if (
+  console.log(catName);
+  console.log(subNames);
+  if (
     !catName.trim() ||
     !subNames.length
   ) {
@@ -1095,14 +1170,14 @@ saveCategoryBtn.addEventListener("click", async () => {
     //   }))
     // });
     state.tree.push({
-    id: String(cat._id),
-    name: cat.name,
-    subcategories:
-      cat.subcategories.map(sub => ({
-        id: String(sub._id),
-        name: sub.name
-      }))
-  });
+      id: String(cat._id),
+      name: cat.name,
+      subcategories:
+        cat.subcategories.map(sub => ({
+          id: String(sub._id),
+          name: sub.name
+        }))
+    });
 
 
     render();
@@ -1116,7 +1191,68 @@ saveCategoryBtn.addEventListener("click", async () => {
 
 
 })
+document
+  .getElementById(
+    "saveSubBtn"
+  )
+  .onclick =
+  async () => {
 
+    const name =
+      document
+        .getElementById(
+          "subcatName"
+        )
+        .value
+        .trim();
+
+    if (!name) return;
+
+    const res =
+      await fetch(
+        "/save_subcategory",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              res_id: resId,
+              category_id:
+                state.activeCategory,
+              name
+            })
+        }
+      );
+
+    const data =
+      await res.json();
+
+    if (!data.success)
+      return;
+
+    const category =
+      state.tree.find(
+        c =>
+          c.id ===
+          String(
+            state.activeCategory
+          )
+      );
+
+    category.subcategories.push({
+      id: String(
+        data.subcategory._id
+      ),
+      name:
+        data.subcategory.name
+    });
+
+    render();
+    closeSubcategoryDrawer();
+  };
 // document.addEventListener("DOMContentLoaded",()=>{
 //   render()
 // })

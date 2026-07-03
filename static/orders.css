@@ -1,186 +1,355 @@
+/* ============================================================
+   ORDERS.CSS — "Order Ticket" system, order-history chapter
+   Past orders are literal ticket stubs: a torn top edge, a
+   token number stamped in mono type, and a status badge that
+   reads like a kitchen-order stamp.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+    --bg: #FFF8EF;
+    --ink: #241C1A;
+    --ink-soft: #6b5f58;
+    --flame: #E8491D;
+    --flame-dark: #C23A15;
+    --mustard: #F5A81C;
+    --maroon: #6E1B12;
+    --card: #FFF1DE;
+    --card-hover: #FFE6C7;
+    --line: #E7D8C3;
+    --white: #FFFDF9;
+    --green: #1F8A4C;
+    --green-bg: #E5F4EA;
+    --red: #C23A15;
+    --red-bg: #FBE7E1;
+    --amber-bg: #FFF0D6;
+
+    --font-display: 'Anton', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --radius: 14px;
+    --shadow-card: 0 2px 0 var(--line), 0 10px 24px -18px rgba(36, 28, 26, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
 .orders-container {
-    max-width: 800px;
-    margin: auto;
-    padding: 20px;
-    font-family: Arial, sans-serif;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 36px 20px 90px;
 }
-body{
-        background: #381042;
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 26px;
 }
-.order-card {
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 15px;
-    margin-bottom: 20px;
-    background: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+
+.header h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: clamp(28px, 5vw, 38px);
+    letter-spacing: 0.01em;
+    margin: 0;
+    color: var(--ink);
 }
-.token-no{
-    margin-bottom: 10px;
+
+.header select {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: var(--font-body);
     font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23241C1A'/%3E%3C/svg%3E") no-repeat right 14px center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 10px 34px 10px 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.12s ease;
 }
+
+.header select:hover {
+    border-color: var(--flame);
+}
+
+.header select:focus-visible {
+    outline: 2px solid var(--flame);
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+
+.empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 380px;
+    margin: 60px auto;
+    padding: 20px;
+}
+
+.empty-state.show {
+    display: flex;
+}
+
+.empty-state .icon {
+    font-size: 56px;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 6px 0 var(--line));
+}
+
+.empty-state h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: 28px;
+    letter-spacing: 0.01em;
+    margin: 4px 0 10px;
+}
+
+.empty-state p {
+    color: var(--ink-soft);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 22px;
+}
+
+.empty-state .btn {
+    background: var(--flame);
+    color: var(--white);
+    border: none;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.03em;
+    padding: 13px 28px;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--flame-dark);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.empty-state .btn:hover { transform: translateY(-1px); }
+.empty-state .btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 var(--flame-dark);
+}
+
+.empty-state .btn:focus-visible {
+    outline: 2px solid var(--flame);
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   ORDERS LIST
+   ============================================================ */
+
+#orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.order-card {
+    position: relative;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 20px 18px;
+    box-shadow: var(--shadow-card);
+    animation: rise 0.3s ease both;
+}
+
+@keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Torn-ticket top edge */
+.order-card::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background-image: radial-gradient(circle at 6px 0, var(--bg) 5px, transparent 5.5px);
+    background-size: 16px 8px;
+    background-repeat: repeat-x;
+    background-position: top center;
+}
+
 .order-header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 12px;
     margin-bottom: 10px;
 }
 
 .order-id {
-    font-weight: bold;
-    overflow-wrap: break-word;
-    word-break: break-word;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
 }
 
 .order-status {
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    height: fit-content;
+    display: inline-block;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 5px 11px;
+    border-radius: 999px;
 }
 
-.status-placed { background: orange; color: white; }
-.status-preparing { background: blue; color: white; }
-.status-completed { background: green; color: white; }
-.status-canceled { background: rgb(255, 0, 0); color: white; }
+.order-status.status-placed {
+    background: var(--amber-bg);
+    color: #915A00;
+}
+
+.order-status.status-completed {
+    background: var(--green-bg);
+    color: var(--green);
+}
+
+.order-status.status-canceled {
+    background: var(--red-bg);
+    color: var(--red);
+}
+
+.token-no {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+}
+
+.order-date {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed var(--line);
+}
 
 .restaurant-name {
-    font-weight: bold;
-    margin-top: 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--flame-dark);
+    margin: 10px 0 6px;
+}
+
+.restaurant-name:first-of-type {
+    margin-top: 0;
 }
 
 .item {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    margin: 5px 0;
+    font-size: 14px;
+    color: var(--ink);
+    padding: 5px 0;
+}
+
+.item span:first-child {
+    color: var(--ink-soft);
+}
+
+.item span:last-child {
+    font-family: var(--font-mono);
+    font-weight: 700;
 }
 
 .total {
-    text-align: right;
-    font-weight: bold;
-    margin-top: 10px;
-}
-h1{
-    color: white;
-}
-
-.header {
     display: flex;
-    justify-content: space-between;  /* 🔥 pushes button to right */
-    align-items: center;
+    justify-content: flex-end;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15.5px;
+    color: var(--ink);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
 }
 
-#filterDropdown {
-    padding: 6px 10px;
-    border-radius: 6px;
+/* Cancel button — inline styles in the HTML/JS are overridden here */
+.cancelBtn,
+button.cancelBtn {
+    display: block;
+    margin: 14px 0 0 auto !important;
+    background: var(--white) !important;
+    color: var(--red) !important;
+    padding: 8px 16px !important;
+    border-radius: 8px !important;
+    border: 1.5px solid var(--red) !important;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.03em;
     cursor: pointer;
-}
-.res_namesss{
-        display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
+    transition: background 0.12s ease, color 0.12s ease;
 }
 
-
-
-/*orders*/
-
-.empty-state{
-    visibility: hidden;
-    position: absolute;
-    width:100%;
-    max-width:500px;
-    background:#fff;
-    border-radius:24px;
-    padding:50px 40px;
-    text-align:center;
-    /* box-shadow:0 10px 40px rgba(0,0,0,0.08); */
-    /* transition:0.3s; */
-        align-self: center;
-    justify-self: center;
-    background: #3d4152;
-}
-.empty-state.show{
-    visibility: visible;
-    position: relative;
+.cancelBtn:hover {
+    background: var(--red) !important;
+    color: var(--white) !important;
 }
 
-/* .empty-state.show .btn{
-
-} */
-.empty-state:hover{
-    transform:translateY(-4px);
+.cancelBtn:disabled {
+    cursor: not-allowed;
 }
 
-.icon{
-    width:120px;
-    height:120px;
-    margin:0 auto 24px;
-    background:#eef2ff;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:60px;
+.cancelBtn:focus-visible {
+    outline: 2px solid var(--flame);
+    outline-offset: 2px;
 }
 
-h1{
-    font-size:28px;
-    color:white;
-    margin-bottom:12px;
-}
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
 
-p{
-    color:#6b7280;
-    font-size:16px;
-    line-height:1.6;
-    margin-bottom:30px;
-}
+@media (max-width: 480px) {
+    .orders-container { padding: 26px 14px 70px; }
 
-.btn{
-    border:none;
-    background:#4f46e5;
-    color:white;
-    padding:14px 28px;
-    border-radius:12px;
-    font-size:16px;
-    font-weight:600;
-    cursor:pointer;
-    /* transition:0.3s; */
-}
-
-.btn:hover{
-    background:#4338ca;
-    transform:translateY(-2px);
-}
-
-.secondary-link{
-    display:block;
-    margin-top:18px;
-    color:#4f46e5;
-    text-decoration:none;
-    font-weight:500;
-}
-
-.secondary-link:hover{
-    text-decoration:underline;
-}
-
-@media(max-width:480px){
-    .empty-state{
-        padding:40px 25px;
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
     }
 
-    h1{
-        font-size:24px;
-    }
-}
-@media (max-width:595px) {
-    body{
-        overflow-x: clip;
-    }
-}
-@media (max-width:240px) {
-    .header{
-        display: block;
-    }
+    .header select { width: 100%; }
+
+    .order-card { padding: 16px 16px 15px; }
 }
