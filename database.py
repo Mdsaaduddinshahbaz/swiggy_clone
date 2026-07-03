@@ -49,9 +49,9 @@ def add_resturants(name,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUd
                 session=session
             )
     return str(result.inserted_id )
-def add_resturant_items(resturant_id,item_name,item_qty,price,sub_id,desc,unit,lowat,available,sold=0):
-    ret=resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price,"sub_id":sub_id,"desc":desc,"unit":unit,"lowat":lowat,"available":available,"sold":sold})
-    return str(ret.inserted_id)
+def add_resturant_items(resturant_id,item_name,item_qty,price,sub_id,desc,unit,lowat,available,sold=0,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
+    ret=resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price,"sub_id":sub_id,"desc":desc,"unit":unit,"lowat":lowat,"available":available,"sold":sold,"file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"})
+    return ({"id":str(ret.inserted_id),"url":f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"})
 def list_resturant_items(resturant_id,types):
     if(types=="seller"):
         res=resturants_items.find({"resturant_id":resturant_id})
@@ -70,7 +70,8 @@ def list_resturant_items(resturant_id,types):
                     "desc":r["desc"],
                     "unit":r["unit"],
                     "lowat":r["lowat"],
-                    "available":r["available"]
+                    "available":r["available"],
+                    "file_url":r["file_url"]
                 }
         return ({"item_name":item_name,"categories":cat})
     else:
@@ -79,7 +80,8 @@ def list_resturant_items(resturant_id,types):
         for r in res:
             item_name[ r["item_name"]]={
                     "price": r["price"],
-                    "id": str(r["_id"])
+                    "id": str(r["_id"]),
+                    "file_url":r["file_url"]
                 }
         return ({"item_name":item_name})
 def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available):

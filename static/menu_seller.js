@@ -59,7 +59,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             item.available,
 
           subId:
-            String(item.sub_id)
+            String(item.sub_id),
+          
+          url:item.file_url
         }));
     render();
   }
@@ -108,7 +110,8 @@ const seedItems = [
     stock: 28,
     lowAt: 10,
     available: true,
-    desc: "Aged long-grain basmati rice."
+    desc: "Aged long-grain basmati rice.",
+    url: "https://drive.google.com/thumbnail?id=1RWYdWg-vzwMi5P048a7RVKdxyoA5mye3&sz=w1000"
   },
   {
     id: "SKU-1002",
@@ -119,7 +122,8 @@ const seedItems = [
     stock: 6,
     lowAt: 8,
     available: true,
-    desc: "Everyday medium-grain rice."
+    desc: "Everyday medium-grain rice.",
+    url: "https://drive.google.com/thumbnail?id=1RWYdWg-vzwMi5P048a7RVKdxyoA5mye3&sz=w1000"
   },
   {
     id: "SKU-1011",
@@ -130,7 +134,8 @@ const seedItems = [
     stock: 32,
     lowAt: 10,
     available: true,
-    desc: "Whole wheat flour, stone-ground."
+    desc: "Whole wheat flour, stone-ground.",
+    url: "https://drive.google.com/thumbnail?id=1RWYdWg-vzwMi5P048a7RVKdxyoA5mye3&sz=w1000"
   }
 ];
 
@@ -327,6 +332,7 @@ function closeDrawer() {
 }
 
 async function saveItem() {
+  const file = document.getElementById("photo").files[0];
   const item = {
     id:
       state.editingItem?.id ||
@@ -373,9 +379,25 @@ async function saveItem() {
     available:
       document.getElementById(
         "itemListed"
-      ).checked
-  };
+      ).checked,
 
+    url:null
+  };
+  const formData = new FormData();
+
+  formData.append("res_id", resId)
+  formData.append("sub_id", item.subId)
+  formData.append("description", item.desc)
+  formData.append("itm_name", item.name)
+  formData.append("unit", item.unit)
+  formData.append("price", item.price)
+  formData.append("itm_qty", item.stock)
+  formData.append("lowAt", item.lowAt)
+  formData.append("available", item.available)
+  formData.append("sold", 0)
+    if (file) {
+        formData.append("photo", file);
+    }
   if (state.editingItem) {
     const res = await fetch("/update_item_details", {
       method: "POST",
@@ -408,26 +430,32 @@ async function saveItem() {
     }
   }
   else {
+    // const res = await fetch("/add_res_items", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     "res_id": resId,
+    //     "sub_id": item.subId,
+    //     "description": item.desc,
+    //     "itm_name": item.name,
+    //     "unit": item.unit,
+    //     "price": item.price,
+    //     "itm_qty": item.stock,
+    //     "lowAt": item.lowAt,
+    //     "available": item.available,
+    //     "sold": 0
+    //   })
+    // })
+    
     const res = await fetch("/add_res_items", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        "res_id": resId,
-        "sub_id": item.subId,
-        "description": item.desc,
-        "itm_name": item.name,
-        "unit": item.unit,
-        "price": item.price,
-        "itm_qty": item.stock,
-        "lowAt": item.lowAt,
-        "available": item.available,
-        "sold": 0
-      })
+      body: formData
     })
     const data = await res.json()
     if (data.success) {
       console.log(data)
       item.id = data.id
+      item.url=data.img_url
       state.items.unshift(
         item
       );
@@ -769,12 +797,13 @@ async function renderCards() {
           'JetBrains Mono';
           font-size:11px;
           color:#87897F;
+          margin-bottom:10px;
           overflow-wrap: anywhere;
         "
       >
         ${item.id}
       </div>
-      <img src="https://drive.google.com/thumbnail?id=1RWYdWg-vzwMi5P048a7RVKdxyoA5mye3&amp;sz=w1000" alt="food" style="
+      <img src="${item.url}" alt="food" style="
     position: absolute; 
     right: 18px;
     top: 48px;

@@ -511,6 +511,7 @@ body {
 
 @media (max-width:300px) {
   img{
+    width: 100% !important;
     position: static !important;
   }
   h3{

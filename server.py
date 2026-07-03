@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image
-# from verifpy1 import upload_image
+# from verify import upload_image
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -123,24 +123,50 @@ def home(userid):
     except:
         return({"success":False})
 
+# @app.post("/add_res_items")
+# def add_itemss():
+#     try:
+#         data=request.get_json()
+#         res_id=data["res_id"]
+#         itm_name=data["itm_name"]
+#         itm_qty=data["itm_qty"]
+#         price=data["price"]
+#         sub_id=data["sub_id"]
+#         desc=data["description"]
+#         unit=data["unit"]
+#         lowat=data["lowAt"]
+#         available=data["available"]
+
+#         # print(res_id,itm)
+#         res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
+#         return ({"success":True,"id":res})
+#     except:
+#         return({"success":False})
 @app.post("/add_res_items")
 def add_itemss():
     try:
-        data=request.get_json()
-        res_id=data["res_id"]
-        itm_name=data["itm_name"]
-        itm_qty=data["itm_qty"]
-        price=data["price"]
-        sub_id=data["sub_id"]
-        desc=data["description"]
-        unit=data["unit"]
-        lowat=data["lowAt"]
-        available=data["available"]
-
+        itm_name = request.form.get("itm_name")
+        res_id = request.form.get("res_id")
+        itm_qty = request.form.get("itm_qty")
+        price = request.form.get("price")
+        sub_id = request.files.get("sub_id")
+        desc = request.files.get("desc")
+        unit = request.files.get("unit")
+        lowat = request.files.get("lowat")
+        available=request.files.get("available")
+        photo = request.files.get("photo")
+        if (photo):
+            file_id=upload_image(photo)
+            print(file_id)
+            res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available,file_id)
+            return ({"success":True,"id":res["id"],"img_url":res["url"]})
+        else:
+            res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
+            return ({"success":True,"id":res["id"],"img_url":res["url"]})
         # print(res_id,itm)
-        res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
-        return ({"success":True,"id":res})
-    except:
+        # res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
+        # return ({"success":True,"id":res})
+    except: 
         return({"success":False})
 
 @app.post("/add_resturant")
