@@ -769,11 +769,20 @@ async function renderCards() {
           'JetBrains Mono';
           font-size:11px;
           color:#87897F;
+          overflow-wrap: anywhere;
         "
       >
         ${item.id}
       </div>
-
+      <img src="https://drive.google.com/thumbnail?id=1RWYdWg-vzwMi5P048a7RVKdxyoA5mye3&amp;sz=w1000" alt="food" style="
+    position: absolute; 
+    right: 18px;
+    top: 48px;
+    height: 86px;
+    border-radius: 20px;
+    object-fit: cover;
+    width: 86px;
+      ">
       <h3>
         ${item.name}
       </h3>
@@ -815,7 +824,7 @@ async function renderCards() {
       document.createElement(
         "div"
       );
-
+    controls.className="controlsContainer"
     controls.style.cssText = `
 display:flex;
 justify-content:flex-end;
