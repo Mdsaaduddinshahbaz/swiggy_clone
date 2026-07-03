@@ -393,6 +393,58 @@ def resturant_stats(res_id):
         "pending":pending
     }
     return stats
+from pymongo import ReturnDocument
+
+from pymongo import ReturnDocument
+
+def add_subcategory(res_id, category_id, subcat_name):
+    try:
+        # Increment counter and get previous value
+        doc = categories.find_one_and_update(
+            {"restaurant_id": res_id},
+            {"$inc": {"next_subcat_id": 1}},
+            return_document=ReturnDocument.BEFORE
+        )
+
+        if doc is None:
+            return {
+                "success": False,
+                "error": "Restaurant not found"
+            }
+
+        subcategory = {
+            "_id": doc.get("next_subcat_id", 0) + 1,
+            "name": subcat_name
+        }
+
+        result = categories.update_one(
+            {
+                "restaurant_id": res_id,
+                "categories._id": int(category_id)
+            },
+            {
+                "$push": {
+                    "categories.$.subcategories": subcategory
+                }
+            }
+        )
+
+        if result.modified_count == 0:
+            return {
+                "success": False,
+                "error": "Category not found"
+            }
+
+        return {
+            "success": True,
+            "subcategory": subcategory
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 def return_res_analytics(res_id):
     # seller_orders.find({"restaurant_id":res_id})
     resturants_itemsss=resturants_items.find({"resturant_id":res_id})
