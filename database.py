@@ -35,14 +35,15 @@ def add_resturants(name,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUd
 
             result=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]},"file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"})
             # parent_id = result.inserted_id 
-
+            
             # 3. Add that parent_id to every seller doc before inserting
             owners.update_one(
                 {"_id": ObjectId(owner_id)},
                 {
                     "$set": {
                         "is_setup":True,
-                        "restaurant_name": name
+                        "restaurant_name": name,
+                        "resturant_id":str(result.inserted_id)
                     }
                     # OR use $push if one owner can have multiple restaurants
                 },
@@ -331,8 +332,11 @@ def check_existing_owner(email,password):
     if(owner): 
         print("in existing user if block",password)
         if(owner["password"]==password):
-            print("in existing user if if block")
-            return ({"success":True,"userid":owner["_id"],"username":owner["username"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+            if(owner["is_verified"]):
+                print("in existing user if if block")
+                return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+            else:
+                return ({"success":True,"user_id":str(owner["_id"]),"username":owner["username"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
         else:
             return {"success":False}
     else: return {"success":404}

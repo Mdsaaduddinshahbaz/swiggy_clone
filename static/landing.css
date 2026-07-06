@@ -1,67 +1,232 @@
-* {
+/* ============================================================
+   LANDING.CSS — "Order Ticket" system, cover page
+   The front door to the whole app: a ticket-booklet cover where
+   you pick which stub you are — customer or restaurant.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+    --bg: #FFF8EF;
+    --ink: #241C1A;
+    --ink-soft: #6b5f58;
+    --flame: #E8491D;
+    --flame-dark: #C23A15;
+    --mustard: #F5A81C;
+    --maroon: #6E1B12;
+    --card: #FFF1DE;
+    --card-hover: #FFE6C7;
+    --line: #E7D8C3;
+    --white: #FFFDF9;
+
+    --font-display: 'Anton', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --radius: 16px;
+    --shadow-card: 0 2px 0 var(--line), 0 10px 24px -18px rgba(36, 28, 26, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
     margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
 }
 
 body {
-    height: 100vh;
+    overflow-y: clip ;
+    /* background: var(--bg); */
+        background-image: url("images/groceries6.jpg");
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
     display: flex;
-    justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
+    justify-content: center;
+    padding: 32px 20px;
+    position: relative;
+    overflow-x: hidden;
+    /* background: linear-gradient(180deg, rgb(207 172 0 / 69%) 0%, rgba(36, 22, 18, 0.9) 100%), url(https://images.unsplash.com/photo-1563865436874-9aef32095fad?auto=format&fit=crop&w=1800&q=80) center / cover no-repeat fixed; */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* Faint perforated border framing the whole screen, like the
+   edge of a ticket sheet */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 14px;
+    border: 2px dashed var(--line);
+    border-radius: 22px;
+    pointer-events: none;
+    z-index: 0;
 }
 
 .container {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+    width: 100%;
     text-align: center;
 }
 
-h1 {
-    margin-bottom: 40px;
-    font-size: 2.5rem;
+.container h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: clamp(34px, 7vw, 54px);
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+    margin: 0 0 10px;
+    color: var(--ink);
 }
+
+/* .container::before {
+    content: 'SWIGGY CLONE';
+    display: block;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    color: var(--flame);
+    margin-bottom: 14px;
+} */
+
+.container > h1 + p,
+.subtitle {
+    color: var(--ink-soft);
+    font-size: 15px;
+    margin: 0 0 40px;
+}
+
+/* ============================================================
+   ROLE CARDS
+   ============================================================ */
 
 .cards {
     display: flex;
-    gap: 40px;
+    gap: 22px;
     justify-content: center;
     flex-wrap: wrap;
+    margin-top: 36px;
 }
 
 .card {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 38px 30px 32px;
     width: 220px;
-    height: 260px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
     cursor: pointer;
-    transition: 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: var(--shadow-card);
+    position: relative;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 24px;
+    right: 24px;
+    border-top: 1px dashed var(--line);
+}
+
+.card:nth-child(1)::before,
+.card:nth-child(2)::before {
+    display: none;
 }
 
 .card:hover {
-    transform: translateY(-10px) scale(1.05);
-    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-6px);
+    border-color: var(--flame);
+    box-shadow: 0 4px 0 var(--flame), 0 20px 34px -18px rgba(232, 73, 29, 0.5);
 }
 
-.icon {
-    font-size: 60px;
-    margin-bottom: 20px;
+.card:active {
+    transform: translateY(-2px);
 }
 
-.title {
-    font-size: 1.5rem;
-    font-weight: bold;
+.card:focus-visible {
+    outline: 2px solid var(--flame);
+    outline-offset: 3px;
 }
 
-.desc {
-    font-size: 0.9rem;
-    opacity: 0.8;
-    margin-top: 10px;
+.card .icon {
+    font-size: 40px;
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    border-radius: 50%;
+    transition: background 0.18s ease;
+}
+
+.card:hover .icon {
+    background: var(--mustard);
+}
+
+.card .title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin-bottom: 8px;
+}
+
+.card .desc {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+}
+
+/* Give each card a distinct accent chip so they read as
+   different "ticket types" at a glance */
+.card:nth-child(1) .title::after,
+.card:nth-child(2) .title::after {
+    content: '';
+    display: block;
+    width: 28px;
+    height: 3px;
+    background: var(--flame);
+    border-radius: 2px;
+    margin: 10px auto 0;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 520px) {
+    body::before { inset: 8px; border-radius: 16px; }
+
+    .cards {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .card {
+        width: 100%;
+        max-width: 280px;
+        padding: 30px 24px 26px;
+    }
+}
+
+@media (max-width:550px) {
+    body{
+        background: linear-gradient(180deg, rgb(207 172 0 / 69%) 0%, rgba(36, 22, 18, 0.9) 100%), url(https://images.unsplash.com/photo-1563865436874-9aef32095fad?auto=format&fit=crop&w=1800&q=80) center / cover no-repeat fixed !important
+    }
 }

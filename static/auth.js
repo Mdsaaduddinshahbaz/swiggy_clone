@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         else if (data.success && data.is_setup) {
           alert(data.message || "Welcome!");
-          window.location.href = `/seller/${data.username}/${data.user_id}`
+          window.location.href = `/seller/${data.res_name}/${data.res_id}`
         }
         else {
           alert("username or password is wrong")

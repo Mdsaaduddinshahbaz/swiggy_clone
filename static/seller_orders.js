@@ -1,62 +1,95 @@
-async function applyFiter() {
-    const filterDropdown = document.getElementById("filterDropdown");
-    console.log(filterDropdown.value.toLowerCase());
+// const filterDropdown = document.getElementById("filterDropdown");
+// async function applyFiter() {
+//     console.log(filterDropdown.value.toLowerCase());
+//     const cards = document.querySelectorAll(".order-card");
+
+//     cards.forEach(card => {
+//         console.log("hello")
+//         const statusText = card
+//             .querySelector(".order-status")
+//             .textContent
+//             .trim()
+//             .toLowerCase();
+//         console.log(true)
+//         if (filterDropdown.value.toLowerCase() === "all" || statusText === filterDropdown.value.toLowerCase()) {
+//             console.log(true)
+
+//             card.style.display = "block";
+//         } else {
+//             card.style.display = "none";
+//         }
+//     });
+//     filterDropdown.addEventListener("change", () => {
+//         const selected = filterDropdown.value.toLowerCase();
+//         console.log(selected)
+//         const cards = document.querySelectorAll(".order-card");
+
+//         cards.forEach(card => {
+//             const statusText = card
+//                 .querySelector(".order-status")
+//                 .textContent
+//                 .trim()
+//                 .toLowerCase();
+
+//             if (selected === "all" || statusText === selected) {
+//                 const buttons = card.querySelectorAll(".statusBtn");
+//                 if (selected !== "placed") {
+//                     console.log("alls")
+//                     // get ALL buttons with class statusBtn inside this card
+    
+//                     buttons.forEach(btn => {
+//                         btn.disabled = true;
+//                         btn.style.opacity = "0.5";   // optional visual
+//                         btn.style.cursor = "not-allowed";
+//                         btn.style.visibility="hidden"
+//                     });
+                    
+//                 }
+//                 else{
+//                     buttons.forEach(btn => {
+//                         btn.disabled = false;
+//                         btn.style.opacity = "1";   // optional visual
+//                         btn.style.cursor = "pointer";
+//                         btn.style.visibility="visible"
+//                     });
+//                 }
+//                 card.style.display = "block";
+//             } else {
+//                 card.style.display = "none";
+//             }
+//         });
+//     });
+// }
+
+const filterDropdown = document.getElementById("filterDropdown");
+
+filterDropdown.addEventListener("change", applyFilter);
+
+// Initial filter when the page loads
+applyFilter();
+
+function applyFilter() {
+    const selected = filterDropdown.value.toLowerCase();
     const cards = document.querySelectorAll(".order-card");
 
     cards.forEach(card => {
-        console.log("hello")
-        const statusText = card
-            .querySelector(".order-status")
+        const statusText = card.querySelector(".order-status")
             .textContent
             .trim()
             .toLowerCase();
-        console.log(true)
-        if (filterDropdown.value.toLowerCase() === "all" || statusText === filterDropdown.value.toLowerCase()) {
-            console.log(true)
 
-            card.style.display = "block";
-        } else {
-            card.style.display = "none";
-        }
-    });
-    filterDropdown.addEventListener("change", () => {
-        const selected = filterDropdown.value.toLowerCase();
-        console.log(selected)
-        const cards = document.querySelectorAll(".order-card");
+        const buttons = card.querySelectorAll(".statusBtn");
 
-        cards.forEach(card => {
-            const statusText = card
-                .querySelector(".order-status")
-                .textContent
-                .trim()
-                .toLowerCase();
+        const show = selected === "all" || statusText === selected;
 
-            if (selected === "all" || statusText === selected) {
-                const buttons = card.querySelectorAll(".statusBtn");
-                if (selected !== "placed") {
-                    console.log("alls")
-                    // get ALL buttons with class statusBtn inside this card
-    
-                    buttons.forEach(btn => {
-                        btn.disabled = true;
-                        btn.style.opacity = "0.5";   // optional visual
-                        btn.style.cursor = "not-allowed";
-                        btn.style.visibility="hidden"
-                    });
-                    
-                }
-                else{
-                    buttons.forEach(btn => {
-                        btn.disabled = false;
-                        btn.style.opacity = "1";   // optional visual
-                        btn.style.cursor = "pointer";
-                        btn.style.visibility="visible"
-                    });
-                }
-                card.style.display = "block";
-            } else {
-                card.style.display = "none";
-            }
+        card.style.display = show ? "block" : "none";
+
+        buttons.forEach(btn => {
+            const enable = selected === "placed";
+            btn.disabled = !enable;
+            btn.style.opacity = enable ? "1" : "0.5";
+            btn.style.cursor = enable ? "pointer" : "not-allowed";
+            btn.style.visibility = enable ? "visible" : "hidden";
         });
     });
 }
@@ -131,8 +164,8 @@ async function loadOrders() {
             total += itemTotal;
 
             restaurantsHTML += `
-                    <div class="item">
-                        <span>${itemName} x ${detail.qty}</span>
+                    <div class="item" item_id=${itemName}>
+                        <span>${detail.name} x ${detail.qty}</span>
                         <span>₹${itemTotal}</span>
                     </div>
                 `;
