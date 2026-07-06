@@ -75,6 +75,7 @@ def get_cart(uid):
     key = f"cart:{uid}"
 
     data = r.get(key)
+    print(type(data))
     print(data)
     if not data:
         return None
@@ -200,6 +201,7 @@ def add_cart(resid, uid, item_name, res_name, item_id, qty, price):
     else:
         cart = {
             "uid": uid,
+            "total":0,
             "cart": {}
         }
 
@@ -221,8 +223,9 @@ def add_cart(resid, uid, item_name, res_name, item_id, qty, price):
             "qty": qty,
             "price": price
         }
-
+    cart["total"] += (int(qty) * int(price))
     r.set(key, json.dumps(cart))
+    return ({"success":True,"total":cart["total"]})
 
 
 def update_cart_qty(uid, item_id, change):
@@ -241,8 +244,9 @@ def update_cart_qty(uid, item_id, change):
         items = cart_data["cart"][res_id]["items"]
 
         if item_id in items:
+            price = items[item_id]["price"]
             items[item_id]["qty"] += change
-
+            cart_data["total"] += change * price
             if items[item_id]["qty"] <= 0:
                 del items[item_id]
 
@@ -253,7 +257,8 @@ def update_cart_qty(uid, item_id, change):
             r.set(key, json.dumps(cart_data))
             return {
                 "success": True,
-                "updated_cart": cart_data
+                "updated_cart": cart_data,
+                "total":cart_data["total"]
             }
 
     return {

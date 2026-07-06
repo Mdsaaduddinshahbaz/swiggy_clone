@@ -1,100 +1,236 @@
-/* General reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
+/* ============================================================
+   AUTH.CSS — "Order Ticket" system, entry-pass chapter
+   Login reads like filling out a small ticket-counter form —
+   same grocery backdrop as the landing page for continuity,
+   with a paper-white card floating on top.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+    --bg: #FFF8EF;
+    --ink: #241C1A;
+    --ink-soft: #6b5f58;
+    --flame: #E8491D;
+    --flame-dark: #C23A15;
+    --mustard: #F5A81C;
+    --maroon: #6E1B12;
+    --card: #FFF1DE;
+    --card-hover: #FFE6C7;
+    --line: #E7D8C3;
+    --white: #FFFDF9;
+    --red: #C23A15;
+
+    --font-display: 'Anton', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --radius: 18px;
+    --shadow-panel: 0 24px 50px -20px rgba(20, 12, 10, 0.5);
 }
 
-/* Background */
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    min-height: 100vh;
+}
+
 body {
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 20px;
+    position: relative;
+    overflow-x: hidden;
+
+    /* Same grocery backdrop as landing.css, for a continuous
+       feel between the cover page and the login step */
+    background:
+        linear-gradient(180deg, rgba(110, 27, 18, 0.86) 0%, rgba(36, 22, 18, 0.9) 100%),
+        url('https://images.unsplash.com/photo-1563865436874-9aef32095fad?auto=format&fit=crop&w=1800&q=80')
+        center / cover no-repeat fixed;
 }
 
-/* Center box */
-.container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
+@media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+.container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* ============================================================
+   LOGIN CARD — a ticket stub you fill out
+   ============================================================ */
 
 .login-box {
-  background: #fff;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-  width: 350px;
-  text-align: center;
+    position: relative;
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 40px 36px 34px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: var(--shadow-panel);
 }
 
-/* Heading */
+/* Torn top edge, matching the order-card motif elsewhere in the app */
+.login-box::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 8px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background-image: radial-gradient(circle at 6px 0, var(--bg) 5px, transparent 5.5px);
+    background-size: 16px 8px;
+    background-repeat: repeat-x;
+    background-position: top center;
+}
+
 .login-box h2 {
-  margin-bottom: 20px;
-  color: #333;
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: 30px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-align: center;
+    margin: 4px 0 26px;
 }
 
-/* Input fields */
+.login-box h2::after {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 3px;
+    background: var(--flame);
+    border-radius: 2px;
+    margin: 10px auto 0;
+}
+
+/* ============================================================
+   FORM
+   ============================================================ */
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
 .input-group {
-  margin-bottom: 20px;
-  text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
 }
 
 .input-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  color: #555;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
 }
 
 .input-group input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  outline: none;
-  transition: border-color 0.3s ease;
+    font-family: var(--font-body);
+    font-size: 14.5px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.input-group input::placeholder {
+    color: var(--ink-soft);
+    opacity: 0.7;
+}
+
+.input-group input:hover {
+    border-color: #d8c4a8;
 }
 
 .input-group input:focus {
-  border-color: #667eea;
+    border-color: var(--flame);
+    background: var(--white);
 }
 
-/* Button */
+.input-group input:invalid:not(:placeholder-shown) {
+    border-color: var(--red);
+}
+
 .btn {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: #6a87f0;
-  color: white;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.3s ease;
+    margin-top: 8px;
+    background: var(--flame);
+    color: var(--white);
+    border: none;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.03em;
+    padding: 14px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--flame-dark);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 
 .btn:hover {
-  background: #5a67d8;
+    background: var(--flame-dark);
 }
 
-/* Sign up link */
+.btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 var(--flame-dark);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--flame);
+    outline-offset: 3px;
+}
+
 .signup-link {
-  margin-top: 15px;
-  font-size: 14px;
-  color: #555;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin: 18px 0 0;
 }
 
 .signup-link a {
-  color: #667eea;
-  text-decoration: none;
-  font-weight: 500;
+    color: var(--flame);
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
 }
 
 .signup-link a:hover {
-  text-decoration: underline;
+    text-decoration: underline;
+    color: var(--flame-dark);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 420px) {
+    .login-box {
+        padding: 32px 24px 28px;
+        border-radius: 14px;
+    }
+
+    .login-box h2 {
+        font-size: 26px;
+    }
 }

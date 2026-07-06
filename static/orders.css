@@ -353,3 +353,11 @@ button.cancelBtn {
 
     .order-card { padding: 16px 16px 15px; }
 }
+@media (max-width:345px) {
+    .order-header{
+        display: block;
+    }
+    .order-id{
+        overflow-wrap: anywhere;
+    }
+}

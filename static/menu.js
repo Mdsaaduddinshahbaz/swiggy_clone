@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const breadcrump = document.querySelector(".breadcrumbs")
     const loading = document.getElementById("loading")
     const menu_container = document.querySelector('.menu-section');
+    const current_total_amount=document.getElementById("amount")
+    const footer = document.getElementsByTagName("footer")[0];
+    const gotoCartBtn=document.getElementById("GoCartBtn")
     breadcrump.innerText = `Home / ${addresss_decoded} / ${decoded}`
     res_location.innerText = addresss_decoded
     heading.innerText = decoded;
@@ -30,6 +33,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     const datas = await rest.json()
     console.log(datas)
+    if(datas.results.total>0){
+        footer.classList.add("show");
+        current_total_amount.innerText=datas.results.total
+    }
     const res = await fetch("/list_items", {
         method: "POST",
         "headers": { "Content-Type": "application/json" },
@@ -140,7 +147,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             const data = await res.json()
             console.log(data)
             if (data.success) {
-                alert(`${names} added to cart`)
+                footer.classList.add("show")
+                // alert(`${names} added to cart`)
+                console.log(data.Total)
+                current_total_amount.innerText=data.Total
+
             }
         }
     });
@@ -181,6 +192,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             const data = await res.json()
             if (data.success) {
                 qtyEl.textContent = Number(qtyEl.textContent) + 1;
+                // current_total_amount.innerText=data.total
+                if(data.total>0){
+                    footer.classList.add("show")
+                    current_total_amount.innerText=data.total
+                }
+                else{
+                    footer.classList.remove("show")
+                }
             }
             else {
                 alert("failed adding item")
@@ -201,6 +220,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             const data = await res.json()
             console.log(data)
             if (data.success) {
+                console.log(data.total)
+                if(data.total>0){
+                    footer.classList.add("show")
+                    current_total_amount.innerText=data.total
+                }
+                else{
+                    footer.classList.remove("show")
+                }
                 if (Number(qtyEl.textContent) > 1) {
                     // Correctly decrement the number
                     qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
@@ -290,6 +317,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     });
+    gotoCartBtn.addEventListener("click",()=>{
+        window.location.href=`/cart/${userId}`
+    })
 
 
 

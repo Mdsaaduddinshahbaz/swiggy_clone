@@ -383,16 +383,17 @@ async function saveItem() {
 
     url:null
   };
+  console.log(item.subId)
   const formData = new FormData();
-
+  
   formData.append("res_id", resId)
   formData.append("sub_id", item.subId)
-  formData.append("description", item.desc)
+  formData.append("desc", item.desc)
   formData.append("itm_name", item.name)
   formData.append("unit", item.unit)
   formData.append("price", item.price)
   formData.append("itm_qty", item.stock)
-  formData.append("lowAt", item.lowAt)
+  formData.append("lowat", item.lowAt)
   formData.append("available", item.available)
   formData.append("sold", 0)
     if (file) {

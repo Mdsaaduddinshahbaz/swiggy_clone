@@ -739,3 +739,8 @@ body {
         color: var(--ink-soft);
     }
 }
+@media (max-width:218px) {
+    .nav-container{
+        display: block;
+    }
+}

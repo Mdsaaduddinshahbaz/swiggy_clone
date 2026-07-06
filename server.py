@@ -51,8 +51,11 @@ serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        token = request.cookies.get("token")
-
+        # token = request.cookies.get("token")
+        token = (
+            request.cookies.get("user_token") or
+            request.cookies.get("seller_token")
+        )
         if not token:
             return jsonify({"success": False}), 401
 
@@ -62,8 +65,12 @@ def login_required(f):
                 app.config["SECRET_KEY"],
                 algorithms=["HS256"]
             )
-
-            g.user_id = payload["user_id"]
+            print(payload)
+            g.type = payload["type"]
+            if(g.type == "user"):
+                g.user_id = payload["user_id"]
+            elif(g.type == "seller"):
+                g.res_id=payload["res_id"]
 
         except jwt.InvalidTokenError:
             return jsonify({"success": False}), 401
@@ -166,11 +173,11 @@ def add_itemss():
         res_id = request.form.get("res_id")
         itm_qty = request.form.get("itm_qty")
         price = request.form.get("price")
-        sub_id = request.files.get("sub_id")
-        desc = request.files.get("desc")
-        unit = request.files.get("unit")
-        lowat = request.files.get("lowat")
-        available=request.files.get("available")
+        sub_id = request.form.get("sub_id")
+        desc = request.form.get("desc")
+        unit = request.form.get("unit")
+        lowat = request.form.get("lowat")
+        available=request.form.get("available")
         photo = request.files.get("photo")
         if (photo):
             file_id=upload_image(photo)
@@ -229,21 +236,24 @@ def list_resturantss():
         return ({"success":True,"results":res})
     except:
         return({"success":False})
-
 @app.post("/list_items")
+@login_required
 def list_item():
-    try:
-        data=request.get_json()
+    data=request.get_json()
+    types=g.type
+    if(types=="seller"):
+        res_id=g.res_id
+    else:
         res_id=data["res_id"]
-        types=data["type"]
-        res=list_resturant_items(res_id,types)
-        if(types=="seller"):
-            return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
-        else:
-            return ({"success":True,"res":res["item_name"]})
-    except Exception as e:
-        print(e)
-        return({"success":False})
+    res=list_resturant_items(res_id,types)
+    if(types=="seller"):
+        return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
+    else:
+        return ({"success":True,"res":res["item_name"]})
+    # try:
+    # except Exception as e:
+    #     print(e)
+    #     return({"success":False})
 @app.post("/update_item_details")
 def update_items():
     try:
@@ -310,18 +320,22 @@ def list_cart_items():
 @login_required
 def addToCart():
     try:
+        print("in addTOCart")
+        print("userid in add to cart",g.__dict__)
         data=request.get_json()
-        userid=g.user_id
+        
+        userid=data["userid"]
         resid=data["resid"]
         name=data["item"]
         qty=data["qty"]
         item_id=data["item_id"]
         res_name=data["ress_name"]
         price=data["price"]
-        add_cart(resid,userid,name,res_name,item_id,qty,price)
-        return({"success":True})
-    except:
-        return({"success":False})
+        res=add_cart(resid,userid,name,res_name,item_id,qty,price)
+        if(res["success"]):
+            return({"success":True,"Total":res["total"]})
+    except Exception as e:
+        return({"success":False ,"error":str(e)})
 @app.get("/seller/menu/<name>/<seller_id>")
 def seller_page(name,seller_id):
     try:
@@ -359,10 +373,12 @@ def getOrders(userid):
     except:
         return({"success":False})
 @app.route("/seller/orders",methods=["POST","GET"])
+@login_required
 def getsellerOrders():
     try:
         data=request.get_json()
         res_id=data["res_id"]
+        res_id=g.res_id
         print(res_id)
         orders=get_seller_ordes(res_id)
         print("orders in server",orders)
@@ -446,7 +462,8 @@ def validate():
                 username=res["username"]
                 print(userid)
                 token = jwt.encode(
-                    {
+                    {   
+                        "type":"user",
                         "user_id": str(userid),
                         "username":username,
                         "exp": datetime.utcnow() + timedelta(days=7)
@@ -455,8 +472,9 @@ def validate():
                     algorithm="HS256"
                 )
                 response=jsonify({"success":True,"user_id":userid,"username":username})
+                response.delete_cookie("seller_token")
                 response.set_cookie(
-                    "token",
+                    "user_token",
                     token,
                     httponly=True,
                     secure=False,      # True in production with HTTPS
@@ -483,11 +501,31 @@ def validate_owner():
         if(res["success"]==False): return({"success":False})
         elif(res["success"]==True):
             if(res["is_verified"]): 
-                userid=str(res["userid"])
-                username=res["username"]
+                res_id=str(res["res_id"])
+                res_name=res["resturant_name"]
                 is_setup=res["is_setup"]
-                print(userid)
-                return ({"success":True,"user_id":userid,"username":username,"is_setup":is_setup})
+                token = jwt.encode(
+                    {
+                        "type":"seller",
+                        "res_id": str(res_id),
+                        "res_name":res_name,
+                        "exp": datetime.utcnow() + timedelta(days=7)
+                    },
+                    app.config["SECRET_KEY"],
+                    algorithm="HS256"
+                )
+                response=jsonify({"success":True,"res_id":res_id,"res_name":res_name,"is_setup":is_setup})
+                response.delete_cookie("user_token")
+                response.set_cookie(
+                    "seller_token",
+                    token,
+                    httponly=True,
+                    secure=False,      # True in production with HTTPS
+                    samesite="Lax",
+                    max_age=7 * 24 * 60 * 60
+                )
+                return response
+                # return ({"success":True,"user_id":userid,"username":username,"is_setup":is_setup})
             else:
                 res_email=send_verification_email(data["email"],"owner")
                 if(res_email==1): return({"success":False,"msg":"not_verified"})
@@ -650,8 +688,8 @@ def update_cart():
         userid=g.user_id
         item_id=data["item_id"]
         qty=data["qty"]
-        update_cart_qty(userid,item_id,qty)
-        return ({"success":True})
+        res=update_cart_qty(userid,item_id,qty)
+        return ({"success":True,"total":res["total"]})
     except:
         return({"success":False})
 @socketio.on("user_cancelled_order")
