@@ -2,9 +2,13 @@ const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
 const type = pathParts[pathParts.length - 4];
+const name=pathParts[pathParts.length - 3]
 console.log(type);
-
 document.addEventListener("DOMContentLoaded", async () => {
+  const homeBtn=document.getElementById("homeBtn")
+  homeBtn.addEventListener("click",()=>{
+    window.location.href=`/seller/${name}/${resId}`
+  })
   const res = await fetch("/list_items", {
     method: "POST",
     "headers": { "Content-Type": "application/json" },
@@ -30,9 +34,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
     state.items =
       Object.entries(data.res)
-        .map(([name, item]) => ({
-          id: item.id,
-          name,
+        .map(([id, item]) => ({
+          id: id,
+          name:item.name,
 
           desc:
             item.desc || "",

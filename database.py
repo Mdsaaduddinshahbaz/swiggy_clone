@@ -64,9 +64,9 @@ def list_resturant_items(resturant_id,types):
         # print("cat",cat)
         item_name={}
         for r in res:
-            item_name[ r["item_name"]]={
+            item_name[ str(r["_id"])]={
                     "price": r["price"],
-                    "id": str(r["_id"]),   # convert ObjectId to string
+                    "name": r["item_name"],   # convert ObjectId to string
                     "item_qty":r["item_qty"],
                     "sold":r["sold"],
                     "sub_id":r["sub_id"],

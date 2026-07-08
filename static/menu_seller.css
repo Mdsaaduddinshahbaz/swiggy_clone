@@ -508,7 +508,12 @@ body {
   border-radius: 10px;
   color: green;
 }
-
+#homeBtn{
+  position: absolute;
+  align-self: flex-end;
+  margin: 0;
+  cursor: pointer;
+}
 @media (max-width:300px) {
   img{
     width: 100% !important;
