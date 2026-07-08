@@ -230,3 +230,8 @@ body::before {
         background: linear-gradient(180deg, rgb(207 172 0 / 69%) 0%, rgba(36, 22, 18, 0.9) 100%), url(https://images.unsplash.com/photo-1563865436874-9aef32095fad?auto=format&fit=crop&w=1800&q=80) center / cover no-repeat fixed !important
     }
 }
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}

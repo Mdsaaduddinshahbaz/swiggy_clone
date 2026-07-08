@@ -92,3 +92,8 @@
                 font-size: 28px;
             }
         }
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}

@@ -937,3 +937,8 @@ img#loading {
     padding-inline: 12px;
 }
 }
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}

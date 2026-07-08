@@ -77,3 +77,8 @@ button:hover {
   border-radius: 8px;
   cursor: pointer;
 }
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}

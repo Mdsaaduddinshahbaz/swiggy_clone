@@ -294,7 +294,11 @@ hr.divider::after {
 
 hr.divider::before { left: -20px; }
 hr.divider::after { right: -20px; }
-
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
 /* ============================================================
    MENU SECTION + ITEMS
    ============================================================ */
