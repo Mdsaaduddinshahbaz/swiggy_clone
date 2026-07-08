@@ -521,7 +521,7 @@ function renderTree() {
         font-size:14px;
         font-weight:600;
       `;
-
+      
       btn.innerHTML = `
         <span>
           ${state.expanded[cat.id]
@@ -537,6 +537,7 @@ function renderTree() {
       `;
 
       btn.onclick = () => {
+        console.log(state.expanded[cat.id])
         state.expanded[cat.id] =
           !state.expanded[cat.id];
 
@@ -1268,7 +1269,7 @@ document
 
     const data =
       await res.json();
-
+    console.log(data)
     if (!data.success)
       return;
 

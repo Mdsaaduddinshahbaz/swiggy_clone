@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     const datas = await rest.json()
     console.log(datas)
+    if(datas.results!==null)
     if(datas.results.total>0){
         footer.classList.add("show");
         current_total_amount.innerText=datas.results.total
@@ -202,7 +203,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
             }
             else {
-                alert("failed adding item")
+                alert(data.message||"failed adding item")
             }
         }
         else if (e.target.classList.contains('reduce')) {

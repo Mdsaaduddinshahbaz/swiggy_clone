@@ -325,20 +325,26 @@ body {
     outline: 2px solid var(--flame);
     outline-offset: 2px;
 }
-
+#noOrdersMessage{
+    
+    content: 'No orders right now — new tickets will appear here automatically.';
+    grid-column: 1 / -1;
+    display: block;
+    text-align: center;
+    font-size: 14px;
+    color: var(--ink-soft);
+    padding: 60px 20px;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+}
 /* ============================================================
    RESPONSIVE
    ============================================================ */
 
 @media (max-width: 700px) {
-    #orders-list {
-        /* grid-template-columns: 1fr;
-         */
+    /* #orders-list {
         display: block;
-    }
-    .order-header{
-        display: block;
-    }
+    } */
     .order-id{
         overflow-wrap: anywhere;
     }
@@ -364,4 +370,16 @@ body {
     .header select { width: 100%; }
 
     .order-card { padding: 16px 16px 15px; }
+}
+@media (max-width:380px) {
+    #orders-list{
+        display: block;
+    }
+    .order-header{
+        display: flex;
+        flex-direction: column;
+    }
+    .order-card{
+        margin-bottom: 10px;
+    }
 }

@@ -57,18 +57,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                 // Object.entries(data.results).forEach(([name, id]) => {
                 //     console.log(name, id)
                 // })
-                Object.entries(data.results).forEach(([name, detail]) => {
+                Object.entries(data.results).forEach(([id, detail]) => {
                     // console.log(element)
                     console.log(detail)
                     display_resturants.innerHTML +=
-                        `<div class="card" id=${detail.res_id}>
+                        `<div class="card" id=${id}>
                 <div class="card-img">
                     
                     <img src=${detail.file_url} alt="Food">
                     <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
                 </div>
                 <div class="card-details">
-                    <h3 class="resturant_name" >${name}</h3>
+                    <h3 class="resturant_name" >${detail.res_name}</h3>
                     <p class="rating"><i class="fa-solid fa-circle-star"></i> 4.2 • 25-30 mins</p>
                     <p class="cuisine">Burgers, American</p>
                     <p class="area">${detail.address}</p>
@@ -174,18 +174,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                 // Object.entries(data.results).forEach(([name, id]) => {
                 //     console.log(name, id)
                 // })
-                Object.entries(data.results).forEach(([name, detail]) => {
+                Object.entries(data.results).forEach(([id, detail]) => {
                     // console.log(element)
                     console.log(detail)
                     display_resturants.innerHTML +=
-                        `<div class="card" id=${detail.res_id}>
+                        `<div class="card" id=${id}>
                 <div class="card-img">
                     
                     <img src=${detail.file_url} alt="Food">
                     <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
                 </div>
                 <div class="card-details">
-                    <h3 class="resturant_name" >${name}</h3>
+                    <h3 class="resturant_name" >${detail.res_name}</h3>
                     <p class="rating"><i class="fa-solid fa-circle-star"></i> 4.2 • 25-30 mins</p>
                     <p class="cuisine">Burgers, American</p>
                     <p class="area">${detail.address}</p>
@@ -704,18 +704,18 @@ async function change(latt, long) {
                 // })
                 display_resturants.innerHTML = ""
                 no_results_container.style.display = "none";
-                Object.entries(data.results).forEach(([name, detail]) => {
+                Object.entries(data.results).forEach(([id, detail]) => {
                     // console.log(element)
                     console.log(detail)
                     display_resturants.innerHTML +=
-                        `<div class="card" id=${detail.res_id}>
+                        `<div class="card" id=${id}>
                 <div class="card-img">
                     
                     <img src=${detail.file_url} alt="Food">
                     <!-- <div class="img-overlay">ITEMS AT ₹129</div> -->
                 </div>
                 <div class="card-details">
-                    <h3 class="resturant_name" >${name}</h3>
+                    <h3 class="resturant_name" >${detail.res_name}</h3>
                     <p class="rating"><i class="fa-solid fa-circle-star"></i> 4.2 • 25-30 mins</p>
                     <p class="cuisine">Burgers, American</p>
                     <p class="area">${detail.address}</p>

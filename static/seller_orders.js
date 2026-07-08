@@ -71,16 +71,24 @@ applyFilter();
 function applyFilter() {
     const selected = filterDropdown.value.toLowerCase();
     const cards = document.querySelectorAll(".order-card");
-
+    const noOrdersMessage = document.getElementById("noOrdersMessage");
+    let hasVisibleCards = false;
+    
     cards.forEach(card => {
         const statusText = card.querySelector(".order-status")
             .textContent
             .trim()
             .toLowerCase();
+        const show = selected === "all" || statusText === selected;
 
+        card.style.display = show ? "block" : "none";
+
+        if (show) {
+            hasVisibleCards = true;
+        }
         const buttons = card.querySelectorAll(".statusBtn");
 
-        const show = selected === "all" || statusText === selected;
+        // const show = selected === "all" || statusText === selected;
 
         card.style.display = show ? "block" : "none";
 
@@ -92,6 +100,22 @@ function applyFilter() {
             btn.style.visibility = enable ? "visible" : "hidden";
         });
     });
+        if (hasVisibleCards) {
+        noOrdersMessage.style.display = "none";
+    } else {
+        noOrdersMessage.style.display = "block";
+
+        if (selected === "pending") {
+            noOrdersMessage.textContent = "No pending orders.";
+        } else if (selected === "completed") {
+            noOrdersMessage.textContent = "No completed orders.";
+        } else if (selected === "placed") {
+            noOrdersMessage.textContent = "No placed orders.";
+        } else {
+            noOrdersMessage.textContent = "No orders found.";
+        }
+    }
+
 }
 const ordersList = document.getElementById("orders-list");
 
@@ -140,7 +164,7 @@ async function loadOrders() {
     const data = await res.json();
     console.log(data)
     if (!data.success) {
-        ordersList.innerHTML = "<p>Error loading orders</p>";
+        ordersList.innerHTML = `<p>Error loading orders - ${data.message}</p>`;
         return;
     }
 
@@ -207,7 +231,7 @@ async function loadOrders() {
 
         ordersList.innerHTML += orderHTML;
     });
-    applyFiter()
+    applyFilter()
 }
 function renderSingleOrder(order, prepend = false) {
     let total = 0;
@@ -285,7 +309,17 @@ document.addEventListener("click", async (e) => {
                 token_no: tokenNo,
                 res_id:resId,
                 status: "completed"   // 🔥 send this instead
-            });
+            }
+            // (response) => {
+            //     console.log(response)
+            //     if (response.success) {
+            //         console.log("Order updated successfully");
+            //     } else {
+            //         alert(response.message)
+            //         console.error(response.message);
+            //     }
+            // }
+            );
             // 🔥 UPDATE UI HERE
             const statusSpan = card.querySelector(".order-status");
             statusSpan.textContent = "completed";   // or "completed"
