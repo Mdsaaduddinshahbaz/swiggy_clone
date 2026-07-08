@@ -47,6 +47,9 @@ body {
     user-select: none;
     -webkit-touch-callout: none;
 }
+* {
+    -webkit-tap-highlight-color: transparent;
+}
 @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }

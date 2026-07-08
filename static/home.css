@@ -923,6 +923,9 @@ img#loading {
     }
 }
 
+* {
+    -webkit-tap-highlight-color: transparent;
+}
 @media (max-width:800px) {
     .location-trigger {
     max-width: 220px; /* adjust as needed */

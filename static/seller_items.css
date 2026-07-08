@@ -256,6 +256,9 @@ body{
     bottom: 5px;
     right: 54%;
 }
+* {
+    -webkit-tap-highlight-color: transparent;
+}
 
 .modal {
   position: fixed;

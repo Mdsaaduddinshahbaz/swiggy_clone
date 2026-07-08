@@ -299,6 +299,9 @@ hr.divider::after { right: -20px; }
     user-select: none;
     -webkit-touch-callout: none;
 }
+* {
+    -webkit-tap-highlight-color: transparent;
+}
 /* ============================================================
    MENU SECTION + ITEMS
    ============================================================ */

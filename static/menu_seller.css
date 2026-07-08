@@ -523,7 +523,14 @@ body {
     width: 50%;
   }
 }
-
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+* {
+    -webkit-tap-highlight-color: transparent;
+}
 @media (max-width:190px) {
   .controlsContainer{
     flex-direction: column;

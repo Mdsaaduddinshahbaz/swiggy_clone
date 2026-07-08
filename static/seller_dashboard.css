@@ -91,3 +91,11 @@ body {
 .btn:hover {
   background: #0ea5e9;
 }
+* {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+* {
+    -webkit-tap-highlight-color: transparent;
+}
