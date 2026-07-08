@@ -252,10 +252,32 @@ document.addEventListener("click", async (e) => {
         }
     }
 });
-
+const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
+    hidecartorderBtn.addEventListener("click",()=>{
+        console.log("clicked")
+        const cartorderContainer=document.getElementById("CartOrderContainer")
+        if(cartorderContainer.classList.contains("hide")){
+            cartorderContainer.classList.replace("hide","show")
+        }
+        else{
+            cartorderContainer.classList.replace("show","hide")
+        }
+    })
 document.getElementById("shopBtn").addEventListener("click", () => {
     // alert("Redirecting to products page...");
     
     // Example:
     window.location.href = `/user/${userId}`;
+});
+document.getElementById("homeBtn").addEventListener("click", () => {
+    // alert("Redirecting to products page...");
+    
+    // Example:
+    window.location.href = `/user/${userId}`;
+});
+document.getElementById("cartBtn").addEventListener("click", () => {
+    // alert("Redirecting to products page...");
+    
+    // Example:
+    window.location.href = `/cart/${userId}`;
 });

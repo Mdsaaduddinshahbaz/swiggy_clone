@@ -335,7 +335,41 @@ button.cancelBtn {
     outline: 2px solid var(--flame);
     outline-offset: 2px;
 }
+/* ============================================================
+   NAVBAR
+   ============================================================ */
 
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--maroon);
+    border-bottom: 3px solid var(--flame);
+}
+
+.nav-container {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.left-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+}
+
+.left-nav .logo {
+    height: 32px;
+    width: auto;
+    flex-shrink: 0;
+}
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -359,5 +393,63 @@ button.cancelBtn {
     }
     .order-id{
         overflow-wrap: anywhere;
+    }
+}
+#CartOrderContainer.show{
+    max-height: max-content;
+    max-width: 100% !important;
+}
+#CartOrderContainer{
+    display: flex;
+    list-style: none;
+        max-width: 0;
+        max-height: 0;
+    overflow: hidden;
+    transition: max-width 0.28s ease, padding 0.28s ease;
+    border-radius: 999px;
+    color: white;
+    font-family: fantasy;
+}
+.fa-cart-shopping:before, .fa-shopping-cart:before {
+    content: "\f07a";
+}
+#homeBtn,
+#cartBtn {
+    background: var(--flame);
+    padding: 4px 17px;
+    border-radius: 50px;
+}
+
+#homeBtn:hover,
+#cartBtn:hover {
+    background: var(--flame-dark);
+}
+
+#homeBtn i,
+#cartBtn i {
+    color: var(--white);
+}
+@media (max-width: 503px) {
+    .right-nav ul{
+        display: flex;
+        margin: 0;
+        padding: 0;
+    }
+    .right-nav li{
+        margin-right: 10px;
+    }
+    #cartBtn{
+        margin-bottom: 10px;
+    }
+    #homeBtn{
+        margin-bottom: 10px;
+    }
+    #hideCartOrderBtn{
+        display: block;
+        color: white;
+        margin: 0;
+        position: fixed;
+        top: 6px;
+        right: 8px;
     }
 }

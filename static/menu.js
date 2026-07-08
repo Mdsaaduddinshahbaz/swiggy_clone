@@ -350,7 +350,7 @@ function mergeMenuWithCart(data, datas, res_id) {
 
     // });
     const merged = Object.entries(data.res).reduce((acc, [name, item]) => {
-        console.log(acc,name,item)
+        console.log(acc,item.name,item)
         acc[name] = {
             id: item.id,
             price: item.price,
