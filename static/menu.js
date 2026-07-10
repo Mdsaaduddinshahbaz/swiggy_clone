@@ -18,9 +18,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const breadcrump = document.querySelector(".breadcrumbs")
     const loading = document.getElementById("loading")
     const menu_container = document.querySelector('.menu-section');
-    const current_total_amount=document.getElementById("amount")
+    const current_total_amount = document.getElementById("amount")
     const footer = document.getElementsByTagName("footer")[0];
-    const gotoCartBtn=document.getElementById("GoCartBtn")
+    const gotoCartBtn = document.getElementById("GoCartBtn")
     breadcrump.innerText = `Home / ${addresss_decoded} / ${decoded}`
     res_location.innerText = addresss_decoded
     heading.innerText = decoded;
@@ -33,15 +33,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     const datas = await rest.json()
     console.log(datas)
-    if(datas.results!==null)
-    if(datas.results.total>0){
-        footer.classList.add("show");
-        current_total_amount.innerText=datas.results.total
-    }
+    if (datas.results !== null)
+        if (datas.results.total > 0) {
+            footer.classList.add("show");
+            current_total_amount.innerText = datas.results.total
+        }
     const res = await fetch("/list_items", {
         method: "POST",
         "headers": { "Content-Type": "application/json" },
-        body: JSON.stringify({ "res_id": res_id , "type":"user" })
+        body: JSON.stringify({ "res_id": res_id, "type": "user" })
     })
 
     const data = await res.json()
@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log(data)
         // res_info.closest("h1").innerText = name
         Object.entries(mergedd).forEach(([name, item]) => {
-            console.log(name, item.id, item.price, item.qty,item.file_url)
+            console.log(name, item.id, item.price, item.qty, item.file_url)
             if (item.qty === 0) {
                 menu_items_container.innerHTML +=
                     `
@@ -110,17 +110,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.location.href = `/orders/${userid}`
     })
 
-    const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
-    hidecartorderBtn.addEventListener("click",()=>{
+    const hidecartorderBtn = document.getElementById("hideCartOrderBtn")
+    hidecartorderBtn.addEventListener("click", () => {
         console.log("clicked")
-        const cartorderContainer=document.getElementById("CartOrderContainer")
-        if(cartorderContainer.classList.contains("hide")){
-            cartorderContainer.classList.replace("hide","show")
+        const cartorderContainer = document.getElementById("CartOrderContainer")
+        if (cartorderContainer.classList.contains("hide")) {
+            cartorderContainer.classList.replace("hide", "show")
         }
-        else{
-            cartorderContainer.classList.replace("show","hide")
+        else {
+            cartorderContainer.classList.replace("show", "hide")
         }
     })
+    message = document.getElementById("message")
+    ReplaceContainer = document.getElementById("ReplaceContainer")
+    overlayContainer = document.getElementById("overlayContainer")
+    let pendingCartItem = null;
     menu_items_container.addEventListener("click", async (e) => {
         if (e.target.classList.contains("add-btn")) {
 
@@ -131,6 +135,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             const item_id = item.getAttribute("id")
             // console.log("Added:", names, price,item_id);
             const userid = localStorage.getItem("userId")
+            const button = item.querySelector(".add-btn")
+            
             // 👉 Here you can send to backend / Redis
             const res = await fetch("/add_to_cart", {
                 method: "POST",
@@ -142,21 +148,92 @@ document.addEventListener("DOMContentLoaded", async () => {
                     ress_name: decoded,
                     qty: 1,
                     item_id: item_id,
-                    price: parseInt(price)   // 🔥 important
+                    price: parseInt(price),
+                    replace: false   // 🔥 important
                 })
             })
             const data = await res.json()
             console.log(data)
             if (data.success) {
+                button.outerHTML = `
+                <div class="quantity-control">
+                    <button class="qty-btn reduce">-</button>
+                    <span class="item_qty">1</span>
+                    <button class="qty-btn increase">+</button>
+                </div>
+            `;
                 footer.classList.add("show")
                 // alert(`${names} added to cart`)
                 console.log(data.Total)
-                current_total_amount.innerText=data.Total
+                current_total_amount.innerText = data.Total
+            }
+            if (!data.success) {
+                pendingCartItem = {
+                    resid: res_id,
+                    userid: userid,
+                    item: names,
+                    ress_name: decoded,
+                    qty: 1,
+                    item_id: item_id,
+                    price: parseInt(price)
+                };
 
+                // button.outerHTML = `<button class="add-btn" id="${item_id}">ADD</button>`
+                console.log(button.innerText);
+                button.innerText="ADD"
+                ReplaceContainer.classList.add("show")
+                overlayContainer.classList.add("show")
+                message.innerText = (data.message || "please Try again")
+                // Reo
             }
         }
     });
+    replaceYesBtn = document.getElementById("YES")
+    replaceYesBtn.addEventListener("click", async () => {
+        const res = await fetch("/add_to_cart", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                resid: pendingCartItem.resid,
+                userid: pendingCartItem.userid,
+                item: pendingCartItem.item,
+                ress_name: pendingCartItem.ress_name,
+                qty: pendingCartItem.qty,
+                item_id: pendingCartItem.item_id,
+                price: pendingCartItem.price,
+                replace: true   // 🔥 important
+            })
+        })
+        const data = await res.json()
+        console.log(data)
+        if (data.success) {
+            footer.classList.add("show")
+            // alert(`${names} added to cart`)
+            console.log(data.Total)
+            current_total_amount.innerText = data.Total
+            ReplaceContainer.classList.remove("show")
+            overlayContainer.classList.remove("show")
+            message.innerText = "Error:"
+            let itemssss = document.getElementById(pendingCartItem.item_id)
+            const button = itemssss.querySelector(".add-btn")
+            console.log(button);
+            button.outerHTML= `
+                <div class="quantity-control">
+                    <button class="qty-btn reduce">-</button>
+                    <span class="item_qty">1</span>
+                    <button class="qty-btn increase">+</button>
+                </div>
+            `;
+            
+        }
+    })
 
+    replaceNoBtn = document.getElementById("NO")
+    replaceNoBtn.addEventListener("click", async () => {
+        ReplaceContainer.classList.remove("show")
+        overlayContainer.classList.remove("show")
+        message.innerText = "Error:"
+    })
     menu_container.addEventListener('click', async (e) => {
         console.log("clicke menu_container")
 
@@ -172,17 +249,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         // console.log(itemId,item_qty,item_price)
         const addBtn = e.target.closest('.add-btn');
         if (e.target.classList.contains('add-btn')) {
-            e.target.outerHTML = `
-                <div class="quantity-control">
-                    <button class="qty-btn reduce">-</button>
-                    <span class="item_qty">1</span>
-                    <button class="qty-btn increase">+</button>
-                </div>
-            `;
+            // e.target.outerHTML = `
+            //     <div class="quantity-control">
+            //         <button class="qty-btn reduce">-</button>
+            //         <span class="item_qty">1</span>
+            //         <button class="qty-btn increase">+</button>
+            //     </div>
+            // `;
         }
         else if (e.target.classList.contains('increase')) {
             const qtyEl = e.target.parentElement.querySelector('.item_qty');
-            
+
             // console.log(item_qty.textContent)
             console.log(`Increasing: ${itemName} (ID: ${itemId})`);
             const res = await fetch("/update_cart", {
@@ -194,16 +271,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (data.success) {
                 qtyEl.textContent = Number(qtyEl.textContent) + 1;
                 // current_total_amount.innerText=data.total
-                if(data.total>0){
+                if (data.total > 0) {
                     footer.classList.add("show")
-                    current_total_amount.innerText=data.total
+                    current_total_amount.innerText = data.total
                 }
-                else{
+                else {
                     footer.classList.remove("show")
                 }
             }
             else {
-                alert(data.message||"failed adding item")
+                alert(data.message || "failed adding item")
             }
         }
         else if (e.target.classList.contains('reduce')) {
@@ -222,11 +299,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.log(data)
             if (data.success) {
                 console.log(data.total)
-                if(data.total>0){
+                if (data.total > 0) {
                     footer.classList.add("show")
-                    current_total_amount.innerText=data.total
+                    current_total_amount.innerText = data.total
                 }
-                else{
+                else {
                     footer.classList.remove("show")
                 }
                 if (Number(qtyEl.textContent) > 1) {
@@ -318,8 +395,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     });
-    gotoCartBtn.addEventListener("click",()=>{
-        window.location.href=`/cart/${userId}`
+    gotoCartBtn.addEventListener("click", () => {
+        window.location.href = `/cart/${userId}`
     })
 
 
@@ -330,7 +407,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function mergeMenuWithCart(data, datas, res_id) {
     const cleanResId = res_id.toString().trim();
     console.log(res_id)
-// const restaurantCart = datas.results.cart?.[cleanResId]?.items || {};
+    // const restaurantCart = datas.results.cart?.[cleanResId]?.items || {};
     const restaurantCart = datas?.results?.cart?.[res_id]?.items || {};
     // const cartIds = Object.keys(datas.results.cart);
     console.log(restaurantCart);
@@ -350,11 +427,11 @@ function mergeMenuWithCart(data, datas, res_id) {
 
     // });
     const merged = Object.entries(data.res).reduce((acc, [name, item]) => {
-        console.log(acc,item.name,item)
+        console.log(acc, item.name, item)
         acc[name] = {
             id: item.id,
             price: item.price,
-            file_url:item.file_url,
+            file_url: item.file_url,
             qty: restaurantCart[item.id]?.qty || 0
         };
 

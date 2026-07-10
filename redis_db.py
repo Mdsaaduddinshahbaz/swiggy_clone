@@ -286,7 +286,8 @@ get_cart("69dc9a0e830ee0aee697bda0")
 #         "success": True,
 #         "total": cart["total"]
 #     }
-def add_cart(resid, uid, item_name, res_name, item_id, qty, price,available_qty):
+def add_cart(resid, uid, item_name, res_name, item_id, qty, price,available_qty,replace=False):
+    print("in add_cart",uid)
     # if(available_qty<qty)
     resid = str(resid)
     item_id = str(item_id)
@@ -340,10 +341,23 @@ def add_cart(resid, uid, item_name, res_name, item_id, qty, price,available_qty)
                 pipe.watch(key)
 
                 existing = pipe.get(key)
-
                 if existing:
                     try:
                         cart = json.loads(existing)
+                        if replace:
+                            cart = {
+                                "uid": uid,
+                                "total": 0,
+                                "cart": {}
+                                    }
+                        else:
+                            # print(len(cart["cart"])>0)
+                            if(len(cart["cart"])>0):
+                                if resid not in cart["cart"]:
+                                    return {
+                                            "success": False,
+                                            "message": f"Items with different store exists, Would you like to replace it?"
+                                        }
                     except json.JSONDecodeError:
                         pipe.unwatch()
                         return {
@@ -356,7 +370,6 @@ def add_cart(resid, uid, item_name, res_name, item_id, qty, price,available_qty)
                         "total": 0,
                         "cart": {}
                     }
-
                 if resid not in cart["cart"]:
                     cart["cart"][resid] = {
                         "name": res_name,
@@ -574,4 +587,4 @@ def update_cart_qty(uid, item_id, change):
     "message": "Please retry"
 }
 
-# delete_cart("6a30e1bccfbdcefd495d5246")
+# delete_cart("6a3ac0f26a6299de83a1c9c6")
