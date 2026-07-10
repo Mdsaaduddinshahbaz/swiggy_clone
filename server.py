@@ -445,11 +445,13 @@ def addToCart():
         if error:
             return error
         userid = g.user_id
-        response = get_resturantItem_price(data["resid"], data["item_id"])
-        if(response["success"]):
-            price=response["price"]
-            available_qty=response["available_qty"]
-        print(response)
+        # response = get_resturantItem_price(data["resid"], data["item_id"])
+        # if(response["success"]):
+        #     price=response["price"]
+        #     available_qty=response["available_qty"]
+        price=data["price"]
+        available_qty=10
+        # print(response)
         try:
             replace =data["replace"]
             print("in replace",replace)
