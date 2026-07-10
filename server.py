@@ -426,6 +426,7 @@ def cartss(userid):
 @login_required
 def list_cart_items():
     try:
+        print("in get cart",g.__dict__)
         data=request.get_json()
         # userid=data["userid"]
         userid=g.user_id
@@ -449,6 +450,12 @@ def addToCart():
             price=response["price"]
             available_qty=response["available_qty"]
         print(response)
+        try:
+            replace =data["replace"]
+            print("in replace",replace)
+        except Exception as e:
+            print(e)
+            replace=False
         res = add_cart(
             data["resid"],
             userid,
@@ -458,7 +465,8 @@ def addToCart():
             data["qty"],
             # data["price"]
             price,
-            available_qty
+            available_qty,
+            replace
         )
 
         if(res["success"]):
@@ -1247,12 +1255,14 @@ from flask import request, jsonify
 
 def validate_add_to_cart():
     data = request.get_json(silent=True)
+    print(data)
     print("validate_add to cart",data)
     if not data:
         return None, (jsonify({
             "success": False,
             "message": "Invalid JSON payload"
         }), 400)
+    
 
     required = [
         "resid",
@@ -1278,6 +1288,12 @@ def validate_add_to_cart():
             "message": "Item name cannot be empty"
         }), 400)
 
+    replace= data["replace"]
+    if(type(replace)!=bool):
+        return None, (jsonify({
+            "success": False,
+            "message": "Replace value must be a Boolean"
+        }), 400)
     # Restaurant name
     res_name = str(data["ress_name"]).strip()
     if not res_name:
@@ -1325,7 +1341,8 @@ def validate_add_to_cart():
         "qty": qty,
         "item_id": item_id,
         "ress_name": res_name,
-        "price": price
+        "price": price,
+        "replace":replace
     }, None
 def validate_update_cart():
     data = request.get_json(silent=True)
