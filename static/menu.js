@@ -325,57 +325,65 @@ document.addEventListener("DOMContentLoaded", async () => {
         else if (e.target.classList.contains('reduce')) {
 
             const qtyEl = e.target.parentElement.querySelector('.item_qty');
-            // qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
-            // console.log('Increase clicked:', itemId);
-            console.log(`Reducing: ${itemName} (ID: ${itemId})`);
-            // Call your update function here
-            const res = await fetch("/update_cart", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ "user_id": userId, "item_id": itemId, "qty": -1 })
-            })
-            const data = await res.json()
-            console.log(data)
-            if (data.success) {
-                console.log(data.total)
-                if (data.total > 0) {
-                    footer.classList.add("show")
-                    current_total_amount.innerText = data.total
-                }
-                else {
-                    footer.classList.remove("show")
-                }
-                if (Number(qtyEl.textContent) > 1) {
-                    // Correctly decrement the number
-                    qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
-                }
-                else {
-                    // If it hits 0, remove the element from the cart UI
-                    // const prevHeading = itemRow.previousElementSibling;
-                    const qtyControl = e.target.closest('.quantity-control');
+            const prevQty = Number(qtyEl.textContent);
+            console.log(`Increasing: ${itemName} (ID: ${itemId})`);
+            // 1. Optimistic UI update — instant feedback
+            qtyEl.textContent = prevQty + 1;
 
-                    qtyControl.outerHTML = `
-                        <button class="add-btn" id="${itemId}">ADD</button>
-                    `;
-
-                    // Check if this is the last item under the heading
-                    const nextSibling = itemRow.nextElementSibling;
-
-                    // itemRow.remove();
-
-                    // if (
-                    //     prevHeading &&
-                    //     prevHeading.tagName === "H2" &&
-                    //     (!nextSibling || nextSibling.tagName === "H2")
-                    // ) {
-                    //     prevHeading.remove();
-                    // }
+            // 2. Batched/debounced network call
+            scheduleCartUpdate(itemId,userId, 1, qtyEl,
+                (data) => {
+                    if (data.total > 0) {
+                        footer.classList.add("show");
+                        current_total_amount.innerText = data.total;
+                    } else {
+                        footer.classList.remove("show");
+                    }
+                },
+                (message) => {
+                    qtyEl.textContent = prevQty; // rollback on failure
+                    alert(message);
                 }
+            );
+            // if (data.success) {
+            //     console.log(data.total)
+            //     if (data.total > 0) {
+            //         footer.classList.add("show")
+            //         current_total_amount.innerText = data.total
+            //     }
+            //     else {
+            //         footer.classList.remove("show")
+            //     }
+            if (Number(qtyEl.textContent) > 1) {
+                // Correctly decrement the number
+                qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
+            }
+            else {
+                // If it hits 0, remove the element from the cart UI
+                // const prevHeading = itemRow.previousElementSibling;
+                const qtyControl = e.target.closest('.quantity-control');
+
+                qtyControl.outerHTML = `
+                    <button class="add-btn" id="${itemId}">ADD</button>
+                `;
+
+                // Check if this is the last item under the heading
+                const nextSibling = itemRow.nextElementSibling;
+
+                // itemRow.remove();
+
+                // if (
+                //     prevHeading &&
+                //     prevHeading.tagName === "H2" &&
+                //     (!nextSibling || nextSibling.tagName === "H2")
+                // ) {
+                //     prevHeading.remove();
+                // }
+            }
             }
             else {
                 alert("failed removing item")
             }
-        }
     });
 
     const searchBtn = document.getElementById("searchBtn");
