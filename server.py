@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -958,29 +958,37 @@ def return_seller_stats():
     except Exception as e:
         print(e)
         return({"success":False})
+# @app.post("/update_cart")
+# @login_required
+# def update_cart():
+#     try:
+#         # data=request.get_json()
+#         # # userid=data["user_id"]
+#         # userid=g.user_id
+#         # item_id=data["item_id"]
+#         # qty=data["qty"]
+#         data, error = validate_update_cart()
+
+#         if error:
+#             return error
+
+#         userid = g.user_id
+#         res = update_cart_qty(userid,data["item_id"],data["qty"])
+#         print(res)
+#         if not res["success"]:
+#             return jsonify({"success": False,"message": res.get("message", "Unable to update cart")}), 400
+#         return ({"success":True,"total":res["total"]})
+#     except Exception as e:
+#         print(e)
+#         return({"success":False})
 @app.post("/update_cart")
 @login_required
-def update_cart():
-    try:
-        # data=request.get_json()
-        # # userid=data["user_id"]
-        # userid=g.user_id
-        # item_id=data["item_id"]
-        # qty=data["qty"]
-        data, error = validate_update_cart()
-
-        if error:
-            return error
-
-        userid = g.user_id
-        res = update_cart_qty(userid,data["item_id"],data["qty"])
-        print(res)
-        if not res["success"]:
-            return jsonify({"success": False,"message": res.get("message", "Unable to update cart")}), 400
-        return ({"success":True,"total":res["total"]})
-    except Exception as e:
-        print(e)
-        return({"success":False})
+def updateCart():
+    data = request.get_json()
+    result = update_cart_qty(g.user_id, data["item_id"], int(data["qty"]))
+    if result["success"]:
+        return jsonify({"success": True, "total": result["total"]})
+    return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
 @socketio.on("user_cancelled_order")
 def handle_user_cancel(data):
     try:
