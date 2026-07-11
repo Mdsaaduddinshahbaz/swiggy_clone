@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -435,29 +435,99 @@ def list_cart_items():
     except Exception as e:
         print(e)
         return({"success":False})
+# @app.post("/add_to_cart")
+# @login_required
+# def addToCart():
+#     try:
+#         print("in addTOCart")
+#         print("userid in add to cart",g.__dict__)
+#         data, error = validate_add_to_cart()
+#         if error:
+#             return error
+#         userid = g.user_id
+#         # response = get_resturantItem_price(data["resid"], data["item_id"])
+#         # if(response["success"]):
+#         #     price=response["price"]
+#         #     available_qty=response["available_qty"]
+#         price=data["price"]
+#         available_qty=10
+#         # print(response)
+#         try:
+#             replace =data["replace"]
+#             print("in replace",replace)
+#         except Exception as e:
+#             print(e)
+#             replace=False
+#         res = add_cart(
+#             data["resid"],
+#             userid,
+#             data["item"],
+#             data["ress_name"],
+#             data["item_id"],
+#             data["qty"],
+#             # data["price"]
+#             price,
+#             available_qty,
+#             replace
+#         )
+
+#         if(res["success"]):
+#             return({"success":True,"Total":res["total"]})
+#         return jsonify({"success": False,"message": res.get("message", "Unable to add item to cart")}), 400
+#     except Exception as e:
+#         print(e)
+#         return({"success":False ,"error":str(e)})
+
+
+@app.post("/update_cart")
+@login_required
+def updateCart():
+    try:
+        data = request.get_json(force=True) or {}
+        item_id = data.get("item_id")
+        qty = data.get("qty")
+
+        if item_id is None or qty is None:
+            return jsonify({"success": False, "message": "item_id and qty are required"}), 400
+
+        try:
+            qty = int(qty)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "qty must be an integer"}), 400
+
+        result = update_cart_qty(g.user_id, item_id, qty)
+
+        if result["success"]:
+            return jsonify({
+                "success": True,
+                "total": result["total"],
+                "removed": result.get("removed", False)
+            })
+        return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
+
+    except Exception as e:
+        print("update_cart error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+
+
 @app.post("/add_to_cart")
 @login_required
 def addToCart():
     try:
-        print("in addTOCart")
-        print("userid in add to cart",g.__dict__)
         data, error = validate_add_to_cart()
         if error:
             return error
+
         userid = g.user_id
+
+        # TODO: re-enable server-side price/stock lookup instead of trusting the client.
         # response = get_resturantItem_price(data["resid"], data["item_id"])
-        # if(response["success"]):
-        #     price=response["price"]
-        #     available_qty=response["available_qty"]
-        price=data["price"]
-        available_qty=10
-        # print(response)
-        try:
-            replace =data["replace"]
-            print("in replace",replace)
-        except Exception as e:
-            print(e)
-            replace=False
+        # price, available_qty = response["price"], response["available_qty"]
+        price = data["price"]
+        available_qty = 10
+
+        replace = data.get("replace", False)
+
         res = add_cart(
             data["resid"],
             userid,
@@ -465,18 +535,18 @@ def addToCart():
             data["ress_name"],
             data["item_id"],
             data["qty"],
-            # data["price"]
             price,
             available_qty,
             replace
         )
 
-        if(res["success"]):
-            return({"success":True,"Total":res["total"]})
-        return jsonify({"success": False,"message": res.get("message", "Unable to add item to cart")}), 400
+        if res["success"]:
+            return jsonify({"success": True, "Total": res["total"]})
+        return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
+
     except Exception as e:
-        print(e)
-        return({"success":False ,"error":str(e)})
+        print("add_to_cart error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
 @app.get("/seller/menu/<name>/<seller_id>")
 def seller_page(name,seller_id):
     try:
@@ -981,14 +1051,14 @@ def return_seller_stats():
 #     except Exception as e:
 #         print(e)
 #         return({"success":False})
-@app.post("/update_cart")
-@login_required
-def updateCart():
-    data = request.get_json()
-    result = update_cart_qty(g.user_id, data["item_id"], int(data["qty"]))
-    if result["success"]:
-        return jsonify({"success": True, "total": result["total"]})
-    return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
+# @app.post("/update_cart")
+# @login_required
+# def updateCart():
+#     data = request.get_json()
+#     result = update_cart_qty(g.user_id, data["item_id"], int(data["qty"]))
+#     if result["success"]:
+#         return jsonify({"success": True, "total": result["total"]})
+#     return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
 @socketio.on("user_cancelled_order")
 def handle_user_cancel(data):
     try:

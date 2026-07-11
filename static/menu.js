@@ -861,9 +861,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     alert(message);
                 }
             );
-            if (Number(qtyEl.textContent) > 1) {
+            if (Number(qtyEl.textContent) >=1) {
                 // Correctly decrement the number
-                qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
+                // qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
             }
             else {
                 // If it hits 0, remove the element from the cart UI
