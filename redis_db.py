@@ -286,152 +286,288 @@ get_cart("69dc9a0e830ee0aee697bda0")
 #         "success": True,
 #         "total": cart["total"]
 #     }
-def add_cart(resid, uid, item_name, res_name, item_id, qty, price,available_qty,replace=False):
-    print("in add_cart",uid)
-    # if(available_qty<qty)
+################ latest one ############
+# def add_cart(resid, uid, item_name, res_name, item_id, qty, price,available_qty,replace=False):
+#     print("in add_cart",uid)
+#     # if(available_qty<qty)
+#     resid = str(resid)
+#     item_id = str(item_id)
+
+#     try:
+#         qty = int(qty)
+#     except ValueError:
+#         return {
+#             "success": False,
+#             "message": "Invalid quantity"
+#         }
+#     try:
+#         available_qty = int(available_qty)
+#     except ValueError:
+#         return {
+#             "success": False,
+#             "message": "Invalid quantity available value"
+#         }
+#     # if(available_qty<qty):
+#     #     return {
+#     #         "success":False,
+#     #         "message": "Item is Out of Stock"
+#     #     }
+#     if qty <= 0:
+#         return {
+#             "success": False,
+#             "message": "Quantity must be positive"
+#         }
+
+#     if price is None:
+#         return {
+#             "success": False,
+#             "message": "Item not found"
+#         }
+
+#     try:
+#         price = int(price)
+#     except ValueError:
+#         return {
+#             "success": False,
+#             "message": "Invalid price"
+#         }
+
+#     key = f"cart:{uid}"
+
+#     # while True:
+#     for _ in range(5):
+#         try:
+#             with r.pipeline() as pipe:
+
+#                 pipe.watch(key)
+
+#                 existing = pipe.get(key)
+#                 if existing:
+#                     try:
+#                         cart = json.loads(existing)
+#                         if replace:
+#                             cart = {
+#                                 "uid": uid,
+#                                 "total": 0,
+#                                 "cart": {}
+#                                     }
+#                         else:
+#                             # print(len(cart["cart"])>0)
+#                             if(len(cart["cart"])>0):
+#                                 if resid not in cart["cart"]:
+#                                     return {
+#                                             "success": False,
+#                                             "message": f"Items with different store exists, Would you like to replace it?"
+#                                         }
+#                     except json.JSONDecodeError:
+#                         pipe.unwatch()
+#                         return {
+#                             "success": False,
+#                             "message": "Corrupted cart data"
+#                         }
+#                 else:
+#                     cart = {
+#                         "uid": uid,
+#                         "total": 0,
+#                         "cart": {}
+#                     }
+#                 if resid not in cart["cart"]:
+#                     cart["cart"][resid] = {
+#                         "name": res_name,
+#                         "items": {}
+#                     }
+
+#                 items = cart["cart"][resid]["items"]
+
+#                 if item_id in items:
+#                     # Keep the original price already stored in cart
+#                     existing_qty = items[item_id]["qty"]
+
+#                     new_total = existing_qty + qty
+
+#                     if new_total > available_qty:
+#                         return {
+#                             "success": False,
+#                             "message": f"Only {available_qty} items available."
+#                         }
+#                     item_price = items[item_id]["price"]
+#                     items[item_id]["qty"] += qty
+#                     items[item_id]["available_qty"] = available_qty
+#                 else:
+#                     if qty > available_qty:
+#                         return {
+#                             "success": False,
+#                             "message": f"Only {available_qty} items available."
+#                         }
+#                     item_price = price
+#                     items[item_id] = {
+#                         "name": item_name,
+#                         "qty": qty,
+#                         "price": item_price,
+#                         "available_qty":available_qty
+#                     }
+
+#                 cart["total"] += qty * item_price
+
+#                 pipe.multi()
+#                 pipe.set(key, json.dumps(cart))
+#                 pipe.execute()
+
+#                 return {
+#                     "success": True,
+#                     "updated_cart": cart,
+#                     "total": cart["total"]
+#                 }
+
+#         except redis.WatchError:
+#             # Another request modified the cart.
+#             # Retry with the latest version.
+#             continue
+#         except (redis.ConnectionError, redis.TimeoutError):
+#             return {
+#                 "success": False,
+#                 "message": "Unable to access cart. Please try again."
+#             }
+#     return {
+#     "success": False,
+#     "message": "Please retry"
+#     }
+import json
+
+def add_cart(resid, uid, item_name, res_name, item_id, qty, price, available_qty, replace=False):
+
     resid = str(resid)
+    uid = str(uid)
     item_id = str(item_id)
 
     try:
         qty = int(qty)
-    except ValueError:
-        return {
-            "success": False,
-            "message": "Invalid quantity"
-        }
-    try:
-        available_qty = int(available_qty)
-    except ValueError:
-        return {
-            "success": False,
-            "message": "Invalid quantity available value"
-        }
-    # if(available_qty<qty):
-    #     return {
-    #         "success":False,
-    #         "message": "Item is Out of Stock"
-    #     }
-    if qty <= 0:
-        return {
-            "success": False,
-            "message": "Quantity must be positive"
-        }
-
-    if price is None:
-        return {
-            "success": False,
-            "message": "Item not found"
-        }
-
-    try:
         price = int(price)
-    except ValueError:
+        available_qty = int(available_qty)
+    except:
         return {
             "success": False,
-            "message": "Invalid price"
+            "message": "Invalid input"
         }
 
-    key = f"cart:{uid}"
+    meta_key = f"cart:{uid}:meta"
+    items_key = f"cart:{uid}:items"
 
-    # while True:
-    for _ in range(5):
-        try:
-            with r.pipeline() as pipe:
+    pipe = r.pipeline(transaction=True)
 
-                pipe.watch(key)
+    # -------------------------
+    # Restaurant validation
+    # -------------------------
 
-                existing = pipe.get(key)
-                if existing:
-                    try:
-                        cart = json.loads(existing)
-                        if replace:
-                            cart = {
-                                "uid": uid,
-                                "total": 0,
-                                "cart": {}
-                                    }
-                        else:
-                            # print(len(cart["cart"])>0)
-                            if(len(cart["cart"])>0):
-                                if resid not in cart["cart"]:
-                                    return {
-                                            "success": False,
-                                            "message": f"Items with different store exists, Would you like to replace it?"
-                                        }
-                    except json.JSONDecodeError:
-                        pipe.unwatch()
-                        return {
-                            "success": False,
-                            "message": "Corrupted cart data"
-                        }
-                else:
-                    cart = {
-                        "uid": uid,
-                        "total": 0,
-                        "cart": {}
-                    }
-                if resid not in cart["cart"]:
-                    cart["cart"][resid] = {
-                        "name": res_name,
-                        "items": {}
-                    }
+    restaurant = r.hget(meta_key, "restaurant")
 
-                items = cart["cart"][resid]["items"]
+    if restaurant:
 
-                if item_id in items:
-                    # Keep the original price already stored in cart
-                    existing_qty = items[item_id]["qty"]
+        restaurant = restaurant.decode()
 
-                    new_total = existing_qty + qty
+        if restaurant != resid:
 
-                    if new_total > available_qty:
-                        return {
-                            "success": False,
-                            "message": f"Only {available_qty} items available."
-                        }
-                    item_price = items[item_id]["price"]
-                    items[item_id]["qty"] += qty
-                    items[item_id]["available_qty"] = available_qty
-                else:
-                    if qty > available_qty:
-                        return {
-                            "success": False,
-                            "message": f"Only {available_qty} items available."
-                        }
-                    item_price = price
-                    items[item_id] = {
-                        "name": item_name,
-                        "qty": qty,
-                        "price": item_price,
-                        "available_qty":available_qty
-                    }
-
-                cart["total"] += qty * item_price
-
-                pipe.multi()
-                pipe.set(key, json.dumps(cart))
+            if replace:
+                pipe.delete(meta_key)
+                pipe.delete(items_key)
                 pipe.execute()
-
+            else:
                 return {
-                    "success": True,
-                    "updated_cart": cart,
-                    "total": cart["total"]
+                    "success": False,
+                    "message": "Items with different store exists, Would you like to replace it?"
                 }
 
-        except redis.WatchError:
-            # Another request modified the cart.
-            # Retry with the latest version.
-            continue
-        except (redis.ConnectionError, redis.TimeoutError):
+    # initialize cart
+
+    if not restaurant or replace:
+
+        pipe.hset(meta_key, mapping={
+            "uid": uid,
+            "restaurant": resid,
+            "restaurant_name": res_name,
+            "total": 0
+        })
+
+        pipe.execute()
+
+    # -------------------------
+    # Existing item
+    # -------------------------
+
+    existing = r.hget(items_key, item_id)
+
+    if existing:
+
+        item = json.loads(existing)
+
+        new_qty = item["qty"] + qty
+
+        if new_qty > available_qty:
+
             return {
                 "success": False,
-                "message": "Unable to access cart. Please try again."
+                "message": f"Only {available_qty} items available."
             }
-    return {
-    "success": False,
-    "message": "Please retry"
+
+        item["qty"] = new_qty
+        item["available_qty"] = available_qty
+
+    else:
+
+        if qty > available_qty:
+
+            return {
+                "success": False,
+                "message": f"Only {available_qty} items available."
+            }
+
+        item = {
+            "name": item_name,
+            "qty": qty,
+            "price": price,
+            "available_qty": available_qty
+        }
+
+    # -------------------------
+    # Save item
+    # -------------------------
+
+    pipe = r.pipeline(transaction=True)
+
+    pipe.hset(items_key, item_id, json.dumps(item))
+
+    pipe.hincrby(meta_key, "total", qty * item["price"])
+
+    pipe.execute()
+
+    # -------------------------
+    # Build response
+    # -------------------------
+
+    total = int(r.hget(meta_key, "total"))
+
+    all_items = {}
+
+    for key, value in r.hgetall(items_key).items():
+
+        all_items[key.decode()] = json.loads(value)
+
+    updated_cart = {
+        "uid": uid,
+        "total": total,
+        "cart": {
+            resid: {
+                "name": res_name,
+                "items": all_items
+            }
+        }
     }
 
+    return {
+        "success": True,
+        "updated_cart": updated_cart,
+        "total": total
+    }
 # def update_cart_qty(uid, item_id, change):  ###### working (best)
 #     key = f"cart:{uid}"
 #     if change not in (-1, 1):
