@@ -326,12 +326,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             const qtyEl = e.target.parentElement.querySelector('.item_qty');
             const prevQty = Number(qtyEl.textContent);
-            console.log(`Increasing: ${itemName} (ID: ${itemId})`);
+            console.log(`Reducing: ${itemName} (ID: ${itemId})`);
             // 1. Optimistic UI update — instant feedback
-            qtyEl.textContent = prevQty + 1;
+            qtyEl.textContent = prevQty - 1;
 
             // 2. Batched/debounced network call
-            scheduleCartUpdate(itemId,userId, 1, qtyEl,
+            scheduleCartUpdate(itemId,userId, -1, qtyEl,
                 (data) => {
                     if (data.total > 0) {
                         footer.classList.add("show");
