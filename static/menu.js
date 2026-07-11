@@ -1,3 +1,45 @@
+// One pending-request tracker per item_id
+const pendingUpdates = new Map(); // itemId -> { timer, accumulatedDelta, controller }
+
+function scheduleCartUpdate(itemId,userId,delta, qtyEl, onSuccess, onFailure) {
+    let entry = pendingUpdates.get(itemId);
+
+    if (entry) {
+        // Fold this click into the pending batch
+        entry.accumulatedDelta += delta;
+        clearTimeout(entry.timer);
+    } else {
+        entry = { accumulatedDelta: delta, timer: null, controller: null };
+        pendingUpdates.set(itemId, entry);
+    }
+
+    entry.timer = setTimeout(async () => {
+        const delta = entry.accumulatedDelta;
+        pendingUpdates.delete(itemId); // clear before await so new clicks start a fresh batch
+
+        // Abort any older in-flight request for this item so responses can't race
+        entry.controller?.abort();
+        const controller = new AbortController();
+
+        try {
+            const res = await fetch("/update_cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, item_id: itemId, qty: delta }),
+                signal: controller.signal
+            });
+            const data = await res.json();
+            if (data.success) {
+                onSuccess(data);
+            } else {
+                onFailure(data.message || "Failed updating cart");
+            }
+        } catch (err) {
+            console.log(err)
+            if (err.name !== "AbortError") onFailure("Network error");
+        }
+    }, 400); // debounce window — tune to taste (300-500ms feels good)
+}
 document.addEventListener("DOMContentLoaded", async () => {
     const path = window.location.pathname
     console.log(path)
@@ -136,7 +178,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             // console.log("Added:", names, price,item_id);
             const userid = localStorage.getItem("userId")
             const button = item.querySelector(".add-btn")
-            
+
             // 👉 Here you can send to backend / Redis
             const res = await fetch("/add_to_cart", {
                 method: "POST",
@@ -180,7 +222,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 // button.outerHTML = `<button class="add-btn" id="${item_id}">ADD</button>`
                 console.log(button.innerText);
-                button.innerText="ADD"
+                button.innerText = "ADD"
                 ReplaceContainer.classList.add("show")
                 overlayContainer.classList.add("show")
                 message.innerText = (data.message || "please Try again")
@@ -217,14 +259,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             let itemssss = document.getElementById(pendingCartItem.item_id)
             const button = itemssss.querySelector(".add-btn")
             console.log(button);
-            button.outerHTML= `
+            button.outerHTML = `
                 <div class="quantity-control">
                     <button class="qty-btn reduce">-</button>
                     <span class="item_qty">1</span>
                     <button class="qty-btn increase">+</button>
                 </div>
             `;
-            
+
         }
     })
 
@@ -259,29 +301,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         else if (e.target.classList.contains('increase')) {
             const qtyEl = e.target.parentElement.querySelector('.item_qty');
-
-            // console.log(item_qty.textContent)
+            const prevQty = Number(qtyEl.textContent);
             console.log(`Increasing: ${itemName} (ID: ${itemId})`);
-            const res = await fetch("/update_cart", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ "user_id": userId, "item_id": itemId, "qty": 1 })
-            })
-            const data = await res.json()
-            if (data.success) {
-                qtyEl.textContent = Number(qtyEl.textContent) + 1;
-                // current_total_amount.innerText=data.total
-                if (data.total > 0) {
-                    footer.classList.add("show")
-                    current_total_amount.innerText = data.total
+            // 1. Optimistic UI update — instant feedback
+            qtyEl.textContent = prevQty + 1;
+
+            // 2. Batched/debounced network call
+            scheduleCartUpdate(itemId,userId, 1, qtyEl,
+                (data) => {
+                    if (data.total > 0) {
+                        footer.classList.add("show");
+                        current_total_amount.innerText = data.total;
+                    } else {
+                        footer.classList.remove("show");
+                    }
+                },
+                (message) => {
+                    qtyEl.textContent = prevQty; // rollback on failure
+                    alert(message);
                 }
-                else {
-                    footer.classList.remove("show")
-                }
-            }
-            else {
-                alert(data.message || "failed adding item")
-            }
+            );
         }
         else if (e.target.classList.contains('reduce')) {
 
