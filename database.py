@@ -81,11 +81,13 @@ def list_resturant_items(resturant_id,types):
         res=resturants_items.find({"resturant_id":resturant_id})
         item_name={}
         for r in res:
-            item_name[ r["item_name"]]={
-                    "price": r["price"],
-                    "id": str(r["_id"]),
-                    "file_url":r["file_url"]
-                }
+            if((int(r["item_qty"])-int(r["sold"]))>0):
+                item_name[ r["item_name"]]={
+                        "price": r["price"],
+                        "id": str(r["_id"]),
+                        "item_qty":(int(r["item_qty"])-int(r["sold"])),
+                        "file_url":r["file_url"]
+                    }
         return ({"item_name":item_name})
 def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available,res_id=None):
     result=resturants_items.find_one_and_update({

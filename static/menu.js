@@ -605,7 +605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (item.qty === 0) {
                 menu_items_container.innerHTML +=
                     `
-                        <div class="menu-item" id=${item.id}>
+                        <div class="menu-item" id=${item.id} available=${item.item_qty}>
                             <div class="item-details">
                                 <h3>${name}</h3>
                                 <p class="price">${item.price}</p>
@@ -623,7 +623,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             else {
                 menu_items_container.innerHTML +=
                     `
-                    <div class="menu-item" id=${item.id}>
+                    <div class="menu-item" id=${item.id} available=${item.item_qty}>
                         <div class="item-details">
                             <h3>${name}</h3>
                             <p class="price">${item.price}</p>
@@ -791,6 +791,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // 2. Extract the data
         const itemId = itemRow.id; // Or itemRow.getAttribute('id')
+        const item_qty=parseInt(itemRow.getAttribute("available"))
+        console.log(item_qty);
+        
         const itemName = itemRow.querySelector('.item-details').textContent
         // const item_qty = itemRow.querySelector('.item_qty').textContent;
         const item_price = itemRow.querySelector('.price').textContent;
@@ -811,8 +814,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.log(`Increasing: ${itemName} (ID: ${itemId})`);
 
             // 1. Optimistic UI update — instant feedback
+            if(parseInt(prevQty + 1)>item_qty){
+                alert(`only ${item_qty} in stock`)
+                return
+            }
             qtyEl.textContent = prevQty + 1;
-
             // 2. Batched/debounced network call
             scheduleCartUpdate(itemId, userId, 1, qtyEl,
                 (data) => {
@@ -957,6 +963,7 @@ function mergeMenuWithCart(data, datas, res_id) {
             id: item.id,
             price: item.price,
             file_url: item.file_url,
+            item_qty:item.item_qty || 0,
             qty: restaurantCart[item.id]?.qty || 0
         };
 
