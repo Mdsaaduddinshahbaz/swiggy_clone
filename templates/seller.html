@@ -4,77 +4,113 @@
 <meta charset="UTF-8">
 <title>Seller Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='seller.css') }}">
 </head>
-
 <body>
 
-<!-- Sidebar -->
-<div class="sidebar">
-  <div class="logo">Seller Panel</div>
+<!-- Rail (sidebar) -->
+<aside class="rail">
+  <div class="rail-head">
+    <span class="rail-mark">⌘</span>
+    <div class="rail-name">
+      <span class="rail-title">Seller Panel</span>
+      <span class="rail-sub" id="resNameLabel">—</span>
+    </div>
+  </div>
 
-  <div class="nav-item" onclick="goToOrders()">📦 Orders</div>
-  <div class="nav-item" onclick="goToMenu()">🍔 Menu</div>
-  <div class="nav-item" onclick="goToAnalytics()">📊 Analytics</div>
-</div>
+  <nav class="rail-nav">
+    <button class="stub" data-nav="orders" onclick="goToOrders()">
+      <span class="stub-hole"></span>
+      <span class="stub-icon">📦</span>
+      <span class="stub-label">Orders</span>
+    </button>
+    <button class="stub" data-nav="menu" onclick="goToMenu()">
+      <span class="stub-hole"></span>
+      <span class="stub-icon">🍔</span>
+      <span class="stub-label">Menu</span>
+    </button>
+    <button class="stub" data-nav="analytics" onclick="goToAnalytics()">
+      <span class="stub-hole"></span>
+      <span class="stub-icon">📊</span>
+      <span class="stub-label">Analytics</span>
+    </button>
+  </nav>
+
+  <div class="rail-foot">
+    <span class="rail-foot-label">Kitchen status</span>
+    <span class="live-pill"><span class="live-dot"></span>Online</span>
+  </div>
+</aside>
 
 <!-- Main -->
-<div class="main">
+<main class="main">
 
-  <!-- Header -->
-  <div class="header">
-    <h1>Dashboard</h1>
-    <div class="status">🟢 Online</div>
-  </div>
-
-  <!-- Stats -->
-  <div class="cards">
-    <div class="card">
-      <h2 id="totalOrders">0</h2>
-      <p>Total Orders</p>
+  <header class="board-header">
+    <div>
+      <p class="eyebrow">Today's board</p>
+      <h1>Dashboard</h1>
     </div>
-
-    <div class="card">
-      <h2 id="pendingOrders">0</h2>
-      <p>Pending</p>
+    <div class="header-right">
+      <span class="live-pill live-pill--lg"><span class="live-dot"></span>Online</span>
     </div>
+  </header>
 
-    <div class="card">
-      <h2 id="completedOrders">0</h2>
-      <p>Completed</p>
+  <!-- Ticket rail of stats -->
+  <section class="tickets" aria-label="Order statistics">
+    <div class="ticket" data-tone="all">
+      <p class="ticket-label">Total orders</p>
+      <h2 class="ticket-num" id="totalOrders">0</h2>
+      <p class="ticket-tag">all time</p>
     </div>
-    <div class="card">
-      <h2 id="canceledOrders">0</h2>
-      <p>Canceled</p>
+    <div class="ticket" data-tone="pending">
+      <p class="ticket-label">Pending</p>
+      <h2 class="ticket-num" id="pendingOrders">0</h2>
+      <p class="ticket-tag">on the fire</p>
     </div>
-  </div>
-
-  <!-- Actions -->
-  <div class="actions">
-
-    <div class="action" onclick="goToOrders()">
-      <div class="icon">📦</div>
-      <div class="title">View Orders</div>
-      <div class="desc">Manage incoming orders</div>
+    <div class="ticket" data-tone="completed">
+      <p class="ticket-label">Completed</p>
+      <h2 class="ticket-num" id="completedOrders">0</h2>
+      <p class="ticket-tag">plated & sent</p>
     </div>
-
-    <div class="action" onclick="goToMenu()">
-      <div class="icon">🍔</div>
-      <div class="title">Manage Menu</div>
-      <div class="desc">Edit your items</div>
+    <div class="ticket" data-tone="canceled">
+      <p class="ticket-label">Canceled</p>
+      <h2 class="ticket-num" id="canceledOrders">0</h2>
+      <p class="ticket-tag">sent back</p>
     </div>
+  </section>
 
-    <div class="action" onclick="goToAnalytics()">
-      <div class="icon">📊</div>
-      <div class="title">Analytics</div>
-      <div class="desc">Track performance</div>
+  <!-- Stations -->
+  <section class="stations" aria-label="Quick actions">
+    <p class="section-label">Stations</p>
+    <div class="station-grid">
+      <button class="station" onclick="goToOrders()">
+        <span class="station-icon">📦</span>
+        <span class="station-title">View orders</span>
+        <span class="station-desc">Manage incoming orders</span>
+        <span class="station-arrow">→</span>
+      </button>
+
+      <button class="station" onclick="goToMenu()">
+        <span class="station-icon">🍔</span>
+        <span class="station-title">Manage menu</span>
+        <span class="station-desc">Edit your items</span>
+        <span class="station-arrow">→</span>
+      </button>
+
+      <button class="station" onclick="goToAnalytics()">
+        <span class="station-icon">📊</span>
+        <span class="station-title">Analytics</span>
+        <span class="station-desc">Track performance</span>
+        <span class="station-arrow">→</span>
+      </button>
     </div>
+  </section>
 
-  </div>
+</main>
 
-</div>
 <script src="{{ url_for('static', filename='seller.js') }}"></script>
-
 </body>
 </html>

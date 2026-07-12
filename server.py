@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -948,10 +948,17 @@ def signup(role):
     except Exception as e:
         print(e)
         return({"success":False})
+# @app.get("/seller/<name>/<seller_id>")
+# def sellerTemplate(name,seller_id):
+#     try:
+#         return render_template("seller.html")
+#     except Exception as e:
+#         print(e)
+#         return({"success":False})
 @app.get("/seller/<name>/<seller_id>")
 def sellerTemplate(name,seller_id):
     try:
-        return render_template("seller.html")
+        return render_template("seller_dashboard.html")
     except Exception as e:
         print(e)
         return({"success":False})
