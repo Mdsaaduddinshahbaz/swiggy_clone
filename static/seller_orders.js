@@ -388,7 +388,7 @@ document.addEventListener("click", async (e) => {
         }
     }
 });
-
+const overlay=document.querySelector(".overlay")
 document.getElementById("menuToggle").onclick = function () {
   const sidebar=document.querySelector(".sidebar")
   sidebar.classList.add("show")
@@ -401,6 +401,12 @@ document.getElementById("hideCategoryBtn").addEventListener("click", function ()
   sidebar.style.display="none"
   overlay.classList.remove("show")
 });
+overlay.addEventListener("click",()=>{
+  const sidebar=document.querySelector(".sidebar")
+  overlay.classList.remove("show")
+  sidebar.style.display="none"
+  sidebar.classList.remove("show")
+})
 
 const DashboardBtn=document.getElementById("DashboardBtn")
 DashboardBtn.addEventListener("click",()=>{

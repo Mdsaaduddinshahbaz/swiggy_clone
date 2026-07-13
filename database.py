@@ -913,6 +913,7 @@ def get_seller_analytics(seller_id: str) -> dict:
             "items_summary": order_items_summary,
             "total_amount": round(_order_amount(order, item_index), 2),
             "status": order.get("status"),
+            "tokenNo": order.get("token_no"),
             "created_at": order.get("time", now).isoformat(),
         })
 

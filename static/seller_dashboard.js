@@ -463,9 +463,10 @@ function renderOrders(orders){
   }
   tbody.innerHTML = orders.map(o=>{
     const s = statusMap[o.status] || { cls:'new', label:o.status || 'Unknown' };
+    // <td><span class="order-id">${o.order_id.slice(-6).toUpperCase()}</span></td>
     return `
     <tr>
-      <td><span class="order-id">${o.order_id.slice(-6).toUpperCase()}</span></td>
+      <td><span class="order-id">${o.tokenNo}</span></td>
       <td>
         <div class="order-name">Customer #${String(o.customer_id).slice(-6)}</div>
         <div class="order-items">${o.items_summary || '—'}</div>
@@ -538,9 +539,12 @@ function renderActivity(stats){
     
     items.push({
       color: cancelled ? 'var(--danger)' : 'var(--green)',
+      // msg: cancelled
+      //   ? `<strong>Order #${o.order_id.slice(-6).toUpperCase()}</strong> was cancelled`
+      //   : `<strong>Order #${o.order_id.slice(-6).toUpperCase()}</strong> placed — ₹${o.total_amount.toLocaleString('en-IN')}`,
       msg: cancelled
-        ? `<strong>Order #${o.order_id.slice(-6).toUpperCase()}</strong> was cancelled`
-        : `<strong>Order #${o.order_id.slice(-6).toUpperCase()}</strong> placed — ₹${o.total_amount.toLocaleString('en-IN')}`,
+          ? `<strong>Order #${o.tokenNo}</strong> was cancelled`
+          : `<strong>Order #${o.tokenNo}</strong> placed — ₹${o.total_amount.toLocaleString('en-IN')}`,
       time: timeAgo(o.created_at),
       sortKey: new Date(o.created_at).getTime(),
     });
@@ -577,7 +581,7 @@ function renderActivity(stats){
 /*
 ========================SideBar=======================
  */
-
+document.querySelector(".seller-name").textContent=decodeURIComponent(resname)
 document.getElementById("menuToggle").onclick = function () {
   const sidebar=document.querySelector(".sidebar")
   sidebar.classList.add("show")
@@ -590,3 +594,10 @@ document.getElementById("hideCategoryBtn").addEventListener("click", function ()
   sidebar.style.display="none"
   overlay.classList.remove("show")
 });
+
+overlay.addEventListener("click",()=>{
+  const sidebar=document.querySelector(".sidebar")
+  overlay.classList.remove("show")
+  sidebar.style.display="none"
+  sidebar.classList.remove("show")
+})
