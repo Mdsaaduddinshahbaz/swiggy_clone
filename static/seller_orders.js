@@ -60,7 +60,12 @@
 //         });
 //     });
 // }
+const pathParts = window.location.pathname.split("/");
 
+const resId = pathParts[pathParts.length - 1];
+const type = pathParts[pathParts.length - 4];
+const resname=pathParts[pathParts.length - 2]
+console.log(resId,name,type);
 const filterDropdown = document.getElementById("filterDropdown");
 
 filterDropdown.addEventListener("change", applyFilter);
@@ -123,9 +128,9 @@ const ordersList = document.getElementById("orders-list");
 // const resID = pathParts[pathParts.length - 1];
 // console.log(resID)
 // const resId=localStorage.getItem("res_id")
-const pathParts = window.location.pathname.split("/");
+// const pathParts = window.location.pathname.split("/");
 
-const resId = pathParts[pathParts.length - 1];
+// const resId = pathParts[pathParts.length - 1];
 console.log(resId)
     const socket = io("https://general-online.onrender.com");
 
@@ -277,10 +282,11 @@ loadOrders();
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("completeBtn")) {
         const card = e.target.closest(".order-card");
+        const item = card.querySelector(".item");
+        const item_id=item.getAttribute("item_id")
 
         // 🔥 select BOTH buttons inside this card
         const buttons = card.querySelectorAll(".statusBtn");
-
 
         const orderId = card
             .querySelector(".order-id")
@@ -382,3 +388,25 @@ document.addEventListener("click", async (e) => {
         }
     }
 });
+
+document.getElementById("menuToggle").onclick = function () {
+  const sidebar=document.querySelector(".sidebar")
+  sidebar.classList.add("show")
+  sidebar.style.display="block"
+  overlay.classList.add("show")
+};
+
+document.getElementById("hideCategoryBtn").addEventListener("click", function () {
+  const sidebar=document.querySelector(".sidebar")
+  sidebar.style.display="none"
+  overlay.classList.remove("show")
+});
+
+const DashboardBtn=document.getElementById("DashboardBtn")
+DashboardBtn.addEventListener("click",()=>{
+  window.location.href=`/seller/${resname}/${resId}`
+})
+const InventoryBtn=document.getElementById("InventoryBtn")
+InventoryBtn.addEventListener("click",()=>{
+  window.location.href=`/seller/menu/${resname}/${resId}`
+})

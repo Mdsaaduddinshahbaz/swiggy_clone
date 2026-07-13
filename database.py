@@ -572,7 +572,373 @@ def return_res_analytics(res_id):
         print(data)
     print("data in res_analytics",data)
     return data
+from pymongo import MongoClient
+from datetime import datetime, timedelta
+from collections import defaultdict
 
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+
+# def get_seller_analytics(seller_id: str) -> dict:
+#     """
+#     Returns full analytics payload for the seller dashboard.
+#     Covers: KPIs, sales chart, top products, stock alerts, recent orders, activity feed.
+#     """
+
+#     # ── fetch data ──────────────────────────────────────────────────────────────
+#     # resturant_items uses the (misspelled, but that's the real field) "resturant_id"
+#     items_cursor = resturants_items.find({"resturant_id": seller_id})
+#     # seller_orders uses the correctly-spelled "restaurant_id" — different from above!
+#     orders_cursor = seller_orders.find({"restaurant_id": seller_id})
+
+#     items_list = list(items_cursor)
+#     orders_list = list(orders_cursor)
+
+#     now = datetime.utcnow()
+#     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+#     # ── item index  (id → item doc) ─────────────────────────────────────────────
+#     item_index = {str(item["_id"]): item for item in items_list}
+
+#     # ── KPIs ────────────────────────────────────────────────────────────────────
+#     total_revenue = 0
+#     today_revenue = 0
+#     today_orders = 0
+#     month_orders = 0
+#     month_revenue = 0
+#     item_sold_counts = defaultdict(int)  # item_id → total units sold
+
+#     for order in orders_list:
+#         order_time = order.get("time", now)            # was "created_at" (field doesn't exist)
+#         order_amount = order.get("total_amount", 0)     # ⚠️ TODO — confirm this field exists on order, see note below
+#         status = order.get("status", "")
+
+#         if status == "canceled":                        # was "cancelled" (your data uses one L)
+#             continue
+
+#         total_revenue += order_amount
+
+#         if order_time >= today:
+#             today_revenue += order_amount
+#             today_orders += 1
+
+#         if order_time >= today.replace(day=1):
+#             month_revenue += order_amount
+#             month_orders += 1
+
+#         # ⚠️ TODO — "items" on your order doc is an Object, not an Array.
+#         # The loop below assumes a list of {item_id, qty, price} dicts, which is
+#         # almost certainly wrong for your schema. Expand the "items" field on one
+#         # order doc in MongoDB and send me the shape (e.g. is it keyed by item_id,
+#         # like {"<item_id>": {"qty": 2, "price": 60}}?) and I'll fix this loop and
+#         # the order_items_summary logic below to match exactly.
+#         order_items = order.get("items", {})
+#         for line in order_items:
+#             item_sold_counts[str(line.get("item_id"))] += line.get("qty", 0)
+
+#     # ── inventory & stock alerts ─────────────────────────────────────────────────
+#     low_stock_items = []
+#     out_of_stock_items = []
+
+#     inventory_data = []
+#     for item in items_list:
+#         item_id = str(item["_id"])
+#         # item_qty is stored as a STRING ("32") in your schema — must cast to int
+#         # or "initial_qty - sold" silently does the wrong thing.
+#         initial_qty = int(item.get("item_qty", 0) or 0)
+#         sold = item_sold_counts.get(item_id, 0)
+#         remaining = max(initial_qty - sold, 0)
+#         low_at = item.get("low_stock_threshold", 10)
+#         price = item.get("price", 0)
+
+#         inventory_data.append({
+#             "item_id": item_id,
+#             "item_name": item.get("item_name"),
+#             # ⚠️ Your item docs (per the screenshot) don't appear to have
+#             # "category" / "subcategory" / "unit" fields — these will come back
+#             # as None unless they exist on some docs and just weren't visible
+#             # in the screenshot. Dashboard's category badges will be blank until
+#             # this is confirmed either way.
+#             "category": item.get("category"),
+#             "subcategory": item.get("subcategory"),
+#             "unit": item.get("unit"),
+#             "price": price,
+#             "initial_qty": initial_qty,
+#             "sold": sold,
+#             "remaining": remaining,
+#             "revenue": round(sold * price, 2),
+#         })
+
+#         if remaining == 0:
+#             out_of_stock_items.append({
+#                 "item_name": item.get("item_name"),
+#                 "category": item.get("subcategory") or item.get("category"),
+#                 "stock": 0,
+#                 "status": "out",
+#             })
+#         elif remaining <= low_at:
+#             low_stock_items.append({
+#                 "item_name": item.get("item_name"),
+#                 "category": item.get("subcategory") or item.get("category"),
+#                 "stock": remaining,
+#                 "status": "low",
+#             })
+
+#     stock_alerts = out_of_stock_items + low_stock_items  # out-of-stock first
+
+#     # ── top products (by units sold) ─────────────────────────────────────────────
+#     top_products = sorted(inventory_data, key=lambda x: x["sold"], reverse=True)[:5]
+
+#     # ── sales chart (daily revenue, last 30 days) ────────────────────────────────
+#     daily_revenue = defaultdict(float)
+#     for order in orders_list:
+#         if order.get("status") == "canceled":           # was "cancelled"
+#             continue
+#         order_time = order.get("time", now)              # was "created_at"
+#         if order_time >= today - timedelta(days=30):
+#             day_key = order_time.strftime("%b %d")
+#             daily_revenue[day_key] += order.get("total_amount", 0)
+
+#     # fill missing days with 0 so the chart has no gaps
+#     chart_labels = []
+#     chart_values = []
+#     for i in range(30, -1, -1):
+#         day = today - timedelta(days=i)
+#         day_key = day.strftime("%b %d")
+#         chart_labels.append(day_key)
+#         chart_values.append(round(daily_revenue.get(day_key, 0), 2))
+
+#     # ── recent orders (last 10) ──────────────────────────────────────────────────
+#     recent_orders = sorted(orders_list, key=lambda x: x.get("time", now), reverse=True)[:10]
+#     recent_orders_data = []
+#     for order in recent_orders:
+#         # ⚠️ depends on the same "items" shape question above
+#         order_items_summary = ", ".join(
+#             item_index.get(str(line.get("item_id")), {}).get("item_name", "Unknown")
+#             for line in order.get("items", {})
+#         ) if isinstance(order.get("items"), list) else ""  # placeholder until shape is confirmed
+
+#         recent_orders_data.append({
+#             "order_id": str(order["_id"]),
+#             "customer_name": order.get("customer_name") or order.get("restaurant_name"),
+#             "items_summary": order_items_summary,
+#             "total_amount": order.get("total_amount", 0),
+#             "status": order.get("status"),
+#             "created_at": order.get("time", now).isoformat(),
+#         })
+
+#     # ── final payload ────────────────────────────────────────────────────────────
+#     return {
+#         "kpis": {
+#             "total_revenue": round(total_revenue, 2),
+#             "month_revenue": round(month_revenue, 2),
+#             "month_orders": month_orders,
+#             "today_revenue": round(today_revenue, 2),
+#             "today_orders": today_orders,
+#             "total_items": len(items_list),
+#             "low_stock_count": len(low_stock_items),
+#             "out_of_stock_count": len(out_of_stock_items),
+#         },
+#         "chart": {
+#             "labels": chart_labels,
+#             "values": chart_values,
+#         },
+#         "top_products": top_products,
+#         "stock_alerts": stock_alerts,
+#         "recent_orders": recent_orders_data,
+#         "inventory": inventory_data,
+#     }
+
+
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+
+def _order_amount(order: dict, item_index: dict) -> float:
+    """
+    seller_orders docs don't store a total_amount field — "items" is a dict
+    keyed by item_id (see store_orders: data["items"].items()), e.g.
+    {"<item_id>": {"qty": 2, ...}}. Price isn't guaranteed to be in the cart
+    snapshot, so we look it up from the item's current price in resturants_items.
+    NOTE: this uses *current* price, not the price at time of order — if you
+    ever change a price after orders exist, historical revenue will drift.
+    """
+    order_items = order.get("items", {}) or {}
+    total = 0
+    for item_id, line in order_items.items():
+        price = item_index.get(str(item_id), {}).get("price", 0)
+        qty = line.get("qty", 0) if isinstance(line, dict) else 0
+        total += int(price) * int(qty)
+    return total
+
+
+def get_seller_analytics(seller_id: str) -> dict:
+    """
+    Returns full analytics payload for the seller dashboard.
+    Covers: KPIs, sales chart, top products, stock alerts, recent orders, activity feed.
+    """
+
+    # ── fetch data ──────────────────────────────────────────────────────────────
+    # resturants_items uses the (misspelled, but that's the real field) "resturant_id"
+    items_cursor = resturants_items.find({"resturant_id": seller_id})
+    # seller_orders uses the correctly-spelled "restaurant_id" — different from above!
+    orders_cursor = seller_orders.find({"restaurant_id": seller_id})
+
+    items_list = list(items_cursor)
+    orders_list = list(orders_cursor)
+
+    now = datetime.utcnow()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # ── item index  (id → item doc) ─────────────────────────────────────────────
+    item_index = {str(item["_id"]): item for item in items_list}
+
+    # ── KPIs ────────────────────────────────────────────────────────────────────
+    total_revenue = 0
+    today_revenue = 0
+    today_orders = 0
+    month_orders = 0
+    month_revenue = 0
+
+    for order in orders_list:
+        order_time = order.get("time", now)
+        status = order.get("status", "")
+
+        # NOTE: your real order statuses are "placed" / "completed" / "canceled"
+        # (see resturant_stats) — not "new"/"processing"/"delivered"/"cancelled"
+        # like the dashboard HTML expects. Map these when rendering.
+        if status == "canceled":
+            continue
+
+        order_amount = _order_amount(order, item_index)
+        total_revenue += order_amount
+
+        if order_time >= today:
+            today_revenue += order_amount
+            today_orders += 1
+
+        if order_time >= today.replace(day=1):
+            month_revenue += order_amount
+            month_orders += 1
+
+    # ── inventory & stock alerts ─────────────────────────────────────────────────
+    low_stock_items = []
+    out_of_stock_items = []
+
+    inventory_data = []
+    for item in items_list:
+        item_id = str(item["_id"])
+        # item_qty can come in as a string depending on how it was inserted —
+        # cast defensively so arithmetic doesn't silently misbehave.
+        initial_qty = int(item.get("item_qty", 0) or 0)
+        # "sold" is maintained directly on the item doc via $inc in store_orders —
+        # that's the source of truth in your codebase (see return_res_analytics),
+        # so use it as-is rather than recomputing from order history.
+        sold = int(item.get("sold", 0) or 0)
+        remaining = max(initial_qty - sold, 0)
+        low_at = item.get("lowat", 10)          # was "low_stock_threshold" — field is "lowat"
+        price = item.get("price", 0)
+
+        inventory_data.append({
+            "item_id": item_id,
+            "item_name": item.get("item_name"),
+            # There's no category/subcategory string on the item doc — only
+            # "sub_id", a numeric reference into the categories collection.
+            # If you want a human-readable category name on the dashboard,
+            # you'll need to join against `categories` for this restaurant.
+            "sub_id": item.get("sub_id"),
+            "unit": item.get("unit"),
+            "price": price,
+            "initial_qty": initial_qty,
+            "sold": sold,
+            "remaining": remaining,
+            "revenue": round(int(sold) * int(price), 2),
+        })
+
+        if remaining == 0:
+            out_of_stock_items.append({
+                "item_name": item.get("item_name"),
+                "sub_id": item.get("sub_id"),
+                "stock": 0,
+                "status": "out",
+            })
+        elif remaining <= low_at:
+            low_stock_items.append({
+                "item_name": item.get("item_name"),
+                "sub_id": item.get("sub_id"),
+                "stock": remaining,
+                "status": "low",
+            })
+
+    stock_alerts = out_of_stock_items + low_stock_items  # out-of-stock first
+
+    # ── top products (by units sold) ─────────────────────────────────────────────
+    top_products = sorted(inventory_data, key=lambda x: x["sold"], reverse=True)[:5]
+
+    # ── sales chart (daily revenue, last 30 days) ────────────────────────────────
+    daily_revenue = defaultdict(float)
+    for order in orders_list:
+        if order.get("status") == "canceled":
+            continue
+        order_time = order.get("time", now)
+        if order_time >= today - timedelta(days=30):
+            day_key = order_time.strftime("%b %d")
+            daily_revenue[day_key] += _order_amount(order, item_index)
+
+    # fill missing days with 0 so the chart has no gaps
+    chart_labels = []
+    chart_values = []
+    for i in range(30, -1, -1):
+        day = today - timedelta(days=i)
+        day_key = day.strftime("%b %d")
+        chart_labels.append(day_key)
+        chart_values.append(round(daily_revenue.get(day_key, 0), 2))
+
+    # ── recent orders (last 10) ──────────────────────────────────────────────────
+    recent_orders = sorted(orders_list, key=lambda x: x.get("time", now), reverse=True)[:10]
+    recent_orders_data = []
+    for order in recent_orders:
+        order_items = order.get("items", {}) or {}
+        order_items_summary = ", ".join(
+            item_index.get(str(item_id), {}).get("item_name", "Unknown")
+            for item_id in list(order_items.keys())[:3]   # show max 3 item names
+        )
+
+        recent_orders_data.append({
+            "order_id": str(order["_id"]),
+            # seller_orders only stores user_id, not a display name — join
+            # against `users` if you want an actual customer name here.
+            "customer_id": order.get("user_id"),
+            "items_summary": order_items_summary,
+            "total_amount": round(_order_amount(order, item_index), 2),
+            "status": order.get("status"),
+            "created_at": order.get("time", now).isoformat(),
+        })
+
+    # ── final payload ────────────────────────────────────────────────────────────
+    return {
+        "kpis": {
+            "total_revenue": round(total_revenue, 2),
+            "month_revenue": round(month_revenue, 2),
+            "month_orders": month_orders,
+            "today_revenue": round(today_revenue, 2),
+            "today_orders": today_orders,
+            "total_items": len(items_list),
+            "low_stock_count": len(low_stock_items),
+            "out_of_stock_count": len(out_of_stock_items),
+        },
+        "chart": {
+            "labels": chart_labels,
+            "values": chart_values,
+        },
+        "top_products": top_products,
+        "stock_alerts": stock_alerts,
+        "recent_orders": recent_orders_data,
+        "inventory": inventory_data,
+    }
+reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
+print(reponse)
 # get_orders("69a959defa10620eb63cf31d")
 def save_address(address,type,uid,cordinates):
     user=users.find_one(ObjectId(uid))

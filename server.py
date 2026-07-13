@@ -1,4 +1,4 @@
-from database import save_category,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+from database import save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty
@@ -618,8 +618,8 @@ def getsellerOrders():
 #     except Exception as e:
         print(e)
 #         return({"success":False})
-@app.get("/seller/orders/<res_id>")
-def renderSellerOrders(res_id):
+@app.get("/seller/orders/<res_name>/<res_id>")
+def renderSellerOrders(res_name,res_id):
     try:
         return render_template("seller_orders.html")
     except Exception as e:
@@ -1031,6 +1031,17 @@ def return_seller_stats():
         # res_id=data["res_id"]
         res_id=g.res_id
         stats=return_res_analytics(res_id)
+        return({"success":True,"stats":stats})
+    except Exception as e:
+        print(e)
+        return({"success":False})
+    
+@app.post("/seller/stats")
+@login_required
+def return_seller_statistics():
+    try:
+        res_id=g.res_id
+        stats=get_seller_analytics(res_id)
         return({"success":True,"stats":stats})
     except Exception as e:
         print(e)

@@ -14,6 +14,7 @@
 <!-- ===== SIDEBAR ===== -->
 <aside class="sidebar">
   <div class="brand">
+    <button id="hideCategoryBtn">+</button>
     <div class="brand-icon">
       <i data-lucide="store" width="16" height="16" style="color:#fff"></i>
     </div>
@@ -25,10 +26,10 @@
 
   <nav class="nav">
     <div class="nav-section">Main</div>
-    <button class="nav-item active"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
-    <button class="nav-item"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge">6</span></button>
-    <button class="nav-item"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
-    <button class="nav-item"><i data-lucide="users" width="16" height="16"></i> Customers</button>
+    <button class="nav-item active" id="DashboardBtn"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
+    <button class="nav-item" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge">6</span></button>
+    <button class="nav-item" id="InventoryBtn"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
+    <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
 
     <div class="nav-section" style="margin-top:12px;">Reports</div>
     <button class="nav-item"><i data-lucide="bar-chart-2" width="16" height="16"></i> Sales Report</button>
@@ -51,11 +52,16 @@
 
 <!-- ===== MAIN ===== -->
 <main class="main">
-
+  <div class="overlay" id="overlayContainer"></div>
   <!-- Top bar -->
   <div class="topbar">
     <div class="topbar-left">
+      <div style="display: flex;">
+      <button id="menuToggle" class="menu-toggle">
+          ☰
+        </button>
       <div class="greeting" id="greeting">Good morning, Ramesh 👋</div>
+      </div>
       <div class="date" id="dateLabel"></div>
     </div>
     <div class="topbar-right">
@@ -77,7 +83,7 @@
         <div class="kpi-change up"><i data-lucide="trending-up" width="12" height="12"></i> +18.4%</div>
       </div>
       <div>
-        <div class="kpi-value">₹84,320</div>
+        <div class="kpi-value" id="kpiRevenue">₹84,320</div>
         <div class="kpi-label">Revenue this month</div>
       </div>
     </div>
@@ -87,7 +93,7 @@
         <div class="kpi-change up"><i data-lucide="trending-up" width="12" height="12"></i> +9.1%</div>
       </div>
       <div>
-        <div class="kpi-value">1,248</div>
+        <div class="kpi-value" id="kpiOrders">1,248</div>
         <div class="kpi-label">Orders this month</div>
       </div>
     </div>
@@ -97,7 +103,7 @@
         <div class="kpi-change down"><i data-lucide="trending-down" width="12" height="12"></i> 6 pending</div>
       </div>
       <div>
-        <div class="kpi-value">6</div>
+        <div class="kpi-value" id="kpiToday">6</div>
         <div class="kpi-label">New orders today</div>
       </div>
     </div>
@@ -107,7 +113,7 @@
         <div class="kpi-change down" style="color:var(--danger)">Needs action</div>
       </div>
       <div>
-        <div class="kpi-value">8</div>
+        <div class="kpi-value" id="kpiStock">8</div>
         <div class="kpi-label">Low / out-of-stock items</div>
       </div>
     </div>
@@ -161,19 +167,19 @@
         <div style="display:flex;flex-direction:column;gap:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:13px;color:var(--muted);">Revenue</span>
-            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;">₹3,840</span>
+            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="todayRevenue">₹3,840</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:13px;color:var(--muted);">Orders placed</span>
-            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;">6</span>
+            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="kpiTodayBtm">6</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:13px;color:var(--muted);">Items sold</span>
-            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;">34</span>
+            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="kpiTotalSold">34</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:13px;color:var(--muted);">Avg order value</span>
-            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;">₹640</span>
+            <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="todayAvg">₹640</span>
           </div>
         </div>
       </div>

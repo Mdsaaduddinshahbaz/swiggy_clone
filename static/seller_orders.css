@@ -177,7 +177,6 @@ body {
     border-color: var(--flame);
     box-shadow: 0 2px 0 var(--flame), 0 10px 24px -18px rgba(232, 73, 29, 0.5);
 }
-
 .order-header {
     display: flex;
     align-items: center;
@@ -298,7 +297,10 @@ body {
     box-shadow: 0 3px 0 var(--green-dark);
     margin-right: 10px !important;
 }
-
+.sidebar{
+    position: fixed !important;
+    z-index: 12;    
+}
 .completeBtn:hover { background: var(--green-dark) !important; }
 
 .cancelBtn {
@@ -307,7 +309,9 @@ body {
     border: 1.5px solid var(--red) !important;
     box-shadow: none;
 }
-
+.orders-container{
+    width: 100% !important;
+}
 .cancelBtn:hover {
     background: var(--red) !important;
     color: var(--white) !important;

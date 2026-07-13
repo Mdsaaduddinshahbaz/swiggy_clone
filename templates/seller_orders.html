@@ -4,15 +4,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='seller_orders.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='seller_dashboard.css') }}">
 </head>
 <body>
+    <!-- ===== SIDEBAR ===== -->
+<aside class="sidebar">
+  <div class="brand">
+    <button id="hideCategoryBtn">+</button>
+    <div class="brand-icon">
+      <i data-lucide="store" width="16" height="16" style="color:#fff"></i>
+    </div>
+    <div>
+      <div class="brand-name">KiranaHub</div>
+      <div class="brand-sub">Seller Portal</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-section">Main</div>
+    <button class="nav-item" id="DashboardBtn"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
+    <button class="nav-item active" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge">6</span></button>
+    <button class="nav-item" id="InventoryBtn"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
+    <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
+
+    <div class="nav-section" style="margin-top:12px;">Reports</div>
+    <button class="nav-item"><i data-lucide="bar-chart-2" width="16" height="16"></i> Sales Report</button>
+    <button class="nav-item"><i data-lucide="trending-up" width="16" height="16"></i> Analytics</button>
+    <button class="nav-item"><i data-lucide="receipt" width="16" height="16"></i> Payouts</button>
+
+    <div class="nav-section" style="margin-top:12px;">Store</div>
+    <button class="nav-item"><i data-lucide="tag" width="16" height="16"></i> Offers & Coupons</button>
+    <button class="nav-item"><i data-lucide="settings" width="16" height="16"></i> Settings</button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="avatar">RS</div>
+    <div>
+      <div class="seller-name">Ramesh Stores</div>
+      <div class="seller-id">SLR-002841</div>
+    </div>
+  </div>
+</aside>
     <!-- <div class="filter">
         <button>filters</button>
     </div> -->
     <div class="orders-container">
     <!-- <h1>Your Orders</h1> -->
     <div class="header">
+        <div style="display: flex;">
+        <button id="menuToggle" class="menu-toggle">
+          ☰
+        </button>
         <h1>Your Orders</h1>
+        </div>
         <select id="filterDropdown">
             <option value="placed">Pending</option>
             <option value="all">All Orders</option>
