@@ -5,6 +5,14 @@
     --card:#FFFFFB; --sidebar:#20231F; --sidebar-txt:#C8C5BC; --sidebar-act:#FFFFFB;
     --sidebar-w:230px;
   }
+  * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    }
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;display:flex;min-height:100vh;}
 
@@ -15,7 +23,7 @@
   }
   .sidebar.show{
     display: block;
-    position: absolute;
+    position: fixed;
     z-index: 232;
   }
   .brand{
@@ -233,4 +241,9 @@
     .menu-toggle{display: block;}
     .main{padding:0 18px 48px;}
     .kpi-row{grid-template-columns:1fr 1fr;}
+  }
+  @media (max-width:470px) {
+    .orders-table td{
+        padding: 12px 0px;
+    }
   }

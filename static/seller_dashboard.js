@@ -426,9 +426,14 @@ window.addEventListener('resize', ()=>{ if (statsData) drawChart(getChartSlice(c
 
 /* ===== Time formatting ===== */
 function timeAgo(iso){
+  if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(iso)) {
+    iso += "Z";
+  }
   const then = new Date(iso).getTime();
   const diffMs = Date.now() - then;
   const mins = Math.floor(diffMs/60000);
+  console.log(mins);
+  
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins} min ago`;
   const hrs = Math.floor(mins/60);
@@ -529,6 +534,8 @@ function renderActivity(stats){
 
   (stats.recent_orders || []).slice(0,4).forEach(o=>{
     const cancelled = o.status === 'canceled';
+    console.log(timeAgo(o.created_at));
+    
     items.push({
       color: cancelled ? 'var(--danger)' : 'var(--green)',
       msg: cancelled

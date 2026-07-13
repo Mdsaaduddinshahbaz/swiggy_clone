@@ -2,7 +2,7 @@ const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
 const type = pathParts[pathParts.length - 4];
-const name=pathParts[pathParts.length - 3]
+const name=pathParts[pathParts.length - 2]
 console.log(type);
 document.addEventListener("DOMContentLoaded", async () => {
   const homeBtn=document.getElementById("homeBtn")
@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           stock:
             Number(
-              item.item_qty
+              (item.item_qty-item.sold)
             ),
 
           lowAt:
