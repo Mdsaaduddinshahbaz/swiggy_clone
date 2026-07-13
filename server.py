@@ -1,7 +1,7 @@
 from database import save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
-from redis_db import add_cart,get_cart,update_cart_qty
+from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
 from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
@@ -557,18 +557,31 @@ def seller_page(name,seller_id):
 @app.post("/store_orders")
 @login_required
 def store_order():
+    user_id = g.user_id
+    lock_key = f"lock:checkout:{user_id}"
+    token = acquire_lock(lock_key, ttl_seconds=15)
+
+    if not token:
+        return jsonify({
+            "success": False,
+            "message": "Your order is already being processed"
+        }), 409
     try:
         # data=request.get_json()
         user_id=g.user_id
         resids=store_orders(user_id)
         if(resids==404):
             return({"success":False})
+        if resids is False:
+            return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
         for resid in resids:
             socketio.emit("new_order", {"msg": "refresh"}, room=resid)
         return ({"success":True})
     except Exception as e:
         print(e)
         return({"success":False})
+    finally:
+        release_lock(lock_key, token)
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:

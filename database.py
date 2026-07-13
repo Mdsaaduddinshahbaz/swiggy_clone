@@ -251,7 +251,13 @@ def store_orders(userid):
                     UpdateOne(
                         {   
                             "_id": ObjectId(item_id),
-                            "resturant_id": res_id   # ✅ safer
+                            "resturant_id": res_id ,
+                            "$expr": {
+                    "$lte": [
+                        {"$add": ["$sold", item["qty"]]},
+                        {"$toInt": "$item_qty"}
+                    ]
+                }  # ✅ safer
                         },
                         {
                             "$inc": {"sold": item["qty"]}

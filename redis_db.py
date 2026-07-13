@@ -480,3 +480,27 @@ def add_json(userid, key, data, expiry=None):
     except Exception as e:
         print("Error:", e)
         return False
+    
+import uuid
+
+_RELEASE_LOCK_LUA = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+else
+    return 0
+end
+"""
+release_lock_script = r.register_script(_RELEASE_LOCK_LUA)
+
+def acquire_lock(key, ttl_seconds=15):
+    """Returns a token if lock acquired, None if already locked."""
+    token = str(uuid.uuid4())
+    acquired = r.set(key, token, nx=True, ex=ttl_seconds)
+    return token if acquired else None
+
+def release_lock(key, token):
+    """Only releases the lock if we're still the owner (didn't expire + get re-grabbed)."""
+    try:
+        release_lock_script(keys=[key], args=[token])
+    except Exception as e:
+        print("release_lock error:", e)
