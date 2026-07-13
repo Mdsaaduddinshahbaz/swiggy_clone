@@ -27,6 +27,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         headers: { "Content-type": "application/json" },
         body: JSON.stringify({ "userid": userId })
     })
+    if(res.status ==401){
+        alert("unauthorized User,Please Log in")
+        window.location.href="/login/user";
+        return;    
+    }
     const data = await res.json()
     console.log(data)
     // console.log(Object.keys(data.results.cart).length)

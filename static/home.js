@@ -104,8 +104,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                 "headers": { "Content-Type": "application/json" },
                 body: JSON.stringify({ "user_id": userId })
             })
+             if (address.status === 401) {
+                    alert("Please log in.");
+                    localStorage.clear()
+                    window.location.href = "/login/user";
+                    return;
+                }
             const data = await address.json()
             console.log(data)
+            console.log(data.status)
             if (data.success) {
                 console.log("in fetch address")
                 console.log(data)

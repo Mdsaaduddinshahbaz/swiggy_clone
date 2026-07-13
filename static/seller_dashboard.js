@@ -243,6 +243,11 @@ let total_sold=0
 async function loadDashboard(){
   try {
     const res = await fetch('/seller/stats', { method: 'POST', credentials: 'same-origin' });
+    if(res.status ==401){
+        alert("unauthorized,Please Log in")
+        window.location.href="/login/seller";
+        return;    
+    }
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load stats');
 

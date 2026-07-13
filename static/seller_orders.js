@@ -166,6 +166,11 @@ async function loadOrders() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ "res_id": resId })
     });
+    if(res.status ==401){
+        alert("unauthorized,Please Log in")
+        window.location.href="/login/seller";
+        return;    
+    }
     const data = await res.json();
     console.log(data)
     if (!data.success) {

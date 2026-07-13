@@ -6,13 +6,14 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-# from verify import upload_image   
-from verifpy1 import upload_image
+from verify import upload_image   
+# from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
 import requests
 import os
+
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
 mail_port=int(os.getenv("Mail_port"))
@@ -24,7 +25,33 @@ secret_key=os.getenv("Mail_secret_key")
 brevo_api=os.getenv("brevo_api_email")
 app=Flask(__name__)
 CORS(app)
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
+def rate_limit_key():
+    if hasattr(g, "user_id"):
+        return f"user:{g.user_id}"
+    if hasattr(g, "res_id"):
+        return f"res:{g.res_id}"
+    return get_remote_address()
+
+# limiter = Limiter(
+#     app=app,
+#     key_func=rate_limit_key,
+#     storage_uri=f"redis://{os.getenv('Redis_uri')}:{os.getenv('Redis_port')}",
+#     default_limits=["200 per minute"]
+# )
+redis_user = os.getenv("Redis_USERNAME", "")
+redis_pass = os.getenv("Redis_PASSWORD", "")
+redis_host = os.getenv("Redis_uri")
+redis_port = os.getenv("Redis_port")
+
+if redis_user or redis_pass:
+    storage_uri = f"redis://{redis_user}:{redis_pass}@{redis_host}:{redis_port}"
+else:
+    storage_uri = f"redis://{redis_host}:{redis_port}"
+print(storage_uri)
+limiter = Limiter(app=app, key_func=rate_limit_key, storage_uri=storage_uri, default_limits=["200 per minute"])
 app.config["MAIL_SERVER"] = mail_sever_name
 app.config["MAIL_PORT"] = mail_port
 app.config["MAIL_USE_TLS"] = mail_use_tls
@@ -73,7 +100,13 @@ def login_required(f):
                 g.res_id=payload["res_id"]
 
         except jwt.InvalidTokenError:
-            return jsonify({"success": False}), 401
+            # response=jsonify({"success": False}), 401
+            # return jsonify({"success": False}), 401
+            # response=jsonify({"success":True,"res_id":id}),401
+            response=jsonify({"success":True,"msg":"invalid Token"}),401
+            response.delete_cookie("user_token")
+            response.delete_cookie("seller_token")
+            return response
 
         return f(*args, **kwargs)
 
@@ -128,7 +161,12 @@ def send_verification_email(user_email,role):
 
 
 # print("Email sent")
-
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "success": False,
+        "message": "Too many requests, please slow down"
+    }), 429
 @app.route("/", methods=["GET", "POST"])
 def land():
     return redirect(url_for('renderLanding'))
@@ -141,6 +179,7 @@ def serve_asset_links_file():
     static_file_dir = os.path.join(app.root_path, 'static')
     return send_from_directory(static_file_dir, 'assetlinks.json', mimetype='application/json')
 @app.route("/user/<userid>", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def home(userid):
     try:
         return render_template('home.html')
@@ -170,6 +209,7 @@ def home(userid):
 #         return({"success":False})
 @app.post("/add_res_items")
 @login_required
+@limiter.limit("10 per minute")
 def add_itemss():
     try:
         # itm_name = request.form.get("itm_name")
@@ -239,6 +279,7 @@ def allowed_file(filename):
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
     )
 @app.post("/add_resturant")
+@limiter.limit("5 per minute")
 def add_resturant():
     try:
         token = request.cookies.get("seller_res_token")
@@ -315,6 +356,7 @@ def add_resturant():
 }), 500
 @app.post("/remove_items")
 @login_required
+@limiter.limit("30 per minute")
 def remove_item():
     try:
         res_id=g.res_id
@@ -359,6 +401,7 @@ def list_item():
     #     return({"success":False})
 @app.post("/update_item_details")
 @login_required
+@limiter.limit("20 per minute")
 def update_items():
     try:
         res_id=g.res_id
@@ -481,6 +524,7 @@ def list_cart_items():
 
 @app.post("/update_cart")
 @login_required
+@limiter.limit("120 per minute")
 def updateCart():
     try:
         data = request.get_json(force=True) or {}
@@ -511,6 +555,7 @@ def updateCart():
 
 
 @app.post("/add_to_cart")
+@limiter.limit("30 per minute")
 @login_required
 def addToCart():
     try:
@@ -555,6 +600,7 @@ def seller_page(name,seller_id):
         print(e)
         return({"success":False})
 @app.post("/store_orders")
+@limiter.limit("5 per minute")
 @login_required
 def store_order():
     user_id = g.user_id
@@ -700,6 +746,7 @@ import re
 
 EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 @app.post("/validate_user")
+@limiter.limit("10 per minute")
 def validate():
     try:
         data=request.get_json()
@@ -768,6 +815,7 @@ def validate():
         print(e)
         return({"success":False})
 @app.post("/validate_owner")
+@limiter.limit("10 per minute")
 def validate_owner():
     try:
         data=request.get_json()
@@ -822,6 +870,7 @@ def validate_owner():
         print(e)
         return {"success": False}
 @app.post("/signup_user")
+@limiter.limit("5 per minute")
 def signup_user():
     try:
         # print(signup)
@@ -921,6 +970,7 @@ def verify_email(token):
 
 @app.post("/save_subcategory")
 @login_required
+@limiter.limit("30 per minute")
 def save_subcats():
     # data=request.get_json()
     # # res_id=data["res_id"]
@@ -984,6 +1034,7 @@ def renderLanding():
         return({"success":False})
 @app.post("/update_order")
 @login_required
+@limiter.limit("30 per minute")
 def update_status():
     try:
         res_id=g.res_id
@@ -1001,6 +1052,7 @@ def update_status():
         return({"success":False})
 @app.post("/update_order_user")
 @login_required
+@limiter.limit("30 per minute")
 def update_status_user():
     try:
         userid=g.user_id
@@ -1103,6 +1155,7 @@ def handle_user_cancel(data):
         return({"success":False})
 @app.post("/save_address")
 @login_required
+@limiter.limit("10 per minute")
 def save_address_type():
     try:    
         # data=request.get_json()
@@ -1133,17 +1186,30 @@ def save_address_type():
 @app.post("/fetch_address")
 @login_required
 def fetch_addresss():
-    data=request.get_json()
-    # uid=data["user_id"]
-    uid=g.user_id
-    address=fetch_address(uid)
-    if(address["success"]):
-        return({"success":True,"address":address["address"]})
-    else:
+    try:
+        data=request.get_json()
+        # uid=data["user_id"]
+        uid=g.user_id
+        address=fetch_address(uid)
+        if(address["success"]):
+            return({"success":True,"address":address["address"]})
+        else:
+            return({"success":False})
+    except AttributeError:
+        # return({"success":False,"msg":"Login Please"})
+        response=jsonify({"success":False,"msg":"Login Please"})
+        # token = (
+        #     request.cookies.get("seller_token")
+        # )
+        
+        response.delete_cookie("seller_token")
+        return response
+    except:
         return({"success":False})
     
 @app.post("/save_categories")
 @login_required
+@limiter.limit("20 per minute")
 def sve_cate():
     # data=request.get_json()
     # # res_id=data["res_id"]

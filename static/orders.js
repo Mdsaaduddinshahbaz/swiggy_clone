@@ -118,6 +118,11 @@ async function loadOrders() {
     const res = await fetch(`/get_orders/${userId}`, {
         method: "POST",
     });
+    if(res.status ==401){
+        alert("unauthorized User,Please Log in")
+        window.location.href="/login/user";
+        return;    
+    }
     const data = await res.json();
     console.log(data)
     console.log(data.orders.length)

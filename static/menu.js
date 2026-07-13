@@ -579,6 +579,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         headers: { "Content-type": "application/json" },
         body: JSON.stringify({ "userid": userId })
     })
+    if(rest.status ==401){
+        alert("unauthorized User,Please Log in")
+        window.location.href="/login/user";
+        
+    }
     const datas = await rest.json()
     console.log(datas)
     if (datas.results !== null)
@@ -591,7 +596,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         "headers": { "Content-Type": "application/json" },
         body: JSON.stringify({ "res_id": res_id, "type": "user" })
     })
+    if(res.status ==401){
+        alert("unauthorized User,Please Log in")
+        window.location.href="/login/user";
 
+    }
     const data = await res.json()
     console.log(data)
     if (data.success) {
@@ -700,6 +709,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                     replace: false   // 🔥 important
                 })
             })
+            if(res.status ==401){
+                alert("unauthorized User,Please Log in")
+                window.location.href="/login/user";
+                return;    
+            }
             const data = await res.json()
             console.log(data)
             if (data.success) {
