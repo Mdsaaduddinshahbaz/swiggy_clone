@@ -960,8 +960,8 @@ def get_seller_analytics(seller_id: str) -> dict:
         "recent_orders": recent_orders_data,
         "inventory": inventory_data,
     }
-reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
-print(reponse)
+# reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
+# print(reponse)
 # get_orders("69a959defa10620eb63cf31d")
 def save_address(address,type,uid,cordinates):
     user=users.find_one(ObjectId(uid))
