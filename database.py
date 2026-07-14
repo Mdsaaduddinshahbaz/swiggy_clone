@@ -1,8 +1,10 @@
 from pymongo import MongoClient,UpdateOne,ReturnDocument
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError,OperationFailure
 from dotenv import load_dotenv
 from bson import ObjectId
 from datetime import datetime
+import time
+
 import os
 from redis_db import delete_cart,get_cart
 load_dotenv(override=True)
@@ -26,6 +28,7 @@ orders=db["Orders"]
 seller_orders=db["seller_orders"]
 users=db["users"]
 categories=db["categories"]
+MAX_RETRIES = 5
 users.create_index("email", unique=True)
 owners.create_index("email", unique=True)
 def add_resturant_owner(username,password):
@@ -273,26 +276,39 @@ def store_orders(userid):
         #     seller_orders.insert_many(seller_docs)
         # if seller_inventory:
         #     resturants_items.bulk_write(seller_inventory)
-        with client.start_session() as session:
-            with session.start_transaction():
+        for attempt in range(MAX_RETRIES):
+            try:
+                with client.start_session() as session:
+                    with session.start_transaction():
 
-                result=orders.insert_one({"user_id":userid,"token_no":token,"status":"placed","items":items,"time":current_time}, session=session)
-                parent_id = result.inserted_id 
+                        result=orders.insert_one({"user_id":userid,"token_no":token,"status":"placed","items":items,"time":current_time}, session=session)
+                        parent_id = result.inserted_id 
 
-                # 3. Add that parent_id to every seller doc before inserting
-                for doc in seller_docs:
-                    doc["parent_order_id"] = str(parent_id)
-                if seller_docs:
-                    seller_orders.insert_many(seller_docs, session=session)
+                        # 3. Add that parent_id to every seller doc before inserting
+                        for doc in seller_docs:
+                            doc["parent_order_id"] = str(parent_id)
+                        if seller_docs:
+                            seller_orders.insert_many(seller_docs, session=session)
 
-                if seller_inventory:
-                    result=resturants_items.bulk_write(seller_inventory, session=session)
-                    if result.modified_count != len(seller_inventory):
-                        raise Exception("Failed to update all inventory items.")
+                        if seller_inventory:
+                            result=resturants_items.bulk_write(seller_inventory, session=session)
+                            if result.modified_count != len(seller_inventory):
+                                raise Exception("Failed to update all inventory items.")
 
-                delete_cart(userid,session=session)
-                print("Order stored successfully")
-        return res_ids
+                        delete_cart(userid,session=session)
+                        print("Order stored successfully")
+                return res_ids
+            except OperationFailure as e:
+
+                if "TransientTransactionError" in e.details.get("errorLabels", []):
+
+                    print(f"Retrying transaction ({attempt+1})")
+
+                    time.sleep(0.05)
+
+                    continue
+
+                raise
     except Exception as e:
         print(e)
         return False

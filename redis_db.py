@@ -252,11 +252,12 @@ PASSWORD = os.getenv("Redis_PASSWORD")
 # -------------------------
 # Pooled connection (create once, reuse everywhere)
 # -------------------------
-pool = redis.ConnectionPool(
+pool = redis.BlockingConnectionPool(
     host=HOST,
     port=PORT,
     username=USERNAME,
     password=PASSWORD,
+    max_connections=30,
     decode_responses=True,
     db=0,
 )
@@ -504,3 +505,4 @@ def release_lock(key, token):
         release_lock_script(keys=[key], args=[token])
     except Exception as e:
         print("release_lock error:", e)
+# delete_cart("6a56037c0d65ee6492341c02")
