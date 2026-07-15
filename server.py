@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -600,34 +600,40 @@ def seller_page(name,seller_id):
         print(e)
         return({"success":False})
 @app.post("/store_orders")
-#@limiter.limit("5 per minute")
 @login_required
 def store_order():
     user_id = g.user_id
     lock_key = f"lock:checkout:{user_id}"
-    token = acquire_lock(lock_key, ttl_seconds=15)
-
-    if not token:
+    lock_token = acquire_lock(lock_key, ttl_seconds=15)
+ 
+    if not lock_token:
         return jsonify({
             "success": False,
             "message": "Your order is already being processed"
         }), 409
+ 
     try:
-        # data=request.get_json()
-        user_id=g.user_id
-        resids=store_orders(user_id)
-        if(resids==404):
-            return({"success":False})
+        resids = store_orders(user_id)
+ 
+        if resids == 404:
+            return jsonify({"success": False, "message": "Cart is empty"}), 404
+ 
         if resids is False:
             return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
+ 
+        # don't block the response on socket emits -- fire after the transaction
+        # has already committed, off the request thread
         for resid in resids:
-            socketio.emit("new_order", {"msg": "refresh"}, room=resid)
-        return ({"success":True})
+            socketio.start_background_task(socketio.emit, "new_order", {"msg": "refresh"}, room=resid)
+ 
+        return jsonify({"success": True})
+ 
     except Exception as e:
-        print(e)
-        return({"success":False})
+        print("store_order endpoint failed: %s", e)
+        return jsonify({"success": False}), 500
+ 
     finally:
-        release_lock(lock_key, token)
+        release_lock(lock_key, lock_token)
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:
@@ -889,11 +895,11 @@ def signup_user():
             }), 400
 
         signup_data, error = validate_signup(data)
-
+        print(signup_data)
         if error:
             return error
         # print(email)
-        print("mail sent",role)
+        # print("mail sent",role)
         res = create_new_user(
             signup_data["email"],
             signup_data["username"],
@@ -933,7 +939,8 @@ def signup_user():
             else: return({"success":False,"msg":"Internal Server Occured Please Try Again"})
         else:
             return ({"success":False,"msg":"user already exists!"})
-    except :
+    except Exception as e:
+        print(e)
         print("in exception signup user")
         return({"success":False,"msg":"Internal Error occured Please Try Again"})
 

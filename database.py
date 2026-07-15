@@ -31,6 +31,7 @@ categories=db["categories"]
 MAX_RETRIES = 5
 users.create_index("email", unique=True)
 owners.create_index("email", unique=True)
+resturants_items.create_index("resturant_id",unique=False)
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
 def add_resturants(name,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
@@ -205,112 +206,111 @@ def normalize_cart(items):
             }
 
     return normalized
+from bson import ObjectId
+from pymongo import UpdateOne
+from pymongo.errors import OperationFailure, DuplicateKeyError
 def generate_token():
-    while True:
-        token = str(uuid.uuid4())[:6].upper()
-        
-        if not orders.find_one({"token_no": token}):
-            return token
+    """No pre-check needed -- rely on the unique index on token_no instead
+    of a find_one-then-insert race. Collisions are handled at insert time."""
+    return str(uuid.uuid4())[:6].upper()
+ 
+ 
 def store_orders(userid):
     try:
-        token = generate_token()
-        # order_id = "ORD_" + str(int(datetime.utcnow().timestamp()))
-
-        # ✅ 1. Insert into user_orders
         items = get_cart(userid)
-        print("items=",items)
-        if(items==None or not items.get("cart")):
+        if items is None or not items.get("cart"):
             return 404
-        # ✅ normalize structure
-        # items = normalize_cart(items)
-
-        # ✅ 2. Prepare seller_orders
+ 
+        cart = items["cart"]
+ 
         seller_docs = []
-        res_ids=[]
-        seller_inventory=[]
-        current_time=datetime.utcnow()
-        print("items in store_orders",items["cart"])
-        cart=items["cart"]
-        print("cart=",cart)
+        res_ids = []
+        seller_inventory = []
+        current_time = datetime.utcnow()
+ 
         for res_id, data in cart.items():
-            # print(res_id,data)
-            print(res_id,data)
             seller_doc = {
-                # "order_id": order_id,
                 "user_id": userid,
-                "token_no":token,
                 "restaurant_id": res_id,
                 "restaurant_name": data["name"],
-
                 "items": data["items"],
-
                 "status": "placed",
-                "time": current_time
+                "time": current_time,
             }
             res_ids.append(res_id)
-            for item_id,item in data["items"].items():
-                print(item)
+ 
+            for item_id, item in data["items"].items():
                 seller_inventory.append(
                     UpdateOne(
-                        {   
-                            "_id": ObjectId(item_id),
-                            "resturant_id": res_id ,
-                            "$expr": {
-                    "$lte": [
-                        {"$add": ["$sold", item["qty"]]},
-                        {"$toInt": "$item_qty"}
-                    ]
-                }  # ✅ safer
-                        },
                         {
-                            "$inc": {"sold": item["qty"]}
-                        }
+                            "_id": ObjectId(item_id),
+                            "restaurant_id": res_id,  # fixed typo: was "resturant_id"
+                            "$expr": {
+                                "$lte": [
+                                    {"$add": ["$sold", item["qty"]]},
+                                    {"$toInt": "$item_qty"},
+                                ]
+                            },
+                        },
+                        {"$inc": {"sold": item["qty"]}},
                     )
                 )
-
-
+ 
             seller_docs.append(seller_doc)
-
-        # ✅ 3. Insert all at once (FAST)
-        # if seller_docs:
-        #     seller_orders.insert_many(seller_docs)
-        # if seller_inventory:
-        #     resturants_items.bulk_write(seller_inventory)
+ 
         for attempt in range(MAX_RETRIES):
+            token = generate_token()  # fresh token each attempt in case of collision
             try:
                 with client.start_session() as session:
                     with session.start_transaction():
-
-                        result=orders.insert_one({"user_id":userid,"token_no":token,"status":"placed","items":items,"time":current_time}, session=session)
-                        parent_id = result.inserted_id 
-
-                        # 3. Add that parent_id to every seller doc before inserting
+                        result = orders.insert_one(
+                            {
+                                "user_id": userid,
+                                "token_no": token,
+                                "status": "placed",
+                                "restaurant_ids": res_ids,  # lighter than storing full cart twice
+                                "time": current_time,
+                            },
+                            session=session,
+                        )
+                        parent_id = result.inserted_id
+ 
                         for doc in seller_docs:
                             doc["parent_order_id"] = str(parent_id)
+                            doc["token_no"] = token
+ 
                         if seller_docs:
                             seller_orders.insert_many(seller_docs, session=session)
-
+ 
                         if seller_inventory:
-                            result=resturants_items.bulk_write(seller_inventory, session=session)
-                            if result.modified_count != len(seller_inventory):
+                            inv_result = resturants_items.bulk_write(
+                                seller_inventory, session=session, ordered=False
+                            )
+                            if inv_result.modified_count != len(seller_inventory):
+                                # at least one item was out of stock / mismatched filter
                                 raise Exception("Failed to update all inventory items.")
-
-                        delete_cart(userid,session=session)
-                        print("Order stored successfully")
+ 
+                        delete_cart(userid, session=session)
+ 
                 return res_ids
+ 
+            except DuplicateKeyError:
+                # token collision -- extremely rare with uuid4, just retry with a new token
+                print("Token collision on attempt %d, retrying", attempt + 1)
+                continue
+ 
             except OperationFailure as e:
-
                 if "TransientTransactionError" in e.details.get("errorLabels", []):
-
-                    print(f"Retrying transaction ({attempt+1})")
-
-                    time.sleep(0.05)
-
+                    print("Transient txn error, retry %d", attempt + 1)
+                    time.sleep(0.05 * (attempt + 1))  # exponential-ish backoff
                     continue
-
                 raise
+ 
+        # exhausted retries
+        return False
+ 
     except Exception as e:
-        print(e)
+        print("store_orders failed for user %s: %s", userid, e)
         return False
 def get_orders(userid):
     final_orders=[]
@@ -960,8 +960,8 @@ def get_seller_analytics(seller_id: str) -> dict:
         "recent_orders": recent_orders_data,
         "inventory": inventory_data,
     }
-reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
-print(reponse)
+# reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
+# print(reponse)
 # get_orders("69a959defa10620eb63cf31d")
 def save_address(address,type,uid,cordinates):
     user=users.find_one(ObjectId(uid))
