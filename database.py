@@ -211,13 +211,17 @@ def generate_token():
         
         if not orders.find_one({"token_no": token}):
             return token
-def store_orders(userid):
+def store_orderss(userid):
     try:
+        import time
+
+        start = time.perf_counter()
         token = generate_token()
         # order_id = "ORD_" + str(int(datetime.utcnow().timestamp()))
 
         # ✅ 1. Insert into user_orders
         items = get_cart(userid)
+        print("cart", time.perf_counter() - start)
         print("items=",items)
         if(items==None or not items.get("cart")):
             return 404
@@ -252,18 +256,15 @@ def store_orders(userid):
                 print(item)
                 seller_inventory.append(
                     UpdateOne(
-                        {   
+                        {
                             "_id": ObjectId(item_id),
-                            "resturant_id": res_id ,
-                            "$expr": {
-                    "$lte": [
-                        {"$add": ["$sold", item["qty"]]},
-                        {"$toInt": "$item_qty"}
-                    ]
-                }  # ✅ safer
+                            "available": {"$gte": item["qty"]}
                         },
                         {
-                            "$inc": {"sold": item["qty"]}
+                            "$inc": {
+                                 "available": -item["qty"],
+                                  "sold": item["qty"]
+                            }
                         }
                     )
                 )
@@ -278,6 +279,7 @@ def store_orders(userid):
         #     resturants_items.bulk_write(seller_inventory)
         for attempt in range(MAX_RETRIES):
             try:
+                start_trasac = time.perf_counter()
                 with client.start_session() as session:
                     with session.start_transaction():
 
@@ -292,11 +294,13 @@ def store_orders(userid):
 
                         if seller_inventory:
                             result=resturants_items.bulk_write(seller_inventory, session=session)
-                            if result.modified_count != len(seller_inventory):
-                                raise Exception("Failed to update all inventory items.")
-
+                            # if result.modified_count != len(seller_inventory):
+                            #     raise Exception("Failed to update all inventory items.")
+                        start = time.perf_counter()
                         delete_cart(userid,session=session)
+                        print("delete", time.perf_counter() - start)
                         print("Order stored successfully")
+                print("txn", time.perf_counter() - start_trasac)
                 return res_ids
             except OperationFailure as e:
 
@@ -312,6 +316,132 @@ def store_orders(userid):
     except Exception as e:
         print(e)
         return False
+from pymongo import UpdateOne
+from bson import ObjectId
+from datetime import datetime
+from pymongo.errors import OperationFailure
+import time
+
+
+def store_orders(userid):
+
+    token = generate_token()
+
+    items = get_cart(userid)
+
+    if not items or not items.get("cart"):
+        return 404
+
+    current_time = datetime.utcnow()
+
+    seller_docs = []
+    inventory_updates = []
+    restaurant_ids = []
+
+    for restaurant_id, restaurant in items["cart"].items():
+
+        restaurant_ids.append(restaurant_id)
+
+        seller_docs.append({
+            "user_id": userid,
+            "token_no": token,
+            "restaurant_id": restaurant_id,
+            "restaurant_name": restaurant["name"],
+            "items": restaurant["items"],
+            "status": "placed",
+            "time": current_time
+        })
+
+        for item_id, item in restaurant["items"].items():
+
+            inventory_updates.append(
+                UpdateOne(
+                    {
+                        "_id": ObjectId(item_id),
+                        "available": {"$gte": item["qty"]}
+                    },
+                    {
+                        "$inc": {
+                            "available": -item["qty"],
+                            "sold": item["qty"]
+                        }
+                    }
+                )
+            )
+
+    for attempt in range(MAX_RETRIES):
+
+        try:
+
+            with client.start_session() as session:
+
+                with session.start_transaction():
+
+                    t = time.perf_counter()
+
+                    result = orders.insert_one(
+                        {
+                            "user_id": userid,
+                            "token_no": token,
+                            "status": "placed",
+                            "items": items,
+                            "time": current_time
+                        },
+                        session=session
+                    )
+
+                    print("order insert", time.perf_counter() - t)
+
+                    parent = str(result.inserted_id)
+
+                    for doc in seller_docs:
+                        doc["parent_order_id"] = parent
+
+                    t = time.perf_counter()
+
+                    if seller_docs:
+                        seller_orders.insert_many(
+                            seller_docs,
+                            session=session
+                        )
+
+                    print("seller insert", time.perf_counter() - t)
+
+                    t = time.perf_counter()
+
+                    if inventory_updates:
+                        inventory_result = resturants_items.bulk_write(
+                            inventory_updates,
+                            session=session
+                        )
+
+                        # Ensure all inventory updates succeeded
+                        # if inventory_result.modified_count != len(inventory_updates):
+                        #     raise Exception("Inventory unavailable")
+
+                    print("inventory", time.perf_counter() - t)
+
+            # Transaction committed here
+
+            t = time.perf_counter()
+
+            delete_cart(userid)
+
+            print("delete cart", time.perf_counter() - t)
+
+            return restaurant_ids
+
+        except OperationFailure as e:
+
+            if "TransientTransactionError" in e.details.get("errorLabels", []):
+
+                time.sleep(0.05)
+
+                continue
+
+            raise
+
+    return False
 def get_orders(userid):
     final_orders=[]
     orderss=orders.find({"user_id":userid})

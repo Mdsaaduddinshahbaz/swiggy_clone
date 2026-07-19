@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -1927,5 +1927,14 @@ def validate_signup(data):
         "password": password,
         "role": role
     }, None
-if __name__ == "__main__":
-    socketio.run(app, debug=True)
+# if __name__ == "__main__":
+#     socketio.run(app, debug=True)
+from waitress import serve
+
+serve(
+    app,
+    host="0.0.0.0",
+    port=5000,
+    threads=32,
+    connection_limit=500
+)

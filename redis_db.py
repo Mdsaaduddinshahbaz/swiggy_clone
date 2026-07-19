@@ -440,7 +440,7 @@ def update_cart_qty(uid, item_id, change):
     return json.loads(result)
 
 
-def get_cart(uid):
+def get_carts(uid):
     uid = str(uid)
     meta_key = f"cart:{uid}:meta"
     items_key = f"cart:{uid}:items"
@@ -463,6 +463,38 @@ def get_cart(uid):
         },
     }
 
+import orjson
+
+def get_cart(uid):
+    uid = str(uid)
+
+    meta_key = f"cart:{uid}:meta"
+    items_key = f"cart:{uid}:items"
+
+    pipe = r.pipeline()
+    pipe.hgetall(meta_key)
+    pipe.hgetall(items_key)
+
+    meta, raw_items = pipe.execute()
+
+    if not meta:
+        return None
+
+    items = {
+        item_id: orjson.loads(value)
+        for item_id, value in raw_items.items()
+    }
+
+    return {
+        "uid": uid,
+        "total": int(meta.get("total", 0)),
+        "cart": {
+            meta["restaurant"]: {
+                "name": meta["restaurant_name"],
+                "items": items
+            }
+        }
+    }
 
 def delete_cart(uid, session=None):
     uid = str(uid)
