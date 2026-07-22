@@ -255,9 +255,9 @@ PASSWORD = os.getenv("Redis_PASSWORD")
 pool = redis.BlockingConnectionPool(
     host=HOST,
     port=PORT,
-    username=USERNAME,
-    password=PASSWORD,
-    max_connections=30,
+    # username=USERNAME,
+    # password=PASSWORD,
+    # max_connections=100,
     decode_responses=True,
     db=0,
 )
@@ -394,28 +394,32 @@ update_qty_script = r.register_script(_UPDATE_QTY_LUA)
 # =========================================================
 
 def add_cart(resid, uid, item_name, res_name, item_id, qty, price, available_qty, replace=False):
-    resid = str(resid)
-    uid = str(uid)
-    item_id = str(item_id)
-
     try:
-        qty = int(qty)
-        price = int(price)
-        available_qty = int(available_qty)
-    except (TypeError, ValueError):
-        return {"success": False, "message": "Invalid input"}
+        resid = str(resid)
+        uid = str(uid)
+        item_id = str(item_id)
 
-    if qty <= 0:
-        return {"success": False, "message": "Quantity must be positive"}
+        try:
+            qty = int(qty)
+            price = int(price)
+            available_qty = int(available_qty)
+        except (TypeError, ValueError):
+            return {"success": False, "message": "Invalid input"}
 
-    meta_key = f"cart:{uid}:meta"
-    items_key = f"cart:{uid}:items"
+        if qty <= 0:
+            return {"success": False, "message": "Quantity must be positive"}
 
-    result = add_cart_script(
-        keys=[meta_key, items_key],
-        args=[uid, resid, res_name, item_id, item_name, qty, price, available_qty, "1" if replace else "0"],
-    )
-    return json.loads(result)
+        meta_key = f"cart:{uid}:meta"
+        items_key = f"cart:{uid}:items"
+
+        result = add_cart_script(
+            keys=[meta_key, items_key],
+            args=[uid, resid, res_name, item_id, item_name, qty, price, available_qty, "1" if replace else "0"],
+        )
+        return json.loads(result)
+    except Exception as e:
+        print("add_cart error:", e)
+        return {"success": False, "message": "Internal server error"," error": str(e)}
 
 
 def update_cart_qty(uid, item_id, change):

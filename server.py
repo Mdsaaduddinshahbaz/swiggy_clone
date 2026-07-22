@@ -6,14 +6,15 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-# from verify import upload_image   
-from verifpy1 import upload_image
+from verify import upload_image   
+#from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
+import time
 import requests
 import os
-
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
 load_dotenv(override=True)
 mail_sever_name=os.getenv("Mail_server")
 mail_port=int(os.getenv("Mail_port"))
@@ -71,7 +72,17 @@ brevo_api=os.getenv("brevo_api_email")
 socketio = SocketIO(app, cors_allowed_origins="*")
 # mail=Mail(app)
 
+@app.before_request
+def before():
+    import time
+    g.enter = time.perf_counter()
+    print("BEFORE_REQUEST", g.enter)
 
+@app.after_request
+def after(resp):
+    import time
+    print("AFTER_REQUEST", time.perf_counter() - g.enter)
+    return resp
 from itsdangerous import URLSafeTimedSerializer
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
@@ -600,34 +611,48 @@ def seller_page(name,seller_id):
         print(e)
         return({"success":False})
 @app.post("/store_orders")
-#@limiter.limit("5 per minute")
 @login_required
 def store_order():
+    route_start = time.perf_counter()
+
     user_id = g.user_id
     lock_key = f"lock:checkout:{user_id}"
+
+    t = time.perf_counter()
     token = acquire_lock(lock_key, ttl_seconds=15)
+    print("acquire_lock", time.perf_counter() - t)
 
     if not token:
         return jsonify({
             "success": False,
             "message": "Your order is already being processed"
         }), 409
+
     try:
-        # data=request.get_json()
-        user_id=g.user_id
-        resids=store_orders(user_id)
-        if(resids==404):
-            return({"success":False})
-        if resids is False:
-            return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
+        t = time.perf_counter()
+        resids = store_orders(user_id)
+        if resids==404:
+            return jsonify({
+                "success": False,
+                "message": "Cart is empty"
+            }), 400
+        print("store_orders()", time.perf_counter() - t)
+
+        t = time.perf_counter()
+        print("resids", resids)
         for resid in resids:
+            print(resid,type(resid))
             socketio.emit("new_order", {"msg": "refresh"}, room=resid)
-        return ({"success":True})
-    except Exception as e:
-        print(e)
-        return({"success":False})
+        print("socketio_emit", time.perf_counter() - t)
+
+        print("ROUTE TOTAL", time.perf_counter() - route_start)
+
+        return {"success": True}
+
     finally:
+        t = time.perf_counter()
         release_lock(lock_key, token)
+        print("release_lock", time.perf_counter() - t)
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:
@@ -1927,14 +1952,5 @@ def validate_signup(data):
         "password": password,
         "role": role
     }, None
-# if __name__ == "__main__":
-#     socketio.run(app, debug=True)
-from waitress import serve
-
-serve(
-    app,
-    host="0.0.0.0",
-    port=5000,
-    threads=32,
-    connection_limit=500
-)
+if __name__ == "__main__":
+    socketio.run(app, debug=True,port=5000)
