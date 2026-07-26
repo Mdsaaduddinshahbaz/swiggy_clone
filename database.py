@@ -407,13 +407,13 @@ def store_orders(userid):
             }
             # session=session
         )
-
+        print("acknowledged",result.acknowledged)
         print("order_insert", time.perf_counter() - t)
 
-        # parent = str(result.inserted_id)
+        parent = str(result.inserted_id)
 
-        # for doc in seller_docs:
-        #     doc["parent_order_id"] = parent
+        for doc in seller_docs:
+            doc["parent_order_id"] = parent
 
         t = time.perf_counter()
 

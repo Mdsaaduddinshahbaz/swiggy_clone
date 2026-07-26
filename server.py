@@ -569,6 +569,7 @@ def updateCart():
 #@limiter.limit("30 per minute")
 @login_required
 def addToCart():
+    print("ENTER add_to_cart", flush=True)
     try:
         data, error = validate_add_to_cart()
         if error:
@@ -595,6 +596,7 @@ def addToCart():
             available_qty,
             replace
         )
+        print("EXIT add_to_cart", flush=True)
 
         if res["success"]:
             return jsonify({"success": True, "Total": res["total"]})
@@ -642,7 +644,7 @@ def store_order():
         print("resids", resids)
         for resid in resids:
             print(resid,type(resid))
-            socketio.emit("new_order", {"msg": "refresh"}, room=resid)
+            # socketio.emit("new_order", {"msg": "refresh"}, room=resid)
         print("socketio_emit", time.perf_counter() - t)
 
         print("ROUTE TOTAL", time.perf_counter() - route_start)
