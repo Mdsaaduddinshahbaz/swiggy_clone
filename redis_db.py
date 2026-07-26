@@ -481,6 +481,9 @@ def get_cart(uid):
     if not meta:
         return None
 
+    if not raw_items:
+        return None
+    
     items = {
         item_id: orjson.loads(value)
         for item_id, value in raw_items.items()

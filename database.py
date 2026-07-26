@@ -323,7 +323,7 @@ from pymongo.errors import OperationFailure
 import time
 
 
-def store_orders(userid):
+def store_ordersss(userid):
 
     token = generate_token()
 
@@ -442,6 +442,162 @@ def store_orders(userid):
             raise
 
     return False
+
+def store_orders(userid):
+    token = generate_token()
+    items = get_cart(userid)
+
+    if not items or not items.get("cart"):
+        return 404
+
+    current_time = datetime.utcnow()
+    seller_docs = []
+    inventory_updates = []
+    restaurant_ids = []
+
+    for restaurant_id, restaurant in items["cart"].items():
+        item_ids = [ObjectId(iid) for iid in restaurant["items"].keys()]
+
+        # authoritative read — never trust cart's stored price/qty limits
+        fresh_docs = resturants_items.find(
+            {"_id": {"$in": item_ids}},
+            {"_id": 1, "price": 1, "available": 1}
+        )
+        price_map = {str(d["_id"]): d for d in fresh_docs}
+
+        restaurant_ids.append(restaurant_id)
+        verified_items = {}
+
+        for item_id, item in restaurant["items"].items():
+            fresh = price_map.get(item_id)
+
+            if not fresh:
+                return {"success": False, "message": f"Item no longer available"}
+
+            if fresh["available"] < item["qty"]:
+                return {"success": False, "message": f"{item.get('item','Item')} is out of stock"}
+
+            if fresh["price"] != item["price"]:
+                # log this distinctly — mismatch = tampering or stale-cache signal
+                print(f"PRICE MISMATCH user={userid} item={item_id} cart={item['price']} actual={fresh['price']}")
+                return {"success": False, "message": f"Price changed for {item.get('item','an item')}, please review your cart"}
+
+            # use server price, never the cart's
+            verified_item = dict(item)
+            verified_item["price"] = fresh["price"]
+            verified_items[item_id] = verified_item
+
+            inventory_updates.append(
+                UpdateOne(
+                    {"_id": ObjectId(item_id), "available": {"$gte": item["qty"]}},
+                    {"$inc": {"available": -item["qty"], "sold": item["qty"]}}
+                )
+            )
+
+        seller_docs.append({
+            "user_id": userid,
+            "token_no": token,
+            "restaurant_id": restaurant_id,
+            "restaurant_name": restaurant["name"],
+            "items": verified_items,
+            "status": "placed",
+            "time": current_time
+        })
+
+        for item_id, item in restaurant["items"].items():
+        
+                    inventory_updates.append(
+                        UpdateOne(
+                            {
+                                "_id": ObjectId(item_id),
+                                "available": {"$gte": item["qty"]}
+                            },
+                            {
+                                "$inc": {
+                                    "available": -item["qty"],
+                                    "sold": item["qty"]
+                                }
+                            }
+                        )
+                    )
+        
+        for attempt in range(MAX_RETRIES):
+    
+            try:
+    
+                with client.start_session() as session:
+    
+                    with session.start_transaction():
+    
+                        t = time.perf_counter()
+    
+                        result = orders.insert_one(
+                            {
+                                "user_id": userid,
+                                "token_no": token,
+                                "status": "placed",
+                                "items": items,
+                                "time": current_time
+                            },
+                            session=session
+                        )
+    
+                        print("order insert", time.perf_counter() - t)
+    
+                        parent = str(result.inserted_id)
+    
+                        for doc in seller_docs:
+                            doc["parent_order_id"] = parent
+    
+                        t = time.perf_counter()
+    
+                        if seller_docs:
+                            seller_orders.insert_many(
+                                seller_docs,
+                                session=session
+                            )
+    
+                        print("seller insert", time.perf_counter() - t)
+    
+                        t = time.perf_counter()
+    
+                        if inventory_updates:
+                            inventory_result = resturants_items.bulk_write(
+                                inventory_updates,
+                                session=session
+                            )
+    
+                            # Ensure all inventory updates succeeded
+                            # if inventory_result.modified_count != len(inventory_updates):
+                            #     raise Exception("Inventory unavailable")
+    
+                        print("inventory", time.perf_counter() - t)
+    
+                # Transaction committed here
+    
+                t = time.perf_counter()
+    
+                delete_cart(userid)
+    
+                print("delete cart", time.perf_counter() - t)
+    
+                return restaurant_ids
+    
+            except OperationFailure as e:
+    
+                if "TransientTransactionError" in e.details.get("errorLabels", []):
+    
+                    time.sleep(0.05)
+    
+                    continue
+    
+                raise
+    
+        return False
+
+    # ... rest unchanged, but re-enable the inventory check:
+    if inventory_result.modified_count != len(inventory_updates):
+        raise Exception("Inventory unavailable")
 def get_orders(userid):
     final_orders=[]
     orderss=orders.find({"user_id":userid})

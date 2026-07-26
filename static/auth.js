@@ -51,11 +51,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const data = await res.json();
-        console.log(data.success)
-        if (data.msg === "Not_found") {
+        console.log(data)
+        if (data.message === "Not_found") {
           alert("user credentials not found")
         }
-        else if(data.msg==="Not_verified"){
+        else if(data.message==="Email not verified"){
           alert("Not verified \n An Email is Sent to You please click the link to verify your mail")
         }
         else if (data.success) {

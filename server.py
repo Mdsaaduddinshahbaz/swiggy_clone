@@ -890,7 +890,7 @@ def validate():
                 }), 500
                 # if(res_email == 1): return({"success":False,"msg":"Not_verified"})
                 # else: return ({"success":False,"msg":"Internal Server occured Please Try Again"})
-        else: return({"success":False,"msg":"Not_found"})
+        else: return({"success":False,"message":"Not_found"})
     except Exception as e:
         print(e)
         return({"success":False})
