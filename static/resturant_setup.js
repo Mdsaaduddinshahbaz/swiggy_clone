@@ -47,7 +47,8 @@ async function setupRestaurant() {
         alert("Restaurant created!");
         window.location.href = `/seller/${name}/${data.res_id}`;
     } else {
-        alert("Error creating restaurant");
+        alert("Error creating restaurant"|| data.message);
+        console.error("Error creating restaurant:", data);
     }
 }
 

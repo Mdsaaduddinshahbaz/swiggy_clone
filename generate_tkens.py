@@ -6,6 +6,7 @@ for i in range(51,1001):
     email=f"user{i}@gmail.com"
     password="sadistic123"
     res=create_new_user(email,"new",password,"user")
+    print(res)
     userid=str(res["id"])
     username="new"
     print(userid)

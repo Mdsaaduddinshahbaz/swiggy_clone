@@ -534,7 +534,11 @@ def check_existing_owner(email,password):
         if(owner["password"]==password):
             if(owner["is_verified"]):
                 print("in existing user if if block")
-                return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+                if(owner["is_setup"]):
+                    return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+                else:
+                    return ({"success":True,"id":str(owner["_id"]),"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+                # return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
             else:
                 return ({"success":True,"user_id":str(owner["_id"]),"username":owner["username"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
         else:

@@ -111,6 +111,37 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return wrapper
+def auth_seller_res(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        # token = request.cookies.get("token")
+        token = (
+            request.cookies.get("seller_res_token")
+        )
+        if not token:
+            return jsonify({"success": False}), 401
+
+        try:
+            payload = jwt.decode(
+                token,
+                app.config["SECRET_KEY"],
+                algorithms=["HS256"]
+            )
+            print(payload)
+            g.type = payload["type"]
+            g.owner_id = payload["owner_id"]
+
+        except jwt.InvalidTokenError:
+            # response=jsonify({"success": False}), 401
+            # return jsonify({"success": False}), 401
+            # response=jsonify({"success":True,"res_id":id}),401
+            response=jsonify({"success":True,"msg":"invalid Token"}),401
+            response.delete_cookie("seller_res_token")
+            return response
+
+        return f(*args, **kwargs)
+
+    return wrapper
 def generate_verification_token(email,role):
     return serializer.dumps({
             "email": email,
@@ -279,10 +310,13 @@ def allowed_file(filename):
         filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
     )
 @app.post("/add_resturant")
+@auth_seller_res
 #@limiter.limit("5 per minute")
 def add_resturant():
     try:
         token = request.cookies.get("seller_res_token")
+        if not token:
+            return jsonify({"success": False, "message": "Token is required"}), 400
         payload = jwt.decode(
                 token,
                 app.config["SECRET_KEY"],
@@ -342,11 +376,57 @@ def add_resturant():
             # return ({"success":True,"res_id":id})
             response=jsonify({"success":True,"res_id":id})
             response.delete_cookie("seller_res_token")
+            # return response
+            res_id=id
+            res_name=name
+            token = jwt.encode(
+                {
+                    "type":"seller",
+                    "res_id": str(res_id),
+                    "res_name":res_name,
+                    "exp": datetime.utcnow() + timedelta(days=7)
+                },
+                app.config["SECRET_KEY"],
+                algorithm="HS256"
+            )
+            # response=jsonify({"success":True,"res_id":res_id,"res_name":res_name,"is_setup":is_setup})
+            # response.delete_cookie("user_token")
+            response.set_cookie(
+                "seller_token",
+                token,
+                httponly=True,
+                secure=False,      # True in production with HTTPS
+                samesite="Lax",
+                max_age=7 * 24 * 60 * 60
+            )
             return response
         else:
             id=add_resturants(name,address,phone,owner_id,long,latt)
             response=jsonify({"success":True,"res_id":id})
             response.delete_cookie("seller_res_token")
+            # return response
+            res_id=id
+            res_name=name
+            token = jwt.encode(
+                {
+                    "type":"seller",
+                    "res_id": str(res_id),
+                    "res_name":res_name,
+                    "exp": datetime.utcnow() + timedelta(days=7)
+                },
+                app.config["SECRET_KEY"],
+                algorithm="HS256"
+            )
+            # response=jsonify({"success":True,"res_id":res_id,"res_name":res_name,"is_setup":is_setup})
+            # response.delete_cookie("user_token")
+            response.set_cookie(
+                "seller_token",
+                token,
+                httponly=True,
+                secure=False,      # True in production with HTTPS
+                samesite="Lax",
+                max_age=7 * 24 * 60 * 60
+            )
             return response
     except Exception as e:
         print(e)
@@ -835,6 +915,27 @@ def validate_owner():
         if(res["success"]==False): return({"success":False})
         elif(res["success"]==True):
             if(res["is_verified"]): 
+                if(res["is_setup"]==False):
+                    token = jwt.encode(
+                        {   
+                            "type":"seller",
+                            "owner_id": str(res["id"]),
+                            "exp": datetime.utcnow() + timedelta(hours=1)
+                        },
+                        app.config["SECRET_KEY"],
+                        algorithm="HS256"
+                        )
+                    response=jsonify({"success":True,"user_id":res["id"],"is_setup":False})
+                    response.set_cookie(
+                        "seller_res_token",
+                        token,
+                        httponly=True,
+                        secure=False,      # True in production with HTTPS
+                        samesite="Lax",
+                        max_age=7 * 24 * 60 * 60
+                    )
+                    return response
+                    # return({"success":True,"res_id":res["res_id"],"is_setup":False})
                 res_id=str(res["res_id"])
                 res_name=res["resturant_name"]
                 is_setup=res["is_setup"]
@@ -893,7 +994,7 @@ def signup_user():
         if error:
             return error
         # print(email)
-        print("mail sent",role)
+        # print("mail sent",role)
         res = create_new_user(
             signup_data["email"],
             signup_data["username"],
@@ -912,7 +1013,7 @@ def signup_user():
                     token = jwt.encode(
                     {   
                         "type":"seller",
-                        "owner_id": str(res["_id"]),
+                        "owner_id": str(res["id"]),
                         "exp": datetime.utcnow() + timedelta(hours=1)
                     },
                     app.config["SECRET_KEY"],
@@ -933,8 +1034,9 @@ def signup_user():
             else: return({"success":False,"msg":"Internal Server Occured Please Try Again"})
         else:
             return ({"success":False,"msg":"user already exists!"})
-    except :
+    except Exception as e:
         print("in exception signup user")
+        print(e)
         return({"success":False,"msg":"Internal Error occured Please Try Again"})
 
 @app.route("/verify/<token>")
@@ -991,6 +1093,7 @@ def save_subcats():
     else:
         return {"success":False}
 @app.get("/seller/resturantSetup/<seller_id>")
+@auth_seller_res
 def renderSetup(seller_id):
     try:
         return render_template("resturant_setup.html")
@@ -1927,14 +2030,14 @@ def validate_signup(data):
         "password": password,
         "role": role
     }, None
-# if __name__ == "__main__":
-#     socketio.run(app, debug=True)
-from waitress import serve
+if __name__ == "__main__":
+    socketio.run(app, debug=True)
+# from waitress import serve
 
-serve(
-    app,
-    host="0.0.0.0",
-    port=5000,
-    threads=32,
-    connection_limit=500
-)
+# serve(
+#     app,
+#     host="0.0.0.0",
+#     port=5000,
+#     threads=32,
+#     connection_limit=500
+# )

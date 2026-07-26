@@ -258,6 +258,7 @@ pool = redis.BlockingConnectionPool(
     username=USERNAME,
     password=PASSWORD,
     max_connections=30,
+    timeout=5,
     decode_responses=True,
     db=0,
 )
