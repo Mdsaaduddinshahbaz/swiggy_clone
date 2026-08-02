@@ -3,8 +3,10 @@ let marker;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const display_resturants = document.getElementById("resturants_container")
-    const cartBtn = document.getElementById("cartBtn")
-    const orderBtn = document.getElementById("orderBtn")
+    // const cartBtn = document.getElementById("cartBtn")
+    const cartBtn = document.getElementById("CartBtn")
+    // const orderBtn = document.getElementById("orderBtn")
+    const orderBtn = document.getElementById("OrdersBtn")
     const pathParts = window.location.pathname.split("/");
     const no_results_container = document.getElementById("no-results-container")
     const select_options = document.getElementById("distance_options")
@@ -776,7 +778,7 @@ async function change(latt, long) {
 
 async function getLocation () {
     // const maps = document.getElementById("map_container");
-    const currentAddress = document.getElementById("currentAddress")
+    let currentAddress = document.getElementById("currentAddress")
     // maps.classList.add("show");
 
     // setTimeout(() => {
