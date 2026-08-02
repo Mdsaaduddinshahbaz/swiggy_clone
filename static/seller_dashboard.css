@@ -247,3 +247,93 @@
         padding: 12px 0px;
     }
   }
+  @media (max-width:275px) {
+    .product-row{
+      display: grid;
+    }
+  }
+ @media (max-width: 340px) {
+    .chart-tabs{
+      display:block;
+    }
+  }
+  @media (max-width: 350px) {
+    .orders-table,
+    .orders-table thead,
+    .orders-table tbody,
+    .orders-table tr,
+    .orders-table th,
+    .orders-table td {
+        display: block;
+    }
+
+    .orders-table thead {
+        display: none;
+    }
+
+    .orders-table tr {
+        margin-bottom: 18px;
+        padding: 16px;
+        border: 1px solid #e5e5e5;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .orders-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0px 0;
+        border: none;
+    }
+
+    .orders-table td::before {
+        font-weight: 600;
+        color: #666;
+    }
+    .order-details {
+      display: flex;
+      flex-direction: column;
+          white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    }
+    .order-name{
+          white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    }
+    .order-items{
+      align-self: flex-end;
+          white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    }
+
+    .orders-table td:nth-child(1)::before { content: "Order"; }
+    .orders-table td:nth-child(2)::before { content: "Customer"; }
+    .orders-table td:nth-child(3)::before { content: "Amount"; }
+    .orders-table td:nth-child(4)::before { content: "Status"; }
+    .orders-table td:nth-child(5)::before { content: "Time"; }
+}
+
+  @media (max-width: 415px) {
+    
+    .orders-table th{
+      padding: 8px 4px;
+    }
+
+    #RecentOrdersWidget{
+      padding: 10px;
+    }
+}
+
+@media (max-width: 370px) {
+    #TopProducts{
+      padding: 10px;
+    }
+    #topProducts .product-row{
+      padding: 8px 0;
+      gap: 0px;
+    }
+}

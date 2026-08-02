@@ -103,6 +103,7 @@ function applyFilter() {
             btn.style.opacity = enable ? "1" : "0.5";
             btn.style.cursor = enable ? "pointer" : "not-allowed";
             btn.style.visibility = enable ? "visible" : "hidden";
+            btn.style.display = enable ? "inline-block" : "none";   
         });
     });
         if (hasVisibleCards) {

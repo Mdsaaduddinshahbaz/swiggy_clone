@@ -691,7 +691,7 @@ def check_existing_owner(email,password):
             if(owner["is_verified"]):
                 print("in existing user if if block")
                 if(owner["is_setup"]):
-                    return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+                    return ({"success":True,"res_id":owner["resturant_id"],"username":owner["username"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
                 else:
                     return ({"success":True,"id":str(owner["_id"]),"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
                 # return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
@@ -1112,6 +1112,7 @@ def get_seller_analytics(seller_id: str) -> dict:
     today_orders = 0
     month_orders = 0
     month_revenue = 0
+    active_orders = 0
 
     for order in orders_list:
         order_time = order.get("time", now)
@@ -1122,6 +1123,8 @@ def get_seller_analytics(seller_id: str) -> dict:
         # like the dashboard HTML expects. Map these when rendering.
         if status == "canceled":
             continue
+        if status in ("placed", "processing"):
+            active_orders += 1
 
         order_amount = _order_amount(order, item_index)
         total_revenue += order_amount
@@ -1249,6 +1252,7 @@ def get_seller_analytics(seller_id: str) -> dict:
         "stock_alerts": stock_alerts,
         "recent_orders": recent_orders_data,
         "inventory": inventory_data,
+        "active_orders": active_orders,
     }
 reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
 print(reponse)

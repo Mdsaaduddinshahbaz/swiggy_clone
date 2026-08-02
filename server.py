@@ -84,7 +84,7 @@ def login_required(f):
             request.cookies.get("seller_token")
         )
         if not token:
-            return jsonify({"success": False}), 401
+            return jsonify({"success": False,"message":"Token is missing or unauthorized access"}), 401
 
         try:
             payload = jwt.decode(
@@ -98,6 +98,7 @@ def login_required(f):
                 g.user_id = payload["user_id"]
             elif(g.type == "seller"):
                 g.res_id=payload["res_id"]
+                g.username=payload["username"]
 
         except jwt.InvalidTokenError:
             # response=jsonify({"success": False}), 401
@@ -130,6 +131,7 @@ def auth_seller_res(f):
             print(payload)
             g.type = payload["type"]
             g.owner_id = payload["owner_id"]
+            g.username = payload["username"]
 
         except jwt.InvalidTokenError:
             # response=jsonify({"success": False}), 401
@@ -384,6 +386,7 @@ def add_resturant():
                     "type":"seller",
                     "res_id": str(res_id),
                     "res_name":res_name,
+                    "username":g.username,
                     "exp": datetime.utcnow() + timedelta(days=7)
                 },
                 app.config["SECRET_KEY"],
@@ -919,6 +922,7 @@ def validate_owner():
                     token = jwt.encode(
                         {   
                             "type":"seller",
+                            "username":res["username"],
                             "owner_id": str(res["id"]),
                             "exp": datetime.utcnow() + timedelta(hours=1)
                         },
@@ -939,11 +943,13 @@ def validate_owner():
                 res_id=str(res["res_id"])
                 res_name=res["resturant_name"]
                 is_setup=res["is_setup"]
+                username=res["username"]
                 token = jwt.encode(
                     {
                         "type":"seller",
                         "res_id": str(res_id),
                         "res_name":res_name,
+                        "username":username,
                         "exp": datetime.utcnow() + timedelta(days=7)
                     },
                     app.config["SECRET_KEY"],
@@ -1014,6 +1020,7 @@ def signup_user():
                     {   
                         "type":"seller",
                         "owner_id": str(res["id"]),
+                        "username":signup_data["username"],
                         "exp": datetime.utcnow() + timedelta(hours=1)
                     },
                     app.config["SECRET_KEY"],
@@ -1122,9 +1129,12 @@ def signup(role):
 #         print(e)
 #         return({"success":False})
 @app.get("/seller/<name>/<seller_id>")
+@login_required
 def sellerTemplate(name,seller_id):
     try:
-        return render_template("seller_dashboard.html")
+        username=g.username
+        print(username)
+        return render_template("seller_dashboard.html",username=username)
     except Exception as e:
         print(e)
         return({"success":False})

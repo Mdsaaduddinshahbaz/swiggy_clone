@@ -27,7 +27,7 @@
   <nav class="nav">
     <div class="nav-section">Main</div>
     <button class="nav-item active" id="DashboardBtn"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
-    <button class="nav-item" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge">6</span></button>
+    <button class="nav-item" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge" id="active_orders">6</span></button>
     <button class="nav-item" id="InventoryBtn"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
     <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
 
@@ -100,7 +100,7 @@
     <div class="kpi">
       <div class="kpi-top">
         <div class="kpi-icon" style="background:#FEF3E2;"><i data-lucide="clock" width="18" height="18" style="color:var(--amber)"></i></div>
-        <div class="kpi-change down"><i data-lucide="trending-down" width="12" height="12"></i> 6 pending</div>
+        <div class="kpi-change down"><i data-lucide="trending-down" width="12" height="12"></i> <div id="pendingOrders">6</div> pending</div>
       </div>
       <div>
         <div class="kpi-value" id="kpiToday">6</div>
@@ -188,7 +188,7 @@
 
   <!-- Row 2: Recent Orders + Top Products -->
   <div class="row">
-    <div class="col-lg widget">
+    <div class="col-lg widget" id="RecentOrdersWidget">
       <div class="widget-head">
         <span class="widget-title">Recent orders</span>
         <button class="widget-link">View all →</button>
@@ -209,7 +209,7 @@
 
     <div class="col-sm" style="display:flex;flex-direction:column;gap:20px;">
       <!-- Top products -->
-      <div class="widget">
+      <div class="widget" id="TopProducts">
         <div class="widget-head">
           <span class="widget-title">Top products</span>
           <button class="widget-link">See all →</button>
@@ -238,7 +238,9 @@
   </div>
 
 </main>
-
+<script>
+const CurrentUsername =  "{{ username }}";
+</script>
 <script src="{{ url_for('static', filename='seller_dashboard.js') }}"></script>
 </body>
 </html>

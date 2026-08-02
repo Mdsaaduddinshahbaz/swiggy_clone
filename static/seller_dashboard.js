@@ -5,6 +5,8 @@
 //   document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 // })();
 
+
+
 // /* ===== Sales chart ===== */
 // const chartData = {
 //   '7d': {
@@ -213,7 +215,7 @@ console.log(resId,name,type);
 (function(){
   const h = new Date().getHours();
   const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('greeting').textContent = `${greet}, Ramesh 👋`;
+  document.getElementById('greeting').textContent = `${greet}, ${CurrentUsername} 👋`;
   document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 })();
 
@@ -304,6 +306,8 @@ function renderKPIs(kpis){
   setText('kpiTodayBtm',kpis.today_orders)
   setText('kpiTotalSold',total_sold);
   setText('kpiStock', kpis.low_stock_count + kpis.out_of_stock_count);
+  setText('active_orders',statsData["active_orders"])
+  setText('pendingOrders',statsData["active_orders"])
 }
 
 /* =====================================================================
@@ -466,15 +470,18 @@ function renderOrders(orders){
     tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;color:var(--muted);">No orders yet</td></tr>`;
     return;
   }
-  tbody.innerHTML = orders.map(o=>{
+  const recentOrders = orders.slice(0, 5); // Show only the 5 most recent orders
+  tbody.innerHTML = recentOrders.map(o=>{
     const s = statusMap[o.status] || { cls:'new', label:o.status || 'Unknown' };
     // <td><span class="order-id">${o.order_id.slice(-6).toUpperCase()}</span></td>
     return `
     <tr>
       <td><span class="order-id">${o.tokenNo}</span></td>
       <td>
+        <div class="order-details">
         <div class="order-name">Customer #${String(o.customer_id).slice(-6)}</div>
         <div class="order-items">${o.items_summary || '—'}</div>
+        </div>
       </td>
       <td><span class="order-price">₹${o.total_amount.toLocaleString('en-IN')}</span></td>
       <td><span class="status-pill ${s.cls}"><span class="status-dot"></span>${s.label}</span></td>

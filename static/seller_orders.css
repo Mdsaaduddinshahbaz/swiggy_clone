@@ -382,6 +382,7 @@ body {
     .order-header{
         display: flex;
         flex-direction: column;
+        align-items:normal
     }
     .order-card{
         margin-bottom: 10px;
