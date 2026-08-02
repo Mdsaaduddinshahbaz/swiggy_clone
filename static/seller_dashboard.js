@@ -238,6 +238,18 @@ const InventoryBtn=document.getElementById("InventoryBtn")
 InventoryBtn.addEventListener("click",()=>{
   window.location.href=`/seller/menu/${resname}/${resId}`
 })
+const LogoutBtn=document.getElementById("LogoutBtn")
+LogoutBtn.addEventListener("click",async()=>{
+  try{
+    const res=await fetch("/logout/seller",{method:"GET"})
+    console.log(res)
+    if(res.ok){
+      window.location.href="/login/seller"
+    }
+  } catch (err) {
+    console.error('Logout failed:', err);
+  }
+})
 /* ===== Boot ===== */
 loadDashboard();
 lucide.createIcons(); // static sidebar/topbar icons — not dependent on fetch

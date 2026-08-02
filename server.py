@@ -84,7 +84,8 @@ def login_required(f):
             request.cookies.get("seller_token")
         )
         if not token:
-            return jsonify({"success": False,"message":"Token is missing or unauthorized access"}), 401
+            return redirect(url_for('renderLanding'))
+            # return jsonify({"success": False,"message":"Token is missing or unauthorized access"}), 401
 
         try:
             payload = jwt.decode(
@@ -219,7 +220,11 @@ def home(userid):
     except Exception as e:
         print(e)
         return({"success":False})
-
+@app.route("/logout/seller", methods=["GET"])
+def logout_seller():
+    response = jsonify({"success": True, "message": "Logged out successfully"})
+    response.delete_cookie("seller_token")
+    return response
 # @app.post("/add_res_items")
 # def add_itemss():
 #     try:
@@ -238,7 +243,7 @@ def home(userid):
 #         res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
 #         return ({"success":True,"id":res})
 #     except Exception as e:
-        print(e)
+        # print(e)
 #         return({"success":False})
 @app.post("/add_res_items")
 @login_required
