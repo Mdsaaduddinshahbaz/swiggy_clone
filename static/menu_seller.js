@@ -2,7 +2,8 @@ const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
 const type = pathParts[pathParts.length - 4];
-const name=pathParts[pathParts.length - 2]
+const name=pathParts[pathParts.length - 2];
+const resname=pathParts[pathParts.length - 2];
 console.log(type);
 document.addEventListener("DOMContentLoaded", async () => {
   const homeBtn=document.getElementById("homeBtn")

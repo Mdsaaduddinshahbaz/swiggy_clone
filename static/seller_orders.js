@@ -161,6 +161,7 @@ socket.on("seller_order_cancelled", (data) => {
         }
     });
 });
+total_orders=0;
 async function loadOrders() {
     const res = await fetch(`/seller/orders`, {
         method: "POST",
@@ -241,7 +242,12 @@ async function loadOrders() {
         `;
 
         ordersList.innerHTML += orderHTML;
+        if (order.status === "placed") {
+            total_orders+=1;
+        }
     });
+    console.log("Total orders:", total_orders);
+    document.getElementById("active_orders").textContent = total_orders;
     applyFilter()
 }
 function renderSingleOrder(order, prepend = false) {
@@ -285,6 +291,7 @@ function renderSingleOrder(order, prepend = false) {
 }
 
 loadOrders();
+
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("completeBtn")) {
         const card = e.target.closest(".order-card");

@@ -219,7 +219,62 @@ body {
 .hidden {
   display: none !important;
 }
+.floating-nav {
+            width: 85%;
+            position: fixed;
+            left: 50%;
+            bottom: 24px;
+            transform: translateX(-50%);
 
+            display: flex;
+            gap: 12px;
+
+            padding: 10px;
+
+            background: rgba(255, 255, 255, .75);
+            backdrop-filter: blur(18px);
+
+            border: 1px solid rgba(255, 255, 255, .4);
+
+            border-radius: 22px;
+
+            box-shadow:
+                0 10px 35px rgba(0, 0, 0, .12);
+
+            /* z-index: 9999; */
+        }
+
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+
+            border: none;
+            background: transparent;
+
+            padding: 3px 18px;
+
+            border-radius: 14px;
+
+            cursor: pointer;
+
+            transition: .25s;
+        }
+
+        .nav-btn i {
+            width: 18px;
+            height: 18px;
+        }
+
+        .nav-btn:hover {
+            background: #f2f4f7;
+        }
+
+        .nav-btn.active {
+            background: #0F172A;
+            color: white;
+        }
 .drawer-overlay {
   position: fixed;
   inset: 0;

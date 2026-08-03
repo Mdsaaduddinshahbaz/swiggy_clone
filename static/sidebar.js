@@ -2,6 +2,22 @@
 const ordersBtn=document.getElementById("OrdersBtn")
 const InventoryBtn=document.getElementById("InventoryBtn")
 const DashboardBtn=document.getElementById("DashboardBtn")
+const logoutBtn=document.getElementById("Logout")
+logoutBtn.addEventListener("click",async ()=>{
+  localStorage.removeItem("resId")
+  localStorage.removeItem("resname")
+  window.location.href="/"
+  const res=await fetch("/logout/seller",{
+    method:"GET"
+  })
+  if(res.ok){
+    console.log("logged out")
+    window.location.href="/landing"
+  }
+  else{
+    console.log("error logging out")
+  }
+})
 ordersBtn.addEventListener("click",()=>{
     DashboardBtn.classList.remove("active")
     InventoryBtn.classList.remove("active")
