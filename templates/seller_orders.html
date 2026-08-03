@@ -1,4 +1,4 @@
-<html lang="en">
+<!-- <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6,9 +6,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='seller_orders.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='seller_dashboard.css') }}">
 </head>
-<body>
+<body> -->
     <!-- ===== SIDEBAR ===== -->
+<<<<<<< HEAD
      {% include 'sidebar.html' %}
+=======
+>>>>>>> ff7b0e8 (trying spa behaviour pages)
 <!-- <aside class="sidebar">
   <div class="brand">
     <button id="hideCategoryBtn">+</button>
@@ -46,6 +49,16 @@
     </div>
   </div>
 </aside> -->
+{% extends "base.html" %}
+
+{% block title %}
+Orders
+{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='seller_orders.css') }}">
+{% endblock %}
+
+{% block content %}
     <!-- <div class="filter">
         <button>filters</button>
     </div> -->
@@ -69,8 +82,8 @@
     <p id="noOrdersMessage" style="display: none;"></p>
     <div id="orders-list"></div>
 </div>
+{% endblock %}
+{% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
-<!-- <script src="/static/js/seller_orders.js"></script> -->
 <script src="{{ url_for('static', filename='seller_orders.js') }}"></script>
-</body>
-</html>
+{% endblock %}

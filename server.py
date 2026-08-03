@@ -768,7 +768,7 @@ def getsellerOrders():
 @app.get("/seller/orders/<res_name>/<res_id>")
 def renderSellerOrders(res_name,res_id):
     try:
-        return render_template("seller_orders.html")
+        return render_template("seller_orders.html",page="orders")
     except Exception as e:
         print(e)
         return({"success":False})
@@ -1139,7 +1139,7 @@ def sellerTemplate(name,seller_id):
     try:
         username=g.username
         print(username)
-        return render_template("seller_dashboard.html",username=username)
+        return render_template("seller_dashboard.html",page="dashboard",username=username)
     except Exception as e:
         print(e)
         return({"success":False})

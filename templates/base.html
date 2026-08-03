@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='seller_dashboard.css') }}">
+
+    <!-- Page-specific CSS -->
+    {% block styles %}
+    {% endblock %}
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+
+    {% include 'sidebar.html' %}
+
+    <main class="main-content" style="width: 100%;">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <script>
+        lucide.createIcons();
+    </script>
+    <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
+    {% block scripts %}
+    {% endblock %}
+
+</body>
+</html>

@@ -414,11 +414,11 @@ overlay.addEventListener("click",()=>{
   sidebar.classList.remove("show")
 })
 
-const DashboardBtn=document.getElementById("DashboardBtn")
-DashboardBtn.addEventListener("click",()=>{
-  window.location.href=`/seller/${resname}/${resId}`
-})
-const InventoryBtn=document.getElementById("InventoryBtn")
-InventoryBtn.addEventListener("click",()=>{
-  window.location.href=`/seller/menu/${resname}/${resId}`
-})
+// const DashboardBtn=document.getElementById("DashboardBtn")
+// DashboardBtn.addEventListener("click",()=>{
+//   window.location.href=`/seller/${resname}/${resId}`
+// })
+// const InventoryBtn=document.getElementById("InventoryBtn")
+// InventoryBtn.addEventListener("click",()=>{
+//   window.location.href=`/seller/menu/${resname}/${resId}`
+// })

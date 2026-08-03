@@ -1,56 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Seller Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-<link rel="stylesheet" href="{{ url_for('static', filename='seller_dashboard.css') }}">
-</head>
-<body>
 
-<!-- ===== SIDEBAR ===== -->
-<aside class="sidebar">
-  <div class="brand">
-    <button id="hideCategoryBtn">+</button>
-    <div class="brand-icon">
-      <i data-lucide="store" width="16" height="16" style="color:#fff"></i>
-    </div>
-    <div>
-      <div class="brand-name">KiranaHub</div>
-      <div class="brand-sub">Seller Portal</div>
-    </div>
-  </div>
 
-  <nav class="nav">
-    <div class="nav-section">Main</div>
-    <button class="nav-item active" id="DashboardBtn"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
-    <button class="nav-item" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge" id="active_orders">6</span></button>
-    <button class="nav-item" id="InventoryBtn"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
-    <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
+{% extends "base.html" %}
 
-    <div class="nav-section" style="margin-top:12px;">Reports</div>
-    <!-- <button class="nav-item"><i data-lucide="bar-chart-2" width="16" height="16"></i> Sales Report</button> -->
-    <button class="nav-item"><i data-lucide="trending-up" width="16" height="16"></i> Analytics</button>
-    <button class="nav-item"><i data-lucide="receipt" width="16" height="16"></i> Payouts</button>
+{% block title %}
+Seller Dashboard
+{% endblock %}
 
-    <div class="nav-section" style="margin-top:12px;">Store</div>
-    <button class="nav-item"><i data-lucide="tag" width="16" height="16"></i> Offers & Coupons</button>
-    <button class="nav-item"><i data-lucide="settings" width="16" height="16"></i> Settings</button>
-    <button class="nav-item" id="LogoutBtn"><i data-lucide="log-out" width="16" height="16"></i> Logout</button>
-  </nav>
-
-  <div class="sidebar-footer">
-    <div class="avatar">RS</div>
-    <div>
-      <div class="seller-name">Ramesh Stores</div>
-      <div class="seller-id">SLR-002841</div>
-    </div>
-  </div>
-</aside>
-
+{% block content %}
 <!-- ===== MAIN ===== -->
 <main class="main">
   <div class="overlay" id="overlayContainer"></div>
@@ -239,9 +195,12 @@
   </div>
 
 </main>
+{% endblock %}
+
+{% block scripts %}
 <script>
-const CurrentUsername =  "{{ username }}";
+const CurrentUsername = "{{ username }}";
 </script>
+
 <script src="{{ url_for('static', filename='seller_dashboard.js') }}"></script>
-</body>
-</html>
+{% endblock %}

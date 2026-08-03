@@ -1,5 +1,3 @@
-
-<!-- ===== SIDEBAR ===== -->
 <aside class="sidebar">
   <div class="brand">
     <button id="hideCategoryBtn">+</button>
@@ -14,20 +12,19 @@
 
   <nav class="nav">
     <div class="nav-section">Main</div>
-    <button class="nav-item active" id="DashboardBtn"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
-    <button class="nav-item" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge" id="active_orders">6</span></button>
-    <button class="nav-item" id="InventoryBtn"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
+    <button class="nav-item {% if page == 'dashboard' %}active{% endif %}" id="DashboardBtn"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
+    <button class="nav-item {% if page == 'orders' %}active{% endif %}" id="OrdersBtn"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge" id="active_orders">6</span></button>
+    <button class="nav-item {% if page == 'inventory' %}active{% endif %}" id="InventoryBtn"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
     <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
 
     <div class="nav-section" style="margin-top:12px;">Reports</div>
-    <!-- <button class="nav-item"><i data-lucide="bar-chart-2" width="16" height="16"></i> Sales Report</button> -->
+    <button class="nav-item"><i data-lucide="bar-chart-2" width="16" height="16"></i> Sales Report</button>
     <button class="nav-item"><i data-lucide="trending-up" width="16" height="16"></i> Analytics</button>
     <button class="nav-item"><i data-lucide="receipt" width="16" height="16"></i> Payouts</button>
 
     <div class="nav-section" style="margin-top:12px;">Store</div>
     <button class="nav-item"><i data-lucide="tag" width="16" height="16"></i> Offers & Coupons</button>
     <button class="nav-item"><i data-lucide="settings" width="16" height="16"></i> Settings</button>
-    <button class="nav-item" id="LogoutBtn"><i data-lucide="log-out" width="16" height="16"></i> Logout</button>
   </nav>
 
   <div class="sidebar-footer">

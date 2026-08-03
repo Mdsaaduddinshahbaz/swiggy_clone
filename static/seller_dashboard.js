@@ -230,26 +230,14 @@ const overlay=document.querySelector(".overlay")
 // function LoadPage(id){
 //   if(id==="OrdersBtn") window.location.hred=`/seller/orders/${resId}`
 // }
-const ordersBtn=document.getElementById("OrdersBtn")
-ordersBtn.addEventListener("click",()=>{
-  window.location.href=`/seller/orders/${resname}/${resId}`
-})
-const InventoryBtn=document.getElementById("InventoryBtn")
-InventoryBtn.addEventListener("click",()=>{
-  window.location.href=`/seller/menu/${resname}/${resId}`
-})
-const LogoutBtn=document.getElementById("LogoutBtn")
-LogoutBtn.addEventListener("click",async()=>{
-  try{
-    const res=await fetch("/logout/seller",{method:"GET"})
-    console.log(res)
-    if(res.ok){
-      window.location.href="/login/seller"
-    }
-  } catch (err) {
-    console.error('Logout failed:', err);
-  }
-})
+// const ordersBtn=document.getElementById("OrdersBtn")
+// ordersBtn.addEventListener("click",()=>{
+//   window.location.href=`/seller/orders/${resname}/${resId}`
+// })
+// const InventoryBtn=document.getElementById("InventoryBtn")
+// InventoryBtn.addEventListener("click",()=>{
+//   window.location.href=`/seller/menu/${resname}/${resId}`
+// })
 /* ===== Boot ===== */
 loadDashboard();
 lucide.createIcons(); // static sidebar/topbar icons — not dependent on fetch
