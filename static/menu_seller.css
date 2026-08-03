@@ -220,6 +220,7 @@ body {
   display: none !important;
 }
 .floating-nav {
+  justify-content: space-between;
             width: 85%;
             position: fixed;
             left: 50%;
