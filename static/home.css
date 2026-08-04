@@ -65,13 +65,14 @@ body {
     max-width: 1120px;
     margin: 0 auto;
     padding: 12px 20px;
-    display: flex;
+    /* display: flex; */
     align-items: center;
     justify-content: space-between;
     gap: 20px;
 }
 
 .left-nav {
+    justify-content: space-between;
     position: relative;
     display: flex;
     align-items: center;
@@ -199,11 +200,11 @@ body {
     }
 }
 
-@media (max-width: 360px) {
+/* @media (max-width: 360px) {
     .right-nav:has(.search-container.active) {
         display: block;
     }
-}
+} */
 
 @media (max-width: 340px) {
 
@@ -517,10 +518,74 @@ body {
     align-items: center;
     gap: 14px;
     flex-shrink: 0;
+    width: 100%;
+    flex-direction:column !important;
+}
+.navigator{
+    position: relative; 
+    width:96vw;
+    display: flex;
+    /* gap: 10px;
+     */
+     justify-content: space-between;
+}
+.nav-btn{
+    position: relative;
+    flex: 1;
+    padding: 10px 0;
+    background:transparent;
+    color:var(--white);
+    border:none;
+        display: flex;
+    flex-direction: column;
+    justify-items: center;
+    align-items: center;
 }
 
+/* .active-indicator{
+        content: "";
+    position: absolute;
+    width: 128px;
+    height: 61px;
+    top: 1px;
+    background: url(/static/active-tab.svg) center / 100% 100% no-repeat;
+    mask: none;
+    z-index: -1;
+    -webkit-mask: none;
+    transition:
+        transform .35s cubic-bezier(.22,1,.36,1),
+        left .35s cubic-bezier(.22,1,.36,1);
+} */
+    /* .nav-btn.active .active-indicator{
+        transform: translateX(calc(var(--active-index) * 100%));
+    } */
+.active-indicator{
+    position: absolute;
+    top: 0;
+    width: 137px;              /* width of your SVG */
+    height: 61px;
+    background: url("/static/active-tab.svg") center/100% 100% no-repeat;
+    pointer-events: none;
+    transition: transform .35s cubic-bezier(.22,1,.36,1);
+}
+.nav-btn.active{
+    color:#f5a81c;
+}
+/* .nav-btn.active::before {
+    content: "";
+    position: absolute;
+    width: 137px;
+    height: 61px;
+    top: 1px;
+    background: url(/static/active-tab.svg) center / 100% 100% no-repeat;
+    mask: none;
+    z-index: -1;
+    -webkit-mask: none;
+} */
 .search-container {
-    max-width: 0;
+    /* max-width: 0; */
+    width: 100%;
+    margin-top:15px;
     overflow: hidden;
     transition: max-width 0.28s ease;
     border-radius: 999px;
@@ -528,7 +593,8 @@ body {
 }
 
 .search-container.active {
-    max-width: 220px;
+    /* max-width: 220px; */
+    width: 100%;
 }
 
 .search-container input {
@@ -926,6 +992,7 @@ footer{
     .nav-container {
         padding: 10px 14px;
         gap: 10px;
+        padding-bottom: 0;
     }
 
     .location-trigger {
@@ -973,13 +1040,13 @@ footer{
 }
 
 @media (max-width: 420px) {
-    .search-container.active {
+    /* .search-container.active {
         max-width: 150px;
-    }
+    } */
 
-    .search-container input {
+    /* .search-container input {
         width: 130px;
-    }
+    } */
 
     .location-trigger {
         max-width: 220px;

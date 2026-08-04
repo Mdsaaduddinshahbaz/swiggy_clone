@@ -237,6 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     catch (e) {
         console.log("access denied", e)
+        console.error(e)
         access_denied_container.style.visibility = "visible"
         Note.style.display = "none"
     }
@@ -315,17 +316,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     //     console.log(userid)
     //     window.location.href = `/orders/${userId}`
     // })
-    const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
-    hidecartorderBtn.addEventListener("click",()=>{
-        console.log("clicked")
-        const cartorderContainer=document.getElementById("CartOrderContainer")
-        if(cartorderContainer.classList.contains("hide")){
-            cartorderContainer.classList.replace("hide","show")
-        }
-        else{
-            cartorderContainer.classList.replace("show","hide")
-        }
-    })
+    // const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
+    // hidecartorderBtn.addEventListener("click",()=>{
+    //     console.log("clicked")
+    //     const cartorderContainer=document.getElementById("CartOrderContainer")
+    //     if(cartorderContainer.classList.contains("hide")){
+    //         cartorderContainer.classList.replace("hide","show")
+    //     }
+    //     else{
+    //         cartorderContainer.classList.replace("show","hide")
+    //     }
+    // })
     cancelbtn.addEventListener("click",()=>{
         document.getElementById("addressTagModal")
             .classList.remove("show");
@@ -372,14 +373,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchBtn = document.getElementById("searchBtn");
     const searchContainer = document.getElementById("searchContainer");
 
-    searchBtn.addEventListener("click", () => {
-        searchContainer.style.display = "block"
-        searchContainer.classList.toggle("active");
+    searchContainer.style.display = "block"
+    searchContainer.classList.toggle("active");
 
-        if (searchContainer.classList.contains("active")) {
-            searchContainer.querySelector("input").focus();
-        }
-    });
+    if (searchContainer.classList.contains("active")) {
+        searchContainer.querySelector("input").focus();
+    }
+    // searchBtn.addEventListener("click", () => {
+    // });
     const searchInput = document.getElementById("searchInput");
 
     searchInput.addEventListener("input", () => {
@@ -401,7 +402,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     });
 
+const indicator = document.querySelector(".active-indicator");
 
+function moveIndicator(btn) {
+    const x = btn.offsetLeft + (btn.offsetWidth - indicator.offsetWidth) / 2;
+    indicator.style.transform = `translateX(${x}px)`;
+}
+
+const buttons = document.querySelectorAll(".nav-btn");
+
+buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelector(".nav-btn.active")?.classList.remove("active");
+        btn.classList.add("active");
+        moveIndicator(btn);
+    });
+});
+
+window.addEventListener("resize", () => {
+    moveIndicator(document.querySelector(".nav-btn.active"));
+});
+
+moveIndicator(document.querySelector(".nav-btn.active"));
 
 
     const input = document.getElementById("addressInput");

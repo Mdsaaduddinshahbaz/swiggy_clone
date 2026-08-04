@@ -17,7 +17,7 @@
     <header class="navbar">
         <div class="nav-container">
             <div class="left-nav">
-                <img src="../static/logo2.png" alt="Swiggy Logo" class="logo">
+                <!-- <img src="../static/logo2.png" alt="Swiggy Logo" class="logo"> -->
                 <div class="location-overlay" id="locationOverlay"></div>
                 <div class="location-trigger" id="locationTrigger">
                     <i class="fa-solid fa-location-dot"></i>
@@ -26,6 +26,8 @@
                     </span>
                     <i class="fa-solid fa-chevron-down"></i>
                 </div>
+                <img src="../static/profile.png" alt="Swiggy Logo" class="logo" id="profileLogo">
+                
                 <div class="location-box visible" id="locationBox">
                     <div class="location-header">
                         <i class="fa-solid fa-location-dot"></i>
@@ -59,23 +61,34 @@
                     </div>
                     <div id="suggestions"></div>
                 </div>
+
             </div>
             <nav class="right-nav">
                 <div class="search-container" id="searchContainer">
                     <input type="text" id="searchInput" placeholder="Search Resturant name...." id="search" />
                 </div>
-                <ul>
+                <!-- <ul>
                     <li id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i> </li>
                     <!-- <li><i class="fa-solid fa-percent"></i> Offers <span class="new-tag">NEW</span></li> -->
                     <!-- <li><i class="fa-solid fa-life-ring"></i> Help</li> -->
                     <!-- <li><i class="fa-solid fa-user"></i> Sign In</li> -->
-                    <h1 id="hideCartOrderBtn">≡</h1>
-                    <img src="../static/profile.png" alt="Swiggy Logo" class="logo" id="profileLogo">
+                    <!-- <h1 id="hideCartOrderBtn">≡</h1> -->
+                    <!-- <img src="../static/profile.png" alt="Swiggy Logo" class="logo" id="profileLogo"> -->
                     <div id="CartOrderContainer" class="hide">
                     <li id="orderBtn"><i class="fa-solid fa-user"></i> Orders</li>
                     <li id="cartBtn"><i class="fa-solid fa-cart-shopping"></i> Cart</li>
                     </div>
-                </ul>
+                </ul> 
+                <div class="navigator">
+                    <div class="active-indicator"></div>
+                    <button class="nav-btn active" id="Home">
+                        
+                        <i data-lucide="home"></i>
+                         
+                        HOME</button>
+                    <button class="nav-btn" id="Order"><i data-lucide="shopping-bag"></i>ORDERS</button>
+                    <button class="nav-btn" id="Cart"><i data-lucide="shopping-cart"></i>CART</button>
+                </div>
             </nav>
         </div>
     </header>
@@ -205,6 +218,10 @@
         <!-- <p>&copy; 2024 Swiggy Clone. All rights reserved.</p> -->
     </footer>
     <script src="../static/home.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 
 </html>

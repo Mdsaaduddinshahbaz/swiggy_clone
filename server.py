@@ -6,8 +6,8 @@ from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -213,6 +213,7 @@ def serve_asset_links_file():
     static_file_dir = os.path.join(app.root_path, 'static')
     return send_from_directory(static_file_dir, 'assetlinks.json', mimetype='application/json')
 @app.route("/user/<userid>", methods=["GET", "POST"])
+@login_required
 ##@limiter.limit("10 per minute")
 def home(userid):
     try:
