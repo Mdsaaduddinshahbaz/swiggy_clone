@@ -83,7 +83,7 @@
 
                 setTimeout(() => {
                     window.location.href = href;
-                }, 350);
+                }, 200);
             });
         });
 
