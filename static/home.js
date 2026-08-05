@@ -237,6 +237,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             selected_address.querySelector(".address-text").textContent;
 
         currentAddress.textContent = addressType + " - " + addressText
+        localStorage.setItem("currentAddress", addressText)
+        localStorage.setItem(
+            "userLocation",
+            JSON.stringify({ latt: latt, long: long })
+        );
         box.classList.remove("show")
         overlay.classList.remove("show")
     })
@@ -545,8 +550,9 @@ async function change(latt, long) {
 
         currentAddress.dataset.long = userLong
         currentAddress.dataset.lat = userLatt
-
+        currentAddress.textContent = address
         userLocation = { latt: userLatt, long: userLong }
+        localStorage.setItem("currentAddress", address)
         localStorage.setItem("userLocation", JSON.stringify(userLocation));
         loading.style.visibility = "visible"
         res = await fetch("/list_resturants", {
@@ -602,7 +608,11 @@ async function getLocation() {
                 currentAddress.dataset.long = userLong
                 currentAddress.dataset.lat = userLatt
                 currentAddress.textContent = address
-
+                localStorage.setItem("currentAddress", address)
+        localStorage.setItem(
+            "userLocation",
+            JSON.stringify({ latt: lat, long: lng })
+        );
                 map.setView([lat, lng], 15);
 
                 if (marker) {
