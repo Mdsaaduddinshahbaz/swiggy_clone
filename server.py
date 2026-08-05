@@ -1311,7 +1311,9 @@ def fetch_addresss():
         uid=g.user_id
         address=fetch_address(uid)
         if(address["success"]):
-            return({"success":True,"address":address["address"]})
+            if(address["status"]==200):
+                return({"success":True,"address":address["address"]}),200
+            return({"success":False,"msg":"No Address Found","status":404})
         else:
             return({"success":False})
     except AttributeError:

@@ -121,7 +121,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 window.location.href = "/login/user";
                 return;
             }
+            // if(address.status===404){
+            //     console.log("No address found for user, fetching current location...");
+            //     return;
+            // }
             const data = await address.json()
+            console.log("fetch_address", data)
+            
             if (data.success) {
                 currentAddress.textContent = data.address[0].adrs_type + " - " + data.address[0].address
                 currentAddress.dataset.long = data.address[0].coordinates.long
@@ -139,22 +145,38 @@ document.addEventListener("DOMContentLoaded", async () => {
                 });
             }
             else {
-                position = await getPosition();
-                userLatt = position.coords.latitude;
-                userLong = position.coords.longitude;
+                if(data.status===404){
+                    console.log("No address found for user, fetching current location...");
+                    // return;
+                }
+                // position = await getPosition();
+                // userLatt = position.coords.latitude;
+                // userLong = position.coords.longitude;
             }
         }
-        const address = await reverseGeocode(
-            userLatt,
-            userLong
-        );
+        if(localStorage.getItem("currentAddress")===null){
+            position = await getPosition();
+                userLatt = position.coords.latitude;
+                userLong = position.coords.longitude;
+            console.log("No current address found in localStorage", new Date().toLocaleTimeString());
+            const address = await reverseGeocode(
+                userLatt,
+                userLong
+            );
 
-        currentAddress.textContent = address
-        localStorage.setItem("currentAddress", address)
+            currentAddress.textContent = address
+            localStorage.setItem("currentAddress", address)
 
-        userLocation = { latt: userLatt, long: userLong }
-        localStorage.setItem("userLocation", JSON.stringify(userLocation));
-
+            userLocation = { latt: userLatt, long: userLong }
+            localStorage.setItem("userLocation", JSON.stringify(userLocation));
+        }
+        else{
+            console.log("Using cached current address from localStorage", new Date().toLocaleTimeString());
+            currentAddress.textContent = localStorage.getItem("currentAddress")
+            userLocation = JSON.parse(localStorage.getItem("userLocation"))
+            userLatt = userLocation.latt
+            userLong = userLocation.long
+        }
         // Only show the spinner if we had nothing cached to display already
         if (!cachedRestaurants) {
             loading.style.visibility = "visible"
@@ -238,55 +260,55 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    const searchBtn = document.getElementById("searchBtn");
-    const searchContainer = document.getElementById("searchContainer");
+    // const searchBtn = document.getElementById("searchBtn");
+    // const searchContainer = document.getElementById("searchContainer");
 
-    searchContainer.style.display = "block"
-    searchContainer.classList.toggle("active");
+    // searchContainer.style.display = "block"
+    // searchContainer.classList.toggle("active");
 
-    if (searchContainer.classList.contains("active")) {
-        searchContainer.querySelector("input").focus();
-    }
-    const searchInput = document.getElementById("searchInput");
+    // if (searchContainer.classList.contains("active")) {
+    //     searchContainer.querySelector("input").focus();
+    // }
+    // const searchInput = document.getElementById("searchInput");
 
-    searchInput.addEventListener("input", () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        const cards = document.querySelectorAll(".card");
-        cards.forEach(card => {
-            const restaurantName = card
-                .querySelector(".resturant_name")
-                .textContent
-                .toLowerCase();
-            if (restaurantName.includes(searchTerm)) {
-                card.style.display = "block";
-            } else {
-                card.style.display = "none";
-            }
-        });
-    });
+    // searchInput.addEventListener("input", () => {
+    //     const searchTerm = searchInput.value.toLowerCase();
+    //     const cards = document.querySelectorAll(".card");
+    //     cards.forEach(card => {
+    //         const restaurantName = card
+    //             .querySelector(".resturant_name")
+    //             .textContent
+    //             .toLowerCase();
+    //         if (restaurantName.includes(searchTerm)) {
+    //             card.style.display = "block";
+    //         } else {
+    //             card.style.display = "none";
+    //         }
+    //     });
+    // });
 
-    const indicator = document.querySelector(".active-indicator");
+    // const indicator = document.querySelector(".active-indicator");
 
-    function moveIndicator(btn) {
-        const x = btn.offsetLeft + (btn.offsetWidth - indicator.offsetWidth) / 2;
-        indicator.style.transform = `translateX(${x}px)`;
-    }
+    // function moveIndicator(btn) {
+    //     const x = btn.offsetLeft + (btn.offsetWidth - indicator.offsetWidth) / 2;
+    //     indicator.style.transform = `translateX(${x}px)`;
+    // }
 
-    const buttons = document.querySelectorAll(".nav-btn");
+    // const buttons = document.querySelectorAll(".nav-btn");
 
-    buttons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelector(".nav-btn.active")?.classList.remove("active");
-            btn.classList.add("active");
-            moveIndicator(btn);
-        });
-    });
+    // buttons.forEach(btn => {
+    //     btn.addEventListener("click", () => {
+    //         document.querySelector(".nav-btn.active")?.classList.remove("active");
+    //         btn.classList.add("active");
+    //         moveIndicator(btn);
+    //     });
+    // });
 
-    window.addEventListener("resize", () => {
-        moveIndicator(document.querySelector(".nav-btn.active"));
-    });
+    // window.addEventListener("resize", () => {
+    //     moveIndicator(document.querySelector(".nav-btn.active"));
+    // });
 
-    moveIndicator(document.querySelector(".nav-btn.active"));
+    // moveIndicator(document.querySelector(".nav-btn.active"));
 
     const input = document.getElementById("addressInput");
     const suggestions = document.getElementById("suggestions");
@@ -432,7 +454,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         currentAddress.dataset.long = userLong
         currentAddress.dataset.lat = userLatt
         currentAddress.textContent = address
-
+        localStorage.setItem("currentAddress", address)
+        localStorage.setItem(
+            "userLocation",
+            JSON.stringify({ latt: lat, long: lng })
+        );
         change(lat, lng)
         if (marker) {
             marker.setLatLng(e.latlng);
@@ -468,6 +494,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
 })
 function getPosition() {
+    console.log("Fetching user position...",new Date().toLocaleTimeString());
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             reject("Geolocation is not supported by your browser");
@@ -487,6 +514,7 @@ function requestLocation() {
 }
 
 async function reverseGeocode(lat, lon) {
+    console.log("Reverse geocoding for coordinates:", lat, lon,new Date().toLocaleTimeString());
     const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
     );
@@ -496,6 +524,7 @@ async function reverseGeocode(lat, lon) {
 }
 
 async function change(latt, long) {
+    console.log("Changing location to:", latt, long,new Date().toLocaleTimeString());
     const display_resturants = document.getElementById("resturants_container")
     const cartBtn = document.getElementById("cartBtn")
     const orderBtn = document.getElementById("orderBtn")
@@ -544,12 +573,12 @@ async function change(latt, long) {
                 window.location.href = `/menu/${name}/${addresss}/${res_id}/${userId}`
             }
         })
-        cartBtn.addEventListener("click", () => {
-            window.location.href = `/cart/${userId}`
-        })
-        orderBtn.addEventListener("click", () => {
-            window.location.href = `/orders/${userId}`
-        })
+        // cartBtn.addEventListener("click", () => {
+        //     window.location.href = `/cart/${userId}`
+        // })
+        // orderBtn.addEventListener("click", () => {
+        //     window.location.href = `/orders/${userId}`
+        // })
     }
     catch (e) {
         console.log("access denied", e)
@@ -559,6 +588,7 @@ async function change(latt, long) {
 }
 
 async function getLocation() {
+    console.log("Getting user location...",new Date().toLocaleTimeString());
     let currentAddress = document.getElementById("currentAddress")
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -585,4 +615,4 @@ async function getLocation() {
         );
     }
 }
-getLocation()
+// getLocation()
