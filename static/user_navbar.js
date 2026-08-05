@@ -59,12 +59,31 @@
         // 1. Snap the indicator to the active tab instantly — no transition on first paint
         moveIndicator(activeItem, false);
 
-        // 2. On click, animate the slide to the clicked tab before normal <a> navigation happens
+        // 2. On click: animate the slide AND kick off the page request at the same time,
+        // then navigate once the animation has had time to play. This guarantees the
+        // indicator is actually visible sliding, instead of being cut off by an instant
+        // navigation (which is what happens right now with the browser's default <a> behavior).
         items.forEach((item) => {
-            item.addEventListener("click", () => {
+            item.addEventListener("click", (e) => {
+                if (item.classList.contains("active")) return; // already here, no-op
+
+                e.preventDefault();
+                const href = item.getAttribute("href");
+
                 items.forEach((i) => i.classList.remove("active"));
                 item.classList.add("active");
                 moveIndicator(item, true);
+
+                // Warm the request in parallel with the animation. Whether the browser
+                // actually reuses this response for the real navigation depends on your
+                // Flask response's Cache-Control headers — without explicit caching this
+                // is mostly just starting the DNS/TCP/TLS + server work early, not a
+                // guaranteed instant swap.
+                fetch(href, { credentials: "same-origin" }).catch(() => {});
+
+                setTimeout(() => {
+                    window.location.href = href;
+                }, 350);
             });
         });
 

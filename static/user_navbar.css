@@ -43,7 +43,9 @@
 .app-navbar .nav-item.active i {
     transform: translateY(-2px) scale(1.05);
 }
-
+@view-transition {
+  navigation: auto;
+}
 /* The pill that slides under/behind the active tab */
 .navbar-indicator {
     position: absolute;
