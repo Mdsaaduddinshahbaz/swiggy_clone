@@ -59,7 +59,7 @@
 
         // Position indicator instantly on load (no animation on first paint)
         setActive(activeItem);
-        moveIndicator(activeItem, false);
+        // moveIndicator(activeItem, false);
 
         // Optional: instant visual feedback before navigation actually happens
         items.forEach((item) => {
