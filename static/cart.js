@@ -267,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         box.classList.add("show");
         overlay.classList.add("show");
     })
-
+    console.log(overlay)
     overlay.addEventListener("click", () => {
         box.classList.remove("show");
         overlay.classList.remove("show");
