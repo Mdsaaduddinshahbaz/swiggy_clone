@@ -54,21 +54,21 @@
         function setActive(el) {
             items.forEach((item) => item.classList.remove("active"));
             el.classList.add("active");
-            // moveIndicator(el);
+            moveIndicator(el);
         }
 
         // Position indicator instantly on load (no animation on first paint)
         setActive(activeItem);
-        moveIndicator(activeItem, false);
+        // moveIndicator(activeItem, false);
 
         // Optional: instant visual feedback before navigation actually happens
-        items.forEach((item) => {
-            item.addEventListener("click", (e) => {
-                setActive(item);
-                // Let the CSS transition play briefly before navigating away
-                // Comment this out if your links/buttons handle routing via JS already
-            });
-        });
+        // items.forEach((item) => {
+        //     item.addEventListener("click", (e) => {
+        //         setActive(item);
+        //         // Let the CSS transition play briefly before navigating away
+        //         // Comment this out if your links/buttons handle routing via JS already
+        //     });
+        // });
 
         // Recalculate on resize (widths/offsets change, e.g. desktop vs mobile layout)
         window.addEventListener("resize", () => moveIndicator(activeItem, false));
