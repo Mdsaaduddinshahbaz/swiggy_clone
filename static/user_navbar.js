@@ -54,12 +54,12 @@
         function setActive(el) {
             items.forEach((item) => item.classList.remove("active"));
             el.classList.add("active");
-            moveIndicator(el);
+            // moveIndicator(el);
         }
 
         // Position indicator instantly on load (no animation on first paint)
         setActive(activeItem);
-        // moveIndicator(activeItem, false);
+        moveIndicator(activeItem, false);
 
         // Optional: instant visual feedback before navigation actually happens
         items.forEach((item) => {
