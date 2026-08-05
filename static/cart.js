@@ -31,10 +31,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         let total = 0;
 
         if (!cart || Object.keys(cart).length === 0) {
+            no_order_container.classList.add("show")
             cartContainer.querySelector(".cart-left").outerHTML = ""
             cartContainer.querySelector(".cart-right").outerHTML = ""
             cartContainer.style.display = "block"
-            no_order_container.classList.add("show")
             return 0;
         }
 
@@ -94,12 +94,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const data = await res.json()
     console.log(data)
+    
 
-    if (data.success) {
+    if (data.success) { 
+        if(data.results === null || Object.keys(data.results.cart).length === 0){
+            no_order_container.classList.add("show");
+            renderCart({});
+        }
+        else{
+            no_order_container.classList.remove("show");
+        }
         restaurants = data.results ? data.results.cart : {};
         sessionStorage.setItem(CART_CACHE_KEY, JSON.stringify(restaurants));
         renderCart(restaurants);
     } else if (!cachedCart) {
+        no_order_container.classList.add("show");
         // Only forcibly clear the UI if we had nothing cached to fall back on
         renderCart({});
     }

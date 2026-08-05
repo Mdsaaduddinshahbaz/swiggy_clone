@@ -5,7 +5,8 @@
     left: 0;
     right: 0;
     display: flex;
-    background: #fff;
+    /* background: #fff; */
+    background:#6e1b12;
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
     z-index: 999;
     padding: 6px 0;
@@ -34,7 +35,9 @@
 }
 
 .app-navbar .nav-item.active {
-    color: #ff4757;
+    /* color: #ff4757;
+     */
+     color:#f5a81c;
 }
 
 .app-navbar .nav-item.active i {
@@ -44,8 +47,9 @@
 /* The pill that slides under/behind the active tab */
 .navbar-indicator {
     position: absolute;
-    top: 4px;
-    height: calc(100% - 8px);
+    /* top: 4px; */
+    /* height: calc(100% - 8px); */
+    height: 90%;
     background: rgba(255, 71, 87, 0.1);
     background:url("svg-path.svg") no-repeat center center;
     border-radius: 14px;
@@ -76,6 +80,7 @@
         margin-left: auto;
         padding: 4px;
         background: #f4f4f4;
+        background:#6e1b12;
         border-radius: 30px;
     }
 

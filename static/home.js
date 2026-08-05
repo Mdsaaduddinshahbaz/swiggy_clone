@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const Note = document.getElementById("Note")
     const loading = document.getElementById("loading")
     const request_location = document.getElementById("requestlocation")
-    const currentAddress = document.getElementById("currentAddress")
+    let currentAddress = document.getElementById("currentAddress")
     const livelocationBtn = document.getElementById("liveLocationBtn")
     const loading_container = document.getElementById("loading_container")
     const savedAddress = document.getElementById("savedAddress")
@@ -227,6 +227,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
     savedAddress.addEventListener("click", async (e) => {
         const selected_address = e.target.closest(".address")
+        console.log(selected_address)
         const latt = parseFloat(selected_address.dataset.latt)
         const long = parseFloat(selected_address.dataset.long)
         change(latt, long)
@@ -443,6 +444,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await change(livelctn.coords.latitude, livelctn.coords.longitude)
         loading_container.classList.remove("show");
         overlay.classList.remove("show");
+        document.getElementById("addressTagModal")
+            .classList.add("show");
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -476,6 +479,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             maps_btn.setAttribute("is_active", false)
             map_container.style.display = "none"
             map_container.style.position = "absolute"
+            document.getElementById("addressTagModal")
+            .classList.add("show");
         }, 1000);
     });
     const map_container = document.getElementById("map_container");
