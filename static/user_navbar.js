@@ -1,8 +1,15 @@
 // ===== Shared App Navbar Logic =====
 // Include this on home.html, orders.html, cart.html (after the navbar markup is in the DOM)
+//
+// Each page should already mark its own tab with class="active" in the HTML
+// (e.g. cart.html's Cart <a> has class="nav-item active"). This script trusts
+// that, snaps the indicator there instantly on load, and only animates when
+// the user actually clicks a different tab.
+
 (function () {
-    const pathparts=window.location.pathname.split("/")
-    const userid=pathparts[pathparts.length-1]
+    const pathparts = window.location.pathname.split("/");
+    const userid = pathparts[pathparts.length - 1];
+
     function initNavbar() {
         const navbar = document.getElementById("appNavbar");
         if (!navbar) return;
@@ -10,13 +17,10 @@
         const indicator = document.getElementById("navbarIndicator");
         const items = Array.from(navbar.querySelectorAll(".nav-item"));
 
-        // uid must be set by the page BEFORE this script runs, e.g.:
-        //   <script>window.APP_USER_ID = "{{ uid }}";</script>
-        //   <script src="../static/navbar.js"></script>
         const uid = userid || window.APP_USER_ID;
         if (!uid) {
             console.warn(
-                "navbar.js: window.APP_USER_ID is not set — nav links won't include the user id."
+                "navbar.js: user id not found in URL or window.APP_USER_ID — nav links won't include it."
             );
         }
 
@@ -31,17 +35,6 @@
             if (routes[page]) item.setAttribute("href", routes[page]);
         });
 
-        // Work out which page we're on from the URL path (not filename,
-        // since routes are /user/<uid>, /orders/<uid>, /cart/<uid>)
-        const path = window.location.pathname;
-        let current = "home";
-        if (path.startsWith("/orders")) current = "orders";
-        else if (path.startsWith("/cart")) current = "cart";
-        else if (path.startsWith("/user")) current = "home";
-
-        let activeItem =
-            items.find((item) => item.dataset.page === current) || items[0];
-
         function moveIndicator(el, animate = true) {
             if (!el) return;
             indicator.style.transition = animate
@@ -51,24 +44,29 @@
             indicator.style.transform = `translateX(${el.offsetLeft}px)`;
         }
 
-        function setActive(el) {
-            items.forEach((item) => item.classList.remove("active"));
-            el.classList.add("active");
-            moveIndicator(el);
+        // Trust whichever tab is already marked active in this page's HTML.
+        // Fall back to path-based detection only if none is marked yet.
+        let activeItem = items.find((item) => item.classList.contains("active"));
+        if (!activeItem) {
+            const path = window.location.pathname;
+            let current = "home";
+            if (path.startsWith("/orders")) current = "orders";
+            else if (path.startsWith("/cart")) current = "cart";
+            activeItem = items.find((item) => item.dataset.page === current) || items[0];
+            activeItem.classList.add("active");
         }
 
-        // Position indicator instantly on load (no animation on first paint)
-        setActive(activeItem);
-        // moveIndicator(activeItem, false);
+        // 1. Snap the indicator to the active tab instantly — no transition on first paint
+        moveIndicator(activeItem, false);
 
-        // Optional: instant visual feedback before navigation actually happens
-        // items.forEach((item) => {
-        //     item.addEventListener("click", (e) => {
-        //         setActive(item);
-        //         // Let the CSS transition play briefly before navigating away
-        //         // Comment this out if your links/buttons handle routing via JS already
-        //     });
-        // });
+        // 2. On click, animate the slide to the clicked tab before normal <a> navigation happens
+        items.forEach((item) => {
+            item.addEventListener("click", () => {
+                items.forEach((i) => i.classList.remove("active"));
+                item.classList.add("active");
+                moveIndicator(item, true);
+            });
+        });
 
         // Recalculate on resize (widths/offsets change, e.g. desktop vs mobile layout)
         window.addEventListener("resize", () => moveIndicator(activeItem, false));
