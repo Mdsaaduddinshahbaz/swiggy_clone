@@ -208,8 +208,8 @@ const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
 const type = pathParts[pathParts.length - 4];
-const resname=pathParts[pathParts.length - 2]
-console.log(resId,name,type);
+const resname=pathParts[pathParts.length - 2];
+console.log(resId,resname,type);
 
 /* ===== Init greeting + date ===== */
 (function(){
@@ -218,7 +218,24 @@ console.log(resId,name,type);
   document.getElementById('greeting').textContent = `${greet}, ${CurrentUsername} 👋`;
   document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 })();
-
+document.getElementById("inventoryRedirectBtn").addEventListener("click",()=>{
+  window.location.href=`/seller/menu/${resname}/${resId}`
+})
+document.addEventListener("DOMContentLoaded",()=>{
+document.getElementById("ordersRedirectBtn").addEventListener("click",()=>{
+  window.location.href=`/seller/orders/${resname}/${resId}`
+})
+document.getElementById("addItemBtn").addEventListener("click",()=>{
+  window.location.href=`/seller/menu/${resname}/${resId}`
+})
+document.getElementById("updateStockBtn").addEventListener("click",()=>{
+  console.log("update stock clicked")
+  window.location.href=`/seller/menu/${resname}/${resId}#updateStock`
+})
+// document.getElementById("createOfferBtn").addEventListener("click",()=>{
+//   window.location.href=`/seller/menu/${resname}/${resId}#createOffer`
+// })
+});
 /* ===== State ===== */
 let statsData = null;
 let currentPeriod = '30d';

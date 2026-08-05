@@ -95,19 +95,19 @@ Seller Dashboard
       <div class="widget" style="padding:18px;">
         <div class="widget-head"><span class="widget-title">Quick actions</span></div>
         <div class="actions-grid">
-          <button class="action-btn">
+          <button class="action-btn" id="addItemBtn">
             <span class="action-icon"><i data-lucide="plus-circle" width="18" height="18"></i></span>
-            <span class="action-label">Add item</span>
+            <span class="action-label" >Add item</span>
             <span class="action-desc">New product to catalogue</span>
           </button>
-          <button class="action-btn">
+          <button class="action-btn" id="updateStockBtn">
             <span class="action-icon"><i data-lucide="package-check" width="18" height="18"></i></span>
-            <span class="action-label">Update stock</span>
+            <span class="action-label" >Update stock</span>
             <span class="action-desc">Restock low items</span>
           </button>
-          <button class="action-btn">
+          <button class="action-btn" id="createOfferBtn">
             <span class="action-icon"><i data-lucide="tag" width="18" height="18"></i></span>
-            <span class="action-label">Create offer</span>
+            <span class="action-label" >Create offer</span>
             <span class="action-desc">Discounts & coupons</span>
           </button>
           <button class="action-btn">
@@ -148,7 +148,7 @@ Seller Dashboard
     <div class="col-lg widget" id="RecentOrdersWidget">
       <div class="widget-head">
         <span class="widget-title">Recent orders</span>
-        <button class="widget-link">View all →</button>
+        <button class="widget-link" id="ordersRedirectBtn">View all →</button>
       </div>
       <table class="orders-table">
         <thead>
@@ -181,7 +181,7 @@ Seller Dashboard
     <div class="col-sm widget">
       <div class="widget-head">
         <span class="widget-title">Stock alerts</span>
-        <button class="widget-link">Go to inventory →</button>
+        <button class="widget-link" id="inventoryRedirectBtn">Go to inventory →</button>
       </div>
       <div id="stockAlerts"></div>
     </div>
