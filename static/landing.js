@@ -1,5 +1,6 @@
 function selectRole(role) {
       if (role === 'user') {
+        console.log("role")
         const userid=localStorage.getItem("userId")
         if (userid){
           window.location.href=`/user/${userid}`

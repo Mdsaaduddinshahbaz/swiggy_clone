@@ -4,7 +4,7 @@ const userId = pathParts[pathParts.length - 1];
 const no_order_container = document.getElementById("No_orders_container")
 const filterDropdown = document.getElementById("filterDropdown");
 console.log(userId)
-const socket = io("https://general-online.onrender.com");
+const socket = io();
 
 socket.on("connect", () => {
     console.log("Connected:", socket.id);
@@ -36,6 +36,7 @@ socket.on("order_status_updated", (data) => {
             const statusSpan = card.querySelector(".order-status");
             statusSpan.textContent = data.status;
             statusSpan.className = `order-status status-${data.status}`;
+            card.querySelector(".cancelBtn").style.display = "none";
         }
     });
 });

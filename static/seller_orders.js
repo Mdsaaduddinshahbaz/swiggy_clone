@@ -133,7 +133,7 @@ const ordersList = document.getElementById("orders-list");
 
 // const resId = pathParts[pathParts.length - 1];
 console.log(resId)
-    const socket = io("https://general-online.onrender.com");
+    const socket = io();
 
 socket.on("connect", () => {
     console.log("Connected:", socket.id);

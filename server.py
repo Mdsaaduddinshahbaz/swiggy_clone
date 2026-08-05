@@ -84,8 +84,14 @@ def login_required(f):
             request.cookies.get("seller_token")
         )
         if not token:
-            return redirect(url_for('renderLanding'))
-            # return jsonify({"success": False,"message":"Token is missing or unauthorized access"}), 401
+            print(request.endpoint)
+            if(request.endpoint=="home"):
+                return redirect(url_for("login", role="seller"))
+            elif(request.endpoint=="sellerTemplate"):
+                return redirect(url_for("login", role="seller"))
+            else:
+            # return redirect(url_for('renderLanding'))
+                return jsonify({"success": False,"message":"Token is missing or unauthorized access"}), 401
 
         try:
             payload = jwt.decode(
