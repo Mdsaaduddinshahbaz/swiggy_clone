@@ -1,91 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiggy Clone | Food Delivery</title>
-    <link rel="stylesheet" href="../static/home.css">
-    <link rel="stylesheet" href="../static/user_navbar.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-</head>
-
-<body>
-
-    <header class="navbar">
-        <div class="nav-container">
-            <div class="left-nav">
-                <!-- <img src="../static/logo2.png" alt="Swiggy Logo" class="logo"> -->
-                <div class="location-overlay" id="locationOverlay"></div>
-                <div class="location-trigger" id="locationTrigger">
-                    <i class="fa-solid fa-location-dot"></i>
-                    <span id="currentAddress">
-                        Select Location
-                    </span>
-                    <i class="fa-solid fa-chevron-down"></i>
-                </div>
-                <img src="../static/profile.png" alt="Swiggy Logo" class="logo" id="profileLogo">
-
-                <div class="location-box visible" id="locationBox">
-                    <div class="location-header">
-                        <i class="fa-solid fa-location-dot"></i>
-                        <span id="currentAddresss">
-                            Select delivery location
-                        </span>
-                    </div>
-
-                    <div class="location-search">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="addressInput" placeholder="Search for area, street, city...">
-                    </div>
-                    <div id="savedAddress">
-                        <h2 style="color: black;
-    top: 10px;
-    font-size: 22px;
-    left: 5px;
-    margin: ne;
-    position: relative;">Saved Address</h2>
-                    </div>
-                    <button id="liveLocationBtn" class="live-location-btn">
-                        <i class="fa-solid fa-location-crosshairs"></i>
-                        Use Current Location
-                    </button>
-                    <button id="map_btn" class="live-location-btn" is_active=false>
-                        <i class="fa-solid fa-location-crosshairs"></i>
-                        Select on Map
-                    </button>
-                    <div id="map_container">
-                        <div id="map" style="height: 250px; border-radius: 15px; margin-top: 10px;"></div>
-                    </div>
-                    <div id="suggestions"></div>
-                </div>
-
-            </div>
-            <nav class="app-navbar" id="appNavbar">
-                <div class="navbar-indicator" id="navbarIndicator"></div>
-
-                <a href="home.html" class="nav-item" data-page="home">
-                    <i class="fa-solid fa-house"></i>
-                    <span>Home</span>
-                </a>
-
-                <a href="orders.html" class="nav-item" data-page="orders">
-                    <i class="fa-solid fa-bag-shopping"></i>
-                    <span>Orders</span>
-                </a>
-
-                <a href="cart.html" class="nav-item" data-page="cart">
-                    <i class="fa-solid fa-cart-shopping"></i>
-                    <span>Cart</span>
-                </a>
-            </nav>
-        </div>
-    </header>
-    <div id="spa-content">
-    <main class="container">
+<main class="container">
         <div id="loading_container">
             <h1>fetching location...</h1>
             <img src="../static/loading-spinner.svg" alt="Loading" id="loading_fetch" class="show">
@@ -202,7 +115,6 @@
             in your browser settings and refresh the page.
         </div>
     </div>
-    </div>
     <footer class="footer">
         <div id="navigationContainer">
             <div class="OrdersBtn" id="OrdersBtn">🛍️ Orders</div>
@@ -210,12 +122,3 @@
         </div>
         <!-- <p>&copy; 2024 Swiggy Clone. All rights reserved.</p> -->
     </footer>
-    <script src="../static/home.js"></script>
-    <script src="../static/user_navbar.js"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
-</body>
-
-</html>

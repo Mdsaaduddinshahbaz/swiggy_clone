@@ -1,0 +1,35 @@
+<div class="orders-container">
+    <div class="header">
+        <h1>Your Orders</h1>
+        <select id="filterDropdown">
+            <option value="placed">Pending</option>
+            <option value="all">All Orders</option>
+            <option value="completed">Completed</option>
+            <option value="canceled">Canceled</option>
+        </select>
+    </div>
+    <div class="empty-state" id="No_orders_container">
+        <div class="icon">🛍️</div>
+
+        <h1 id="No_orders">No Orders Yet</h1>
+
+        <p>
+            Looks like you haven't placed any orders yet.
+            Start exploring our products and find something you'll love.
+        </p>
+
+        <button class="btn" id="shopBtn">
+            Start Shopping
+        </button>
+
+        <!-- <a href="#" class="secondary-link">
+            Browse Categories
+        </a> -->
+    </div>
+
+
+    <div id="orders-list"></div>
+    <!-- <div class="res_namesss" style="display: flex;justify-content: space-between;margin-bottom: 10px;">
+            <span class="order-status status-placed">placed</span>
+            </div> -->
+</div>

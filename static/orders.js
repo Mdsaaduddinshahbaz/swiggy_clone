@@ -114,53 +114,33 @@ async function applyFiter() {
         }
     });
 }
-async function loadOrders() {
-    const res = await fetch(`/get_orders/${userId}`, {
-        method: "POST",
-    });
-    if(res.status ==401){
-        alert("unauthorized User,Please Log in")
-        window.location.href="/login/user";
-        return;    
-    }
-    const data = await res.json();
-    console.log(data)
-    console.log(data.orders.length)
-    if (!data.success) {
-        ordersList.innerHTML = "<p>Error loading orders</p>";
+
+// ===== Cache helpers =====
+const ORDERS_CACHE_KEY = `cachedOrders_${userId}`;
+
+function renderOrders(orders) {
+    if (!orders || orders.length === 0) {
+        no_order_container.classList.add("show");
+        ordersList.innerHTML = "";
         return;
     }
-    if (!data.orders || data.orders.length === 0) {
-        no_order_container.classList.add("show");
-    }
-    else {
-        no_order_container.classList.remove("show");
-    }
+    no_order_container.classList.remove("show");
     ordersList.innerHTML = "";
 
-    data.orders.forEach(order => {
-        console.log(order)
+    orders.forEach(order => {
         const cart = order.resturants.cart;
-        console.log(cart)
         let total = 0;
-
         let restaurantsHTML = "";
 
         Object.entries(cart).forEach(([resId, blabla]) => {
-            console.log("Restaurant:", blabla);
-
             restaurantsHTML += `
         <div class="restaurant-name" res_id=${resId}>
             ${blabla.name}
         </div>
     `;
-
             Object.entries(blabla.items).forEach(([itemid, item]) => {
-                // console.log("Item:", itemName, item);
-
                 const itemTotal = item.price * item.qty;
                 total += itemTotal;
-
                 restaurantsHTML += `
             <div class="item" item_id=${itemid}>
                 <span>${item.name} x ${item.qty}</span>
@@ -196,8 +176,44 @@ async function loadOrders() {
         `;
 
         ordersList.innerHTML += orderHTML;
-        applyFiter()
     });
+
+    applyFiter();
+}
+
+async function loadOrders({ background = false } = {}) {
+    // 1. Instantly show cached orders (if any) with no loading state at all
+    if (!background) {
+        const cached = sessionStorage.getItem(ORDERS_CACHE_KEY);
+        if (cached) {
+            try {
+                renderOrders(JSON.parse(cached));
+            } catch (e) {
+                console.warn("bad orders cache, ignoring", e);
+            }
+        }
+    }
+
+    // 2. Always fetch fresh in the background and update cache + UI when it lands
+    const res = await fetch(`/get_orders/${userId}`, {
+        method: "POST",
+    });
+    if (res.status == 401) {
+        alert("unauthorized User,Please Log in")
+        window.location.href = "/login/user";
+        return;
+    }
+    const data = await res.json();
+    if (!data.success) {
+        // Only show an error if we had nothing cached to fall back on
+        if (!sessionStorage.getItem(ORDERS_CACHE_KEY)) {
+            ordersList.innerHTML = "<p>Error loading orders</p>";
+        }
+        return;
+    }
+
+    sessionStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(data.orders || []));
+    renderOrders(data.orders);
 }
 
 loadOrders();
@@ -214,12 +230,9 @@ document.addEventListener("click", async (e) => {
             .textContent.split(": ")[1];
         let res_ids = []
         const reside = card.querySelectorAll(".restaurant-name")
-        // console.log(reside.getAttribute("res_id"))
         reside.forEach(residss => {
-            console.log(residss.getAttribute("res_id"))
             res_ids.push(residss.getAttribute("res_id"))
         })
-        console.log(res_ids)
         const res = await fetch("/update_order_user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -238,51 +251,17 @@ document.addEventListener("click", async (e) => {
                 user_id: userId,
                 status: "canceled"
             });
-            // card.remove();
-            // 🔥 UPDATE UI HERE
             const statusSpan = card.querySelector(".order-status");
-            statusSpan.textContent = "canceled";   // or "completed"
+            statusSpan.textContent = "canceled";
             statusSpan.className = "order-status status-canceled";
-
-            // optional UX improvement
             e.target.style.display = "none";
-            // e.target.innerText = "Done ✔";
-            // card.remove();
 
-            window.location.reload()
+            // Refresh from server (updates cache too) instead of a full page reload
+            await loadOrders({ background: true });
             console.log("Completed sent:", orderId, tokenNo);
         }
         else {
             alert("failed updating status")
         }
     }
-});
-const hidecartorderBtn=document.getElementById("hideCartOrderBtn")
-    hidecartorderBtn.addEventListener("click",()=>{
-        console.log("clicked")
-        const cartorderContainer=document.getElementById("CartOrderContainer")
-        if(cartorderContainer.classList.contains("hide")){
-            cartorderContainer.classList.replace("hide","show")
-        }
-        else{
-            cartorderContainer.classList.replace("show","hide")
-        }
-    })
-document.getElementById("shopBtn").addEventListener("click", () => {
-    // alert("Redirecting to products page...");
-    
-    // Example:
-    window.location.href = `/user/${userId}`;
-});
-document.getElementById("homeBtn").addEventListener("click", () => {
-    // alert("Redirecting to products page...");
-    
-    // Example:
-    window.location.href = `/user/${userId}`;
-});
-document.getElementById("cartBtn").addEventListener("click", () => {
-    // alert("Redirecting to products page...");
-    
-    // Example:
-    window.location.href = `/cart/${userId}`;
 });

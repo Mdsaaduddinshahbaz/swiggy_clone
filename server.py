@@ -217,7 +217,7 @@ def serve_asset_links_file():
 ##@limiter.limit("10 per minute")
 def home(userid):
     try:
-        return render_template('home.html')
+        return render_template('home.html',page="home")
     except Exception as e:
         print(e)
         return({"success":False})
@@ -551,7 +551,7 @@ def s_me(id):
 @app.get("/cart/<userid>")
 def cartss(userid):
     try:
-        return render_template("cart.html")
+        return render_template("cart.html",page="cart")
     except Exception as e:
         return({"success":False})
 @app.post("/get_cart_items")
@@ -720,7 +720,7 @@ def store_order():
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:
-        return render_template("orders.html")
+        return render_template("orders.html",page="orders")
     except Exception as e:
         print(e)
         return({"success":False})

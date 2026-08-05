@@ -1,0 +1,98 @@
+/* ===== Shared App Navbar ===== */
+.app-navbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background: #fff;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+    z-index: 999;
+    padding: 6px 0;
+}
+
+.app-navbar .nav-item {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0;
+    text-decoration: none;
+    color: #6b6b6b;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 2;
+    transition: color 0.25s ease;
+}
+
+.app-navbar .nav-item i {
+    font-size: 18px;
+    transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.app-navbar .nav-item.active {
+    color: #ff4757;
+}
+
+.app-navbar .nav-item.active i {
+    transform: translateY(-2px) scale(1.05);
+}
+
+/* The pill that slides under/behind the active tab */
+.navbar-indicator {
+    position: absolute;
+    top: 4px;
+    height: calc(100% - 8px);
+    background: rgba(255, 71, 87, 0.1);
+    background:url("svg-path.svg") no-repeat center center;
+    border-radius: 14px;
+    z-index: 1;
+    transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+        width 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Tiny top bar accent that rises above the active tab (Swiggy-esque) */
+.navbar-indicator::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 3px;
+    border-radius: 3px;
+    background: #ff4757;
+}
+
+@media (min-width: 768px) {
+    /* On larger screens, dock the navbar inside the header instead of the bottom */
+    .app-navbar {
+        position: static;
+        box-shadow: none;
+        width: fit-content;
+        margin-left: auto;
+        padding: 4px;
+        background: #f4f4f4;
+        border-radius: 30px;
+    }
+
+    .app-navbar .nav-item {
+        flex-direction: row;
+        padding: 8px 18px;
+        gap: 6px;
+        font-size: 13px;
+    }
+
+    .navbar-indicator {
+        border-radius: 24px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .navbar-indicator::after {
+        display: none;
+    }
+}
