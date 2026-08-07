@@ -1,134 +1,47 @@
-const ordersList = document.getElementById("orders-list");
-const pathParts = window.location.pathname.split("/");
-const userId = pathParts[pathParts.length - 1];
-const no_order_container = document.getElementById("No_orders_container")
-const filterDropdown = document.getElementById("filterDropdown");
-console.log(userId)
-const socket = io();
+// Socket connects ONCE, the first time this script loads, and stays alive
+// across all SPA navigation (this script tag is only ever injected once —
+// see spa-router.js's ensureScriptLoaded).
+const socket = io("https://general-online.onrender.com");
 
 socket.on("connect", () => {
     console.log("Connected:", socket.id);
-
-    socket.emit("join_user_room", {
-        user_id: userId
-    });
+    const uid = window.APP_USER_ID || window.location.pathname.split("/").pop();
+    socket.emit("join_user_room", { user_id: uid });
 });
+
 socket.on("order_status_updated", (data) => {
-    console.log("Update received:", data);
-
     const orderCards = document.querySelectorAll(".order-card");
-
     orderCards.forEach(card => {
-        // const tokenNo = card.querySelector(".token-no").textContent;
-        const tokenNo = card
-            .querySelector(".token-no")
-            .textContent.split(": ")[1]
-            .trim();
-        // console.log(statusSpan.textContent)
-        console.log(tokenNo)
-        console.log(data.token_no)
-        const orderid = data.order_id.replace("#", "");
-        console.log(orderid)
-
-
+        const tokenNo = card.querySelector(".token-no").textContent.split(": ")[1].trim();
         if (tokenNo === `${data.token_no}`) {
-            console.log("true")
             const statusSpan = card.querySelector(".order-status");
             statusSpan.textContent = data.status;
             statusSpan.className = `order-status status-${data.status}`;
-            card.querySelector(".cancelBtn").style.display = "none";
         }
     });
+    // keep the cache in sync so a later revisit shows the updated status too
+    const uid = window.APP_USER_ID || window.location.pathname.split("/").pop();
+    const cacheKey = `cachedOrders_${uid}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+        try {
+            const orders = JSON.parse(cached);
+            const order = orders.find(o => `#${o.order_id}` === data.order_id || `${o.order_id}` === data.order_id.replace("#", ""));
+            if (order) order.status = data.status;
+            sessionStorage.setItem(cacheKey, JSON.stringify(orders));
+        } catch (e) {}
+    }
 });
-async function applyFiter() {
-    no_order_container.classList.remove("show");
-    console.log(filterDropdown.value.toLowerCase());
-    const cards = document.querySelectorAll(".order-card");
-    let visibleCardss = 0;
-    cards.forEach(card => {
-        console.log("hello")
-        const statusText = card
-            .querySelector(".order-status")
-            .textContent
-            .trim()
-            .toLowerCase();
-        console.log(true)
-        if (filterDropdown.value.toLowerCase() === "all" || statusText === filterDropdown.value.toLowerCase()) {
-            console.log(true)
 
-            card.style.display = "block";
-            visibleCardss++;
-        } else {
-            card.style.display = "none";
-        }
-    });
-    if (visibleCardss !== 0) {
-            no_order_container.classList.remove("show");
-        } else {
-            no_order_container.classList.add("show");
-        }
-    filterDropdown.addEventListener("change", () => {
-        const selected = filterDropdown.value.toLowerCase();
-        console.log(selected)
-        const cards = document.querySelectorAll(".order-card");
-        let visibleCards = 0;
-        no_order_container.classList.remove("show");
-        cards.forEach(card => {
-            const statusText = card
-                .querySelector(".order-status")
-                .textContent
-                .trim()
-                .toLowerCase();
-
-            if (selected === "all" || statusText === selected) {
-                const buttons = card.querySelectorAll(".cancelBtn");
-                if (selected !== "placed") {
-                    console.log("alls")
-                    // get ALL buttons with class statusBtn inside this card
-
-                    buttons.forEach(btn => {
-                        btn.disabled = true;
-                        btn.style.opacity = "0.5";   // optional visual
-                        btn.style.cursor = "not-allowed";
-                        btn.style.visibility = "hidden"
-                    });
-
-                }
-                else {
-                    buttons.forEach(btn => {
-                        btn.disabled = false;
-                        btn.style.opacity = "1";   // optional visual
-                        btn.style.cursor = "pointer";
-                        btn.style.visibility = "visible"
-                    });
-                }
-                card.style.display = "block";
-                visibleCards++;
-            } else {
-                card.style.display = "none";
-            }
-        });
-        if (visibleCards !== 0) {
-            no_order_container.classList.remove("show");
-        } else {
-            no_order_container.classList.add("show");
-        }
-    });
-}
-
-// ===== Cache helpers =====
-const ORDERS_CACHE_KEY = `cachedOrders_${userId}`;
-
-function renderOrders(orders) {
+function renderOrders(orders, ordersList, no_order_container) {
     if (!orders || orders.length === 0) {
         no_order_container.classList.add("show");
         ordersList.innerHTML = "";
         return;
     }
     no_order_container.classList.remove("show");
-    ordersList.innerHTML = "";
 
-    orders.forEach(order => {
+    const html = orders.map(order => {
         const cart = order.resturants.cart;
         let total = 0;
         let restaurantsHTML = "";
@@ -151,7 +64,7 @@ function renderOrders(orders) {
             });
         });
 
-        const orderHTML = `
+        return `
             <div class="order-card">
                 <div class="order-header">
                     <span class="order-id">#${order.order_id}</span>
@@ -160,11 +73,8 @@ function renderOrders(orders) {
                     </span>
                 </div>
                 <div class="token-no">Token No: ${order.token_no}</div>
-
                 <div class="order-date">${order.date}</div>
-
                 ${restaurantsHTML}
-
                 <div class="total">Total: ₹${total}</div>
                 <button class="cancelBtn" style="
                     background: red;
@@ -175,30 +85,42 @@ function renderOrders(orders) {
                 ">Cancel Order</button>
             </div>
         `;
+    }).join("");
 
-        ordersList.innerHTML += orderHTML;
-    });
-
-    applyFiter();
+    ordersList.innerHTML = html;
 }
 
-async function loadOrders({ background = false } = {}) {
-    // 1. Instantly show cached orders (if any) with no loading state at all
+function applyFilterFor(filterDropdown, no_order_container) {
+    no_order_container.classList.remove("show");
+    const cards = document.querySelectorAll(".order-card");
+    let visibleCardss = 0;
+    cards.forEach(card => {
+        const statusText = card.querySelector(".order-status").textContent.trim().toLowerCase();
+        if (filterDropdown.value.toLowerCase() === "all" || statusText === filterDropdown.value.toLowerCase()) {
+            card.style.display = "block";
+            visibleCardss++;
+        } else {
+            card.style.display = "none";
+        }
+    });
+    no_order_container.classList.toggle("show", visibleCardss === 0);
+}
+
+async function loadOrders(userId, { background = false } = {}) {
+    const ordersList = document.getElementById("orders-list");
+    const no_order_container = document.getElementById("No_orders_container");
+    if (!ordersList) return;
+    const cacheKey = `cachedOrders_${userId}`;
+
     if (!background) {
-        const cached = sessionStorage.getItem(ORDERS_CACHE_KEY);
+        const cached = sessionStorage.getItem(cacheKey);
         if (cached) {
-            try {
-                renderOrders(JSON.parse(cached));
-            } catch (e) {
-                console.warn("bad orders cache, ignoring", e);
-            }
+            try { renderOrders(JSON.parse(cached), ordersList, no_order_container); }
+            catch (e) { console.warn("bad orders cache, ignoring", e); }
         }
     }
 
-    // 2. Always fetch fresh in the background and update cache + UI when it lands
-    const res = await fetch(`/get_orders/${userId}`, {
-        method: "POST",
-    });
+    const res = await fetch(`/get_orders/${userId}`, { method: "POST" });
     if (res.status == 401) {
         alert("unauthorized User,Please Log in")
         window.location.href = "/login/user";
@@ -206,63 +128,60 @@ async function loadOrders({ background = false } = {}) {
     }
     const data = await res.json();
     if (!data.success) {
-        // Only show an error if we had nothing cached to fall back on
-        if (!sessionStorage.getItem(ORDERS_CACHE_KEY)) {
-            ordersList.innerHTML = "<p>Error loading orders</p>";
-        }
+        if (!sessionStorage.getItem(cacheKey)) ordersList.innerHTML = "<p>Error loading orders</p>";
         return;
     }
-
-    sessionStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(data.orders || []));
-    renderOrders(data.orders);
+    sessionStorage.setItem(cacheKey, JSON.stringify(data.orders || []));
+    renderOrders(data.orders, ordersList, no_order_container);
 }
 
-loadOrders();
-document.addEventListener("click", async (e) => {
-    if (e.target.classList.contains("cancelBtn")) {
+function initOrdersPage() {
+    const ordersList = document.getElementById("orders-list");
+    if (!ordersList) return; // not actually on the orders content
+
+    const pathParts = window.location.pathname.split("/");
+    const userId = window.APP_USER_ID || pathParts[pathParts.length - 1];
+    const no_order_container = document.getElementById("No_orders_container");
+    const filterDropdown = document.getElementById("filterDropdown");
+
+    filterDropdown.addEventListener("change", () => applyFilterFor(filterDropdown, no_order_container));
+
+    loadOrders(userId).then(() => applyFilterFor(filterDropdown, no_order_container));
+
+    ordersList.addEventListener("click", async (e) => {
+        if (!e.target.classList.contains("cancelBtn")) return;
         const card = e.target.closest(".order-card");
-
-        const orderId = card
-            .querySelector(".order-id")
-            .textContent.replace("#", "");
-
-        const tokenNo = card
-            .querySelector(".token-no")
-            .textContent.split(": ")[1];
+        const orderId = card.querySelector(".order-id").textContent.replace("#", "");
+        const tokenNo = card.querySelector(".token-no").textContent.split(": ")[1];
         let res_ids = []
-        const reside = card.querySelectorAll(".restaurant-name")
-        reside.forEach(residss => {
-            res_ids.push(residss.getAttribute("res_id"))
-        })
+        card.querySelectorAll(".restaurant-name").forEach(r => res_ids.push(r.getAttribute("res_id")));
+
         const res = await fetch("/update_order_user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                order_id: orderId,
-                status: "canceled",
-                user_id: userId
-            })
+            body: JSON.stringify({ order_id: orderId, status: "canceled", user_id: userId })
         })
         const data = await res.json()
         if (data.success) {
             socket.emit("user_cancelled_order", {
-                order_id: orderId,
-                token_no: tokenNo,
-                res_ids: res_ids,
-                user_id: userId,
-                status: "canceled"
+                order_id: orderId, token_no: tokenNo, res_ids: res_ids, user_id: userId, status: "canceled"
             });
             const statusSpan = card.querySelector(".order-status");
             statusSpan.textContent = "canceled";
             statusSpan.className = "order-status status-canceled";
             e.target.style.display = "none";
-
-            // Refresh from server (updates cache too) instead of a full page reload
-            await loadOrders({ background: true });
-            console.log("Completed sent:", orderId, tokenNo);
+            await loadOrders(userId, { background: true });
+            applyFilterFor(filterDropdown, no_order_container);
         }
         else {
             alert("failed updating status")
         }
-    }
+    });
+}
+
+// Run on this page's first real load...
+initOrdersPage();
+// ...and re-run every time the SPA router swaps Orders back into view
+document.addEventListener("spa:pageload", (e) => {
+    if (e.detail.page === "orders") initOrdersPage();
 });
