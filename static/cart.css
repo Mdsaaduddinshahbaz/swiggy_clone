@@ -72,7 +72,8 @@ body {
 }
 
 .left-nav {
-    display: block !important;
+    /* display: block !important; */
+    display: flex !important;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -104,7 +105,10 @@ body {
     background: var(--flame-dark);
     transform: translateY(-1px);
 }
-
+.right-nav{
+    padding-top:10px;
+    display: block
+}
 /* ============================================================
    LAYOUT
    ============================================================ */
@@ -668,6 +672,7 @@ body {
 .bill-row.total {
     font-size: 16px;
     padding-top: 6px;
+    justify-content: space-between;
 }
 
 .bill-row.total span:first-child {

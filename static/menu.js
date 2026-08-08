@@ -1,501 +1,20 @@
-// // One pending-request tracker per item_id
-// const pendingUpdates = new Map(); // itemId -> { timer, accumulatedDelta, controller }
-
-// function scheduleCartUpdate(itemId,userId,delta, qtyEl, onSuccess, onFailure) {
-//     let entry = pendingUpdates.get(itemId);
-
-//     if (entry) {
-//         // Fold this click into the pending batch
-//         entry.accumulatedDelta += delta;
-//         clearTimeout(entry.timer);
-//     } else {
-//         entry = { accumulatedDelta: delta, timer: null, controller: null };
-//         pendingUpdates.set(itemId, entry);
-//     }
-
-//     entry.timer = setTimeout(async () => {
-//         const delta = entry.accumulatedDelta;
-//         pendingUpdates.delete(itemId); // clear before await so new clicks start a fresh batch
-
-//         // Abort any older in-flight request for this item so responses can't race
-//         entry.controller?.abort();
-//         const controller = new AbortController();
-
-//         try {
-//             const res = await fetch("/update_cart", {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({ user_id: userId, item_id: itemId, qty: delta }),
-//                 signal: controller.signal
-//             });
-//             const data = await res.json();
-//             if (data.success) {
-//                 onSuccess(data);
-//             } else {
-//                 onFailure(data.message || "Failed updating cart");
-//             }
-//         } catch (err) {
-//             console.log(err)
-//             if (err.name !== "AbortError") onFailure("Network error");
-//         }
-//     }, 400); // debounce window — tune to taste (300-500ms feels good)
-// }
-// document.addEventListener("DOMContentLoaded", async () => {
-//     const path = window.location.pathname
-//     console.log(path)
-//     const userId = path.split("/")[5]
-//     const res_id = path.split("/")[4]
-//     const addresss = path.split("/")[3]
-//     const res_name = path.split("/")[2]
-//     console.log(res_name)
-//     const decoded = decodeURIComponent(res_name);
-//     const addresss_decoded = decodeURIComponent(addresss);
-//     const menu_items_container = document.getElementById("menu_container")
-//     const cartBtn = document.getElementById("cartBtn")
-//     const orderBtn = document.getElementById("orderBtn")
-//     // const res_info=document.getElementById("res_info")
-//     const res_info = document.querySelector(".res-info");
-//     const heading = res_info.querySelector("h1");
-//     const res_location = res_info.querySelector(".res-location");
-//     const breadcrump = document.querySelector(".breadcrumbs")
-//     const loading = document.getElementById("loading")
-//     const menu_container = document.querySelector('.menu-section');
-//     const current_total_amount = document.getElementById("amount")
-//     const footer = document.getElementsByTagName("footer")[0];
-//     const gotoCartBtn = document.getElementById("GoCartBtn")
-//     breadcrump.innerText = `Home / ${addresss_decoded} / ${decoded}`
-//     res_location.innerText = addresss_decoded
-//     heading.innerText = decoded;
-
-
-//     const rest = await fetch("/get_cart_items", {
-//         method: "POST",
-//         headers: { "Content-type": "application/json" },
-//         body: JSON.stringify({ "userid": userId })
-//     })
-//     const datas = await rest.json()
-//     console.log(datas)
-//     if (datas.results !== null)
-//         if (datas.results.total > 0) {
-//             footer.classList.add("show");
-//             current_total_amount.innerText = datas.results.total
-//         }
-//     const res = await fetch("/list_items", {
-//         method: "POST",
-//         "headers": { "Content-Type": "application/json" },
-//         body: JSON.stringify({ "res_id": res_id, "type": "user" })
-//     })
-
-//     const data = await res.json()
-//     console.log(data)
-//     if (data.success) {
-//         const mergedd = mergeMenuWithCart(data, datas,
-//             res_id)
-//         loading.style.display = "none"
-//         console.log(data)
-//         // res_info.closest("h1").innerText = name
-//         Object.entries(mergedd).forEach(([name, item]) => {
-//             console.log(name, item.id, item.price, item.qty, item.file_url)
-//             if (item.qty === 0) {
-//                 menu_items_container.innerHTML +=
-//                     `
-//                         <div class="menu-item" id=${item.id}>
-//                             <div class="item-details">
-//                                 <h3>${name}</h3>
-//                                 <p class="price">${item.price}</p>
-//                             </div>
-//                             <div class="item-img-wrapper">
-//                                 <img src=${item.file_url} alt="Burger">
-//                                 <button class="add-btn" id=${item.id}>ADD</button>
-//                                 <p class="customisable">Customisable</p>
-//                             </div>
-//                         </div>
-
-//                         <hr class="item-divider">
-//             `
-//             }
-//             else {
-//                 menu_items_container.innerHTML +=
-//                     `
-//                     <div class="menu-item" id=${item.id}>
-//                         <div class="item-details">
-//                             <h3>${name}</h3>
-//                             <p class="price">${item.price}</p>
-//                         </div>
-//                         <div class="item-img-wrapper">
-//                             <img src="${item.file_url}"
-//                                 alt="Burger">
-//                             <div class="quantity-control">
-//                                 <button class="qty-btn reduce">-</button>
-//                                 <span class="item_qty">${item.qty}</span>
-//                                 <button class="qty-btn increase">+</button>
-//                             </div>
-//                             <p class="customisable">Customisable</p>
-//                         </div>
-//                     </div>
-
-//                     <hr class="item-divider">
-//             `
-//             }
-//         });
-//     }
-//     cartBtn.addEventListener("click", () => {
-//         console.log("clicked")
-//         const userid = localStorage.getItem("userId")
-//         console.log(userid)
-//         window.location.href = `/cart/${userid}`
-//     })
-//     orderBtn.addEventListener("click", () => {
-//         console.log("clicked")
-//         const userid = localStorage.getItem("userId")
-//         console.log(userid)
-//         window.location.href = `/orders/${userid}`
-//     })
-
-//     const hidecartorderBtn = document.getElementById("hideCartOrderBtn")
-//     hidecartorderBtn.addEventListener("click", () => {
-//         console.log("clicked")
-//         const cartorderContainer = document.getElementById("CartOrderContainer")
-//         if (cartorderContainer.classList.contains("hide")) {
-//             cartorderContainer.classList.replace("hide", "show")
-//         }
-//         else {
-//             cartorderContainer.classList.replace("show", "hide")
-//         }
-//     })
-//     message = document.getElementById("message")
-//     ReplaceContainer = document.getElementById("ReplaceContainer")
-//     overlayContainer = document.getElementById("overlayContainer")
-//     let pendingCartItem = null;
-//     menu_items_container.addEventListener("click", async (e) => {
-//         if (e.target.classList.contains("add-btn")) {
-
-//             // Get item details
-//             const item = e.target.closest(".menu-item");
-//             const names = item.querySelector("h3").innerText;
-//             const price = item.querySelector(".price").innerText;
-//             const item_id = item.getAttribute("id")
-//             // console.log("Added:", names, price,item_id);
-//             const userid = localStorage.getItem("userId")
-//             const button = item.querySelector(".add-btn")
-
-//             // 👉 Here you can send to backend / Redis
-//             const res = await fetch("/add_to_cart", {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     resid: res_id,
-//                     userid: userid,
-//                     item: names,
-//                     ress_name: decoded,
-//                     qty: 1,
-//                     item_id: item_id,
-//                     price: parseInt(price),
-//                     replace: false   // 🔥 important
-//                 })
-//             })
-//             const data = await res.json()
-//             console.log(data)
-//             if (data.success) {
-//                 button.outerHTML = `
-//                 <div class="quantity-control">
-//                     <button class="qty-btn reduce">-</button>
-//                     <span class="item_qty">1</span>
-//                     <button class="qty-btn increase">+</button>
-//                 </div>
-//             `;
-//                 footer.classList.add("show")
-//                 // alert(`${names} added to cart`)
-//                 console.log(data.Total)
-//                 current_total_amount.innerText = data.Total
-//             }
-//             if (!data.success) {
-//                 pendingCartItem = {
-//                     resid: res_id,
-//                     userid: userid,
-//                     item: names,
-//                     ress_name: decoded,
-//                     qty: 1,
-//                     item_id: item_id,
-//                     price: parseInt(price)
-//                 };
-
-//                 // button.outerHTML = `<button class="add-btn" id="${item_id}">ADD</button>`
-//                 console.log(button.innerText);
-//                 button.innerText = "ADD"
-//                 ReplaceContainer.classList.add("show")
-//                 overlayContainer.classList.add("show")
-//                 message.innerText = (data.message || "please Try again")
-//                 // Reo
-//             }
-//         }
-//     });
-//     replaceYesBtn = document.getElementById("YES")
-//     replaceYesBtn.addEventListener("click", async () => {
-//         const res = await fetch("/add_to_cart", {
-//             method: "POST",
-//             headers: { "Content-Type": "application/json" },
-//             body: JSON.stringify({
-//                 resid: pendingCartItem.resid,
-//                 userid: pendingCartItem.userid,
-//                 item: pendingCartItem.item,
-//                 ress_name: pendingCartItem.ress_name,
-//                 qty: pendingCartItem.qty,
-//                 item_id: pendingCartItem.item_id,
-//                 price: pendingCartItem.price,
-//                 replace: true   // 🔥 important
-//             })
-//         })
-//         const data = await res.json()
-//         console.log(data)
-//         if (data.success) {
-//             footer.classList.add("show")
-//             // alert(`${names} added to cart`)
-//             console.log(data.Total)
-//             current_total_amount.innerText = data.Total
-//             ReplaceContainer.classList.remove("show")
-//             overlayContainer.classList.remove("show")
-//             message.innerText = "Error:"
-//             let itemssss = document.getElementById(pendingCartItem.item_id)
-//             const button = itemssss.querySelector(".add-btn")
-//             console.log(button);
-//             button.outerHTML = `
-//                 <div class="quantity-control">
-//                     <button class="qty-btn reduce">-</button>
-//                     <span class="item_qty">1</span>
-//                     <button class="qty-btn increase">+</button>
-//                 </div>
-//             `;
-
-//         }
-//     })
-
-//     replaceNoBtn = document.getElementById("NO")
-//     replaceNoBtn.addEventListener("click", async () => {
-//         ReplaceContainer.classList.remove("show")
-//         overlayContainer.classList.remove("show")
-//         message.innerText = "Error:"
-//     })
-//     menu_container.addEventListener('click', async (e) => {
-//         console.log("clicke menu_container")
-
-//         // 1. Get the parent cart-item element
-//         const itemRow = e.target.closest('.menu-item');
-//         // 1. Get the parent cart-item element
-
-//         // 2. Extract the data
-//         const itemId = itemRow.id; // Or itemRow.getAttribute('id')
-//         const itemName = itemRow.querySelector('.item-details').textContent
-//         // const item_qty = itemRow.querySelector('.item_qty').textContent;
-//         const item_price = itemRow.querySelector('.price').textContent;
-//         // console.log(itemId,item_qty,item_price)
-//         const addBtn = e.target.closest('.add-btn');
-//         if (e.target.classList.contains('add-btn')) {
-//             // e.target.outerHTML = `
-//             //     <div class="quantity-control">
-//             //         <button class="qty-btn reduce">-</button>
-//             //         <span class="item_qty">1</span>
-//             //         <button class="qty-btn increase">+</button>
-//             //     </div>
-//             // `;
-//         }
-//         else if (e.target.classList.contains('increase')) {
-//             const qtyEl = e.target.parentElement.querySelector('.item_qty');
-//             const prevQty = Number(qtyEl.textContent);
-//             console.log(`Increasing: ${itemName} (ID: ${itemId})`);
-//             // 1. Optimistic UI update — instant feedback
-//             qtyEl.textContent = prevQty + 1;
-
-//             // 2. Batched/debounced network call
-//             scheduleCartUpdate(itemId,userId, 1, qtyEl,
-//                 (data) => {
-//                     if (data.total > 0) {
-//                         footer.classList.add("show");
-//                         current_total_amount.innerText = data.total;
-//                     } else {
-//                         footer.classList.remove("show");
-//                     }
-//                 },
-//                 (message) => {
-//                     qtyEl.textContent = prevQty; // rollback on failure
-//                     alert(message);
-//                 }
-//             );
-//         }
-//         else if (e.target.classList.contains('reduce')) {
-
-//             const qtyEl = e.target.parentElement.querySelector('.item_qty');
-//             const prevQty = Number(qtyEl.textContent);
-//             console.log(`Reducing: ${itemName} (ID: ${itemId})`);
-//             // 1. Optimistic UI update — instant feedback
-//             qtyEl.textContent = prevQty - 1;
-
-//             // 2. Batched/debounced network call
-//             scheduleCartUpdate(itemId,userId, -1, qtyEl,
-//                 (data) => {
-//                     if (data.total > 0) {
-//                         footer.classList.add("show");
-//                         current_total_amount.innerText = data.total;
-//                     } else {
-//                         footer.classList.remove("show");
-//                     }
-//                 },
-//                 (message) => {
-//                     qtyEl.textContent = prevQty; // rollback on failure
-//                     alert(message);
-//                 }
-//             );
-//             // if (data.success) {
-//             //     console.log(data.total)
-//             //     if (data.total > 0) {
-//             //         footer.classList.add("show")
-//             //         current_total_amount.innerText = data.total
-//             //     }
-//             //     else {
-//             //         footer.classList.remove("show")
-//             //     }
-//             if (Number(qtyEl.textContent) > 1) {
-//                 // Correctly decrement the number
-//                 qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
-//             }
-//             else {
-//                 // If it hits 0, remove the element from the cart UI
-//                 // const prevHeading = itemRow.previousElementSibling;
-//                 const qtyControl = e.target.closest('.quantity-control');
-
-//                 qtyControl.outerHTML = `
-//                     <button class="add-btn" id="${itemId}">ADD</button>
-//                 `;
-
-//                 // Check if this is the last item under the heading
-//                 const nextSibling = itemRow.nextElementSibling;
-
-//                 // itemRow.remove();
-
-//                 // if (
-//                 //     prevHeading &&
-//                 //     prevHeading.tagName === "H2" &&
-//                 //     (!nextSibling || nextSibling.tagName === "H2")
-//                 // ) {
-//                 //     prevHeading.remove();
-//                 // }
-//             }
-//             }
-//             else {
-//                 alert("failed removing item")
-//             }
-//     });
-
-//     const searchBtn = document.getElementById("searchBtn");
-//     const searchContainer = document.getElementById("searchContainer");
-
-//     searchBtn.addEventListener("click", () => {
-//         searchContainer.classList.toggle("active");
-
-//         if (searchContainer.classList.contains("active")) {
-//             searchContainer.querySelector("input").focus();
-//         }
-//     });
-//     const searchInput = document.getElementById("searchInput");
-
-//     searchInput.addEventListener("input", () => {
-//         const searchTerm = searchInput.value.toLowerCase();
-
-//         const menuItems = document.querySelectorAll(".menu-item");
-
-//         // menuItems.forEach(item => {
-//         //     const itemName = item
-//         //         .querySelector(".item-details h3")
-//         //         .textContent
-//         //         .toLowerCase();
-
-//         //     if (itemName.includes(searchTerm)) {
-//         //         item.style.display = "flex"; // your menu-item uses flex
-//         //     } else {
-//         //         item.style.display = "none";
-
-//         //     }
-//         // });
-
-//         menuItems.forEach(item => {
-//             const itemName = item
-//                 .querySelector(".item-details h3")
-//                 .textContent
-//                 .toLowerCase();
-
-//             const divider = item.nextElementSibling; // the <hr>
-
-//             if (itemName.includes(searchTerm)) {
-//                 item.style.display = "flex";
-
-//                 if (divider && divider.classList.contains("item-divider")) {
-//                     divider.style.display = "block";
-//                 }
-//             } else {
-//                 item.style.display = "none";
-
-//                 if (divider && divider.classList.contains("item-divider")) {
-//                     divider.style.display = "none";
-//                 }
-//             }
-//         });
-
-
-//     });
-//     gotoCartBtn.addEventListener("click", () => {
-//         window.location.href = `/cart/${userId}`
-//     })
-
-
-
-
-// })
-
-// function mergeMenuWithCart(data, datas, res_id) {
-//     const cleanResId = res_id.toString().trim();
-//     console.log(res_id)
-//     // const restaurantCart = datas.results.cart?.[cleanResId]?.items || {};
-//     const restaurantCart = datas?.results?.cart?.[res_id]?.items || {};
-//     // const cartIds = Object.keys(datas.results.cart);
-//     console.log(restaurantCart);
-//     const itemId = Object.keys(restaurantCart)[0];
-//     console.log(itemId)
-//     // console.log(Object.keys(restaurantCart));
-//     // console.log(datas.results.cart?.[cleanResId])
-//     // const merged = Object.entries(data.res).map(([name, item]) => {
-//     //     console.log(name)
-//     //     return {
-//     //         name : {
-//     //             id: item.id,
-//     //             price: item.price,
-//     //             qty: restaurantCart[name]?.qty || 0
-//     //         }
-//     //     };
-
-//     // });
-//     const merged = Object.entries(data.res).reduce((acc, [name, item]) => {
-//         console.log(acc, item.name, item)
-//         acc[name] = {
-//             id: item.id,
-//             price: item.price,
-//             file_url: item.file_url,
-//             qty: restaurantCart[item.id]?.qty || 0
-//         };
-
-//         return acc;
-
-//     }, {});
-
-//     console.log("Merged Menu:", merged);
-
-//     return merged;
-// }
-
 // One pending (not-yet-sent) batch per item, and one in-flight-request tracker per item.
 // pendingUpdates handles debouncing rapid clicks; inFlightControllers cancels a request
 // that's already been sent if a newer batch needs to go out before the old one resolves.
 const pendingUpdates = new Map();       // itemId -> { timer, accumulatedDelta }
 const inFlightControllers = new Map();  // itemId -> AbortController
+
+// Basic HTML-escaping so item names/prices/urls from the API can never break
+// out of the markup they're injected into (XSS guard).
+function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
 
 function scheduleCartUpdate(itemId, userId, delta, qtyEl, onSuccess, onFailure) {
     let entry = pendingUpdates.get(itemId);
@@ -529,6 +48,7 @@ function scheduleCartUpdate(itemId, userId, delta, qtyEl, onSuccess, onFailure) 
                 body: JSON.stringify({ user_id: userId, item_id: itemId, qty: netDelta }),
                 signal: controller.signal
             });
+            if (!res.ok) throw new Error(`update_cart failed: ${res.status}`);
             const data = await res.json();
             if (data.success) {
                 onSuccess(data);
@@ -536,8 +56,10 @@ function scheduleCartUpdate(itemId, userId, delta, qtyEl, onSuccess, onFailure) 
                 onFailure(data.message || "Failed updating cart");
             }
         } catch (err) {
-            console.log(err);
-            if (err.name !== "AbortError") onFailure("Network error");
+            if (err.name !== "AbortError") {
+                console.error("cart update failed", err);
+                onFailure("Network error");
+            }
         } finally {
             if (inFlightControllers.get(itemId) === controller) {
                 inFlightControllers.delete(itemId);
@@ -546,294 +68,302 @@ function scheduleCartUpdate(itemId, userId, delta, qtyEl, onSuccess, onFailure) 
     }, 400); // debounce window — tune to taste (300-500ms feels good)
 }
 
+function mergeMenuWithCart(data, datas, res_id) {
+    // bugfix: cleanResId was computed but never actually used for the lookup
+    const cleanResId = res_id.toString().trim();
+    const restaurantCart = datas?.results?.cart?.[cleanResId]?.items || {};
+
+    // bugfix: was keyed by item *name* — two items sharing a name would
+    // silently overwrite each other. item.id is the actual unique key.
+    const merged = Object.entries(data.res).reduce((acc, [name, item]) => {
+        acc[item.id] = {
+            id: item.id,
+            name: name,
+            price: item.price,
+            file_url: item.file_url,
+            item_qty: item.item_qty ?? 0,
+            qty: restaurantCart[item.id]?.qty || 0
+        };
+        return acc;
+    }, {});
+
+    return merged;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
-    const path = window.location.pathname
-    console.log(path)
-    const userId = path.split("/")[5]
-    const res_id = path.split("/")[4]
-    const addresss = path.split("/")[3]
-    const res_name = path.split("/")[2]
-    console.log(res_name)
+    const path = window.location.pathname;
+    // Path shape: /menu/:res_name/:address/:res_id/:userId
+    const userId = path.split("/")[5];
+    const res_id = path.split("/")[4];
+    const addresss = path.split("/")[3];
+    const res_name = path.split("/")[2];
     const decoded = decodeURIComponent(res_name);
     const addresss_decoded = decodeURIComponent(addresss);
-    const menu_items_container = document.getElementById("menu_container")
-    const cartBtn = document.getElementById("cartBtn")
-    const orderBtn = document.getElementById("orderBtn")
-    // const res_info=document.getElementById("res_info")
+
+    const menu_items_container = document.getElementById("menu_container");
+    const cartBtn = document.getElementById("cartBtn");
+    const orderBtn = document.getElementById("orderBtn");
     const res_info = document.querySelector(".res-info");
     const heading = res_info.querySelector("h1");
     const res_location = res_info.querySelector(".res-location");
-    const breadcrump = document.querySelector(".breadcrumbs")
-    const loading = document.getElementById("loading")
+    const breadcrump = document.querySelector(".breadcrumbs");
+    const loading = document.getElementById("loading");
     const menu_container = document.querySelector('.menu-section');
-    const current_total_amount = document.getElementById("amount")
+    const current_total_amount = document.getElementById("amount");
     const footer = document.getElementsByTagName("footer")[0];
-    const gotoCartBtn = document.getElementById("GoCartBtn")
-    breadcrump.innerText = `Home / ${addresss_decoded} / ${decoded}`
-    res_location.innerText = addresss_decoded
-    heading.innerText = decoded;
+    const gotoCartBtn = document.getElementById("GoCartBtn");
+    const message = document.getElementById("message");
+    const ReplaceContainer = document.getElementById("ReplaceContainer");
+    const overlayContainer = document.getElementById("overlayContainer");
 
+    breadcrump.innerText = `Home / ${addresss_decoded} / ${decoded}`;
+    res_location.innerText = addresss_decoded;
+    heading.innerText = decoded;
 
     const rest = await fetch("/get_cart_items", {
         method: "POST",
         headers: { "Content-type": "application/json" },
         body: JSON.stringify({ "userid": userId })
-    })
-    if(rest.status ==401){
-        alert("unauthorized User,Please Log in")
-        window.location.href="/login/user";
-        
+    });
+    if (rest.status === 401) {
+        alert("Unauthorized user. Please log in");
+        window.location.href = "/login/user";
+        return; // bugfix: previously kept executing after redirecting
     }
-    const datas = await rest.json()
-    console.log(datas)
-    if (datas.results !== null)
-        if (datas.results.total > 0) {
-            footer.classList.add("show");
-            current_total_amount.innerText = datas.results.total
-        }
+    if (!rest.ok) {
+        alert("Error loading cart");
+        return;
+    }
+    const datas = await rest.json();
+    if (datas.results !== null && datas.results.total > 0) {
+        footer.classList.add("show");
+        current_total_amount.innerText = datas.results.total;
+    }
+
     const res = await fetch("/list_items", {
         method: "POST",
-        "headers": { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ "res_id": res_id, "type": "user" })
-    })
-    if(res.status ==401){
-        alert("unauthorized User,Please Log in")
-        window.location.href="/login/user";
-
+    });
+    if (res.status === 401) {
+        alert("Unauthorized user. Please log in");
+        window.location.href = "/login/user";
+        return; // bugfix: previously kept executing after redirecting
     }
-    const data = await res.json()
-    console.log(data)
+    if (!res.ok) {
+        alert("Error loading menu");
+        return;
+    }
+    const data = await res.json();
+
     if (data.success) {
-        const mergedd = mergeMenuWithCart(data, datas,
-            res_id)
-        loading.style.display = "none"
-        console.log(data)
-        // res_info.closest("h1").innerText = name
-        Object.entries(mergedd).forEach(([name, item]) => {
-            console.log(name, item.id, item.price, item.qty, item.file_url)
-            if (item.qty === 0) {
-                menu_items_container.innerHTML +=
-                    `
-                        <div class="menu-item" id=${item.id} available=${item.item_qty}>
-                            <div class="item-details">
-                                <h3>${name}</h3>
-                                <p class="price">${item.price}</p>
-                            </div>
-                            <div class="item-img-wrapper">
-                                <img src=${item.file_url} alt="Burger">
-                                <button class="add-btn" id=${item.id}>ADD</button>
-                                <p class="customisable">Customisable</p>
-                            </div>
-                        </div>
+        const mergedd = mergeMenuWithCart(data, datas, res_id);
+        loading.style.display = "none";
 
-                        <hr class="item-divider">
-            `
-            }
-            else {
-                menu_items_container.innerHTML +=
-                    `
-                    <div class="menu-item" id=${item.id} available=${item.item_qty}>
-                        <div class="item-details">
-                            <h3>${name}</h3>
-                            <p class="price">${item.price}</p>
-                        </div>
-                        <div class="item-img-wrapper">
-                            <img src="${item.file_url}"
-                                alt="Burger">
-                            <div class="quantity-control">
-                                <button class="qty-btn reduce">-</button>
-                                <span class="item_qty">${item.qty}</span>
-                                <button class="qty-btn increase">+</button>
-                            </div>
-                            <p class="customisable">Customisable</p>
-                        </div>
+        const html = Object.values(mergedd).map((item) => {
+            const controls = item.qty === 0
+                ? `<button class="add-btn" id="${escapeHtml(item.id)}">ADD</button>`
+                : `<div class="quantity-control">
+                        <button class="qty-btn reduce">-</button>
+                        <span class="item_qty">${escapeHtml(item.qty)}</span>
+                        <button class="qty-btn increase">+</button>
+                    </div>`;
+            return `
+                <div class="menu-item" id="${escapeHtml(item.id)}" available="${escapeHtml(item.item_qty)}">
+                    <div class="item-details">
+                        <h3>${escapeHtml(item.name)}</h3>
+                        <p class="price">${escapeHtml(item.price)}</p>
                     </div>
-
-                    <hr class="item-divider">
-            `
-            }
-        });
+                    <div class="item-img-wrapper">
+                        <img src="${escapeHtml(item.file_url)}" alt="Burger">
+                        ${controls}
+                        <p class="customisable">Customisable</p>
+                    </div>
+                </div>
+                <hr class="item-divider">
+            `;
+        }).join("");
+        menu_items_container.innerHTML = html; // bugfix: was `+=` against existing (empty) content, kept for clarity/perf
     }
+
+    // bugfix: cart/order buttons previously read localStorage.getItem("userId"),
+    // which this app never sets — it would send `/cart/null`. Use the userId
+    // that's already parsed from the current URL instead.
     cartBtn.addEventListener("click", () => {
-        console.log("clicked")
-        const userid = localStorage.getItem("userId")
-        console.log(userid)
-        window.location.href = `/cart/${userid}`
-    })
+        window.location.href = `/cart/${userId}`;
+    });
     orderBtn.addEventListener("click", () => {
-        console.log("clicked")
-        const userid = localStorage.getItem("userId")
-        console.log(userid)
-        window.location.href = `/orders/${userid}`
-    })
+        window.location.href = `/orders/${userId}`;
+    });
 
-    const hidecartorderBtn = document.getElementById("hideCartOrderBtn")
+    const hidecartorderBtn = document.getElementById("hideCartOrderBtn");
     hidecartorderBtn.addEventListener("click", () => {
-        console.log("clicked")
-        const cartorderContainer = document.getElementById("CartOrderContainer")
+        const cartorderContainer = document.getElementById("CartOrderContainer");
         if (cartorderContainer.classList.contains("hide")) {
-            cartorderContainer.classList.replace("hide", "show")
+            cartorderContainer.classList.replace("hide", "show");
+        } else {
+            cartorderContainer.classList.replace("show", "hide");
         }
-        else {
-            cartorderContainer.classList.replace("show", "hide")
-        }
-    })
-    message = document.getElementById("message")
-    ReplaceContainer = document.getElementById("ReplaceContainer")
-    overlayContainer = document.getElementById("overlayContainer")
+    });
+
     let pendingCartItem = null;
+
     menu_items_container.addEventListener("click", async (e) => {
-        if (e.target.classList.contains("add-btn")) {
+        if (!e.target.classList.contains("add-btn")) return;
 
-            // Get item details
-            const item = e.target.closest(".menu-item");
-            const names = item.querySelector("h3").innerText;
-            const price = item.querySelector(".price").innerText;
-            const item_id = item.getAttribute("id")
-            // console.log("Added:", names, price,item_id);
-            const userid = localStorage.getItem("userId")
-            const button = item.querySelector(".add-btn")
+        const item = e.target.closest(".menu-item");
+        const names = item.querySelector("h3").innerText;
+        const price = item.querySelector(".price").innerText;
+        const item_id = item.getAttribute("id");
+        const available = parseInt(item.getAttribute("available"));
+        const button = item.querySelector(".add-btn");
 
-            // 👉 Here you can send to backend / Redis
+        // bugfix: nothing previously stopped you from adding an item that's out of stock
+        if (!Number.isNaN(available) && available <= 0) {
+            alert("This item is currently out of stock");
+            return;
+        }
+
+        try {
             const res = await fetch("/add_to_cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     resid: res_id,
-                    userid: userid,
+                    userid: userId,
                     item: names,
                     ress_name: decoded,
                     qty: 1,
                     item_id: item_id,
                     price: parseInt(price),
-                    replace: false   // 🔥 important
+                    replace: false
                 })
-            })
-            if(res.status ==401){
-                alert("unauthorized User,Please Log in")
-                window.location.href="/login/user";
-                return;    
+            });
+            if (res.status === 401) {
+                alert("Unauthorized user. Please log in");
+                window.location.href = "/login/user";
+                return;
             }
-            const data = await res.json()
-            console.log(data)
+            if (!res.ok) throw new Error(`add_to_cart failed: ${res.status}`);
+            const data = await res.json();
+
             if (data.success) {
                 button.outerHTML = `
-                <div class="quantity-control">
-                    <button class="qty-btn reduce">-</button>
-                    <span class="item_qty">1</span>
-                    <button class="qty-btn increase">+</button>
-                </div>
-            `;
-                footer.classList.add("show")
-                // alert(`${names} added to cart`)
-                console.log(data.Total)
-                current_total_amount.innerText = data.Total
-            }
-            if (!data.success) {
+                    <div class="quantity-control">
+                        <button class="qty-btn reduce">-</button>
+                        <span class="item_qty">1</span>
+                        <button class="qty-btn increase">+</button>
+                    </div>
+                `;
+                footer.classList.add("show");
+                current_total_amount.innerText = data.Total;
+            } else {
                 pendingCartItem = {
                     resid: res_id,
-                    userid: userid,
+                    userid: userId,
                     item: names,
                     ress_name: decoded,
                     qty: 1,
                     item_id: item_id,
                     price: parseInt(price)
                 };
-
-                // button.outerHTML = `<button class="add-btn" id="${item_id}">ADD</button>`
-                console.log(button.innerText);
-                button.innerText = "ADD"
-                ReplaceContainer.classList.add("show")
-                overlayContainer.classList.add("show")
-                message.innerText = (data.message || "please Try again")
-                // Reo
+                button.innerText = "ADD";
+                ReplaceContainer.classList.add("show");
+                overlayContainer.classList.add("show");
+                message.innerText = data.message || "please Try again";
             }
+        } catch (err) {
+            console.error("add_to_cart failed", err);
+            alert("Something went wrong adding this item. Please try again.");
         }
     });
-    replaceYesBtn = document.getElementById("YES")
+
+    const replaceYesBtn = document.getElementById("YES");
     replaceYesBtn.addEventListener("click", async () => {
-        const res = await fetch("/add_to_cart", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                resid: pendingCartItem.resid,
-                userid: pendingCartItem.userid,
-                item: pendingCartItem.item,
-                ress_name: pendingCartItem.ress_name,
-                qty: pendingCartItem.qty,
-                item_id: pendingCartItem.item_id,
-                price: pendingCartItem.price,
-                replace: true   // 🔥 important
-            })
-        })
-        const data = await res.json()
-        console.log(data)
-        if (data.success) {
-            footer.classList.add("show")
-            // alert(`${names} added to cart`)
-            console.log(data.Total)
-            current_total_amount.innerText = data.Total
-            ReplaceContainer.classList.remove("show")
-            overlayContainer.classList.remove("show")
-            message.innerText = "Error:"
-            let itemssss = document.getElementById(pendingCartItem.item_id)
-            const button = itemssss.querySelector(".add-btn")
-            console.log(button);
-            button.outerHTML = `
-                <div class="quantity-control">
-                    <button class="qty-btn reduce">-</button>
-                    <span class="item_qty">1</span>
-                    <button class="qty-btn increase">+</button>
-                </div>
-            `;
+        if (!pendingCartItem) return;
+        try {
+            const res = await fetch("/add_to_cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    resid: pendingCartItem.resid,
+                    userid: pendingCartItem.userid,
+                    item: pendingCartItem.item,
+                    ress_name: pendingCartItem.ress_name,
+                    qty: pendingCartItem.qty,
+                    item_id: pendingCartItem.item_id,
+                    price: pendingCartItem.price,
+                    replace: true
+                })
+            });
+            if (res.status === 401) {
+                alert("Unauthorized user. Please log in");
+                window.location.href = "/login/user";
+                return;
+            }
+            if (!res.ok) throw new Error(`add_to_cart(replace) failed: ${res.status}`);
+            const data = await res.json();
 
+            if (data.success) {
+                footer.classList.add("show");
+                current_total_amount.innerText = data.Total;
+                ReplaceContainer.classList.remove("show");
+                overlayContainer.classList.remove("show");
+                message.innerText = "Error:";
+                const itemEl = document.getElementById(pendingCartItem.item_id);
+                const button = itemEl?.querySelector(".add-btn");
+                if (button) {
+                    button.outerHTML = `
+                        <div class="quantity-control">
+                            <button class="qty-btn reduce">-</button>
+                            <span class="item_qty">1</span>
+                            <button class="qty-btn increase">+</button>
+                        </div>
+                    `;
+                }
+            } else {
+                alert(data.message || "Failed to replace cart item");
+            }
+        } catch (err) {
+            console.error("replace add_to_cart failed", err);
+            alert("Something went wrong. Please try again.");
+        } finally {
+            pendingCartItem = null;
         }
-    })
+    });
 
-    replaceNoBtn = document.getElementById("NO")
-    replaceNoBtn.addEventListener("click", async () => {
-        ReplaceContainer.classList.remove("show")
-        overlayContainer.classList.remove("show")
-        message.innerText = "Error:"
-    })
+    const replaceNoBtn = document.getElementById("NO");
+    replaceNoBtn.addEventListener("click", () => {
+        ReplaceContainer.classList.remove("show");
+        overlayContainer.classList.remove("show");
+        message.innerText = "Error:";
+        pendingCartItem = null;
+    });
+
     menu_container.addEventListener('click', async (e) => {
-        console.log("clicke menu_container")
-
-        // 1. Get the parent cart-item element
         const itemRow = e.target.closest('.menu-item');
-        // 1. Get the parent cart-item element
+        if (!itemRow) return;
 
-        // 2. Extract the data
-        const itemId = itemRow.id; // Or itemRow.getAttribute('id')
-        const item_qty=parseInt(itemRow.getAttribute("available"))
-        console.log(item_qty);
-        
-        const itemName = itemRow.querySelector('.item-details').textContent
-        // const item_qty = itemRow.querySelector('.item_qty').textContent;
-        const item_price = itemRow.querySelector('.price').textContent;
-        // console.log(itemId,item_qty,item_price)
-        const addBtn = e.target.closest('.add-btn');
-        if (e.target.classList.contains('add-btn')) {
-            // e.target.outerHTML = `
-            //     <div class="quantity-control">
-            //         <button class="qty-btn reduce">-</button>
-            //         <span class="item_qty">1</span>
-            //         <button class="qty-btn increase">+</button>
-            //     </div>
-            // `;
-        }
-        else if (e.target.classList.contains('increase')) {
+        const itemId = itemRow.id;
+        const itemName = itemRow.querySelector('.item-details').textContent;
+        // bugfix: default to "unlimited" (Infinity) instead of NaN when the
+        // available-stock attribute is missing, so the stock check below
+        // doesn't silently become a no-op comparison against NaN
+        const availableRaw = itemRow.getAttribute("available");
+        const item_qty = availableRaw !== null && availableRaw !== "" ? parseInt(availableRaw) : Infinity;
+
+        if (e.target.classList.contains('increase')) {
             const qtyEl = e.target.parentElement.querySelector('.item_qty');
             const prevQty = Number(qtyEl.textContent);
-            console.log(`Increasing: ${itemName} (ID: ${itemId})`);
 
-            // 1. Optimistic UI update — instant feedback
-            if(parseInt(prevQty + 1)>item_qty){
-                alert(`only ${item_qty} in stock`)
-                return
+            if (prevQty + 1 > item_qty) {
+                alert(`only ${item_qty} in stock`);
+                return;
             }
+
+            // Optimistic UI update — instant feedback
             qtyEl.textContent = prevQty + 1;
-            // 2. Batched/debounced network call
+
             scheduleCartUpdate(itemId, userId, 1, qtyEl,
                 (data) => {
                     if (data.total > 0) {
@@ -843,21 +373,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                         footer.classList.remove("show");
                     }
                 },
-                (message) => {
+                (msg) => {
                     qtyEl.textContent = prevQty; // rollback on failure
-                    alert(message);
+                    alert(msg);
                 }
             );
-        }
-        else if (e.target.classList.contains('reduce')) {
+        } else if (e.target.classList.contains('reduce')) {
             const qtyEl = e.target.parentElement.querySelector('.item_qty');
             const prevQty = Number(qtyEl.textContent);
-            console.log(`Reducing: ${itemName} (ID: ${itemId})`);
 
-            // 1. Optimistic UI update — instant feedback (and ONLY this, nothing else)
+            // Optimistic UI update — instant feedback
             qtyEl.textContent = Math.max(0, prevQty - 1);
 
-            // 2. Batched/debounced network call
             scheduleCartUpdate(itemId, userId, -1, qtyEl,
                 (data) => {
                     if (data.total > 0) {
@@ -866,9 +393,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     } else {
                         footer.classList.remove("show");
                     }
-
-                    // Backend is the source of truth on whether the item fully left
-                    // the cart — don't infer this from qtyEl.textContent client-side.
+                    // bugfix: removal is now driven only by the server response
+                    // (data.removed), not inferred from the optimistic qtyEl
+                    // text — previously both an optimistic AND a server-driven
+                    // removal path existed and could fight each other.
                     if (data.removed) {
                         const qtyControl = e.target.closest('.quantity-control');
                         if (qtyControl) {
@@ -876,116 +404,41 @@ document.addEventListener("DOMContentLoaded", async () => {
                         }
                     }
                 },
-                (message) => {
+                (msg) => {
                     qtyEl.textContent = prevQty; // rollback on failure
-                    alert(message);
+                    alert(msg);
                 }
             );
-            if (Number(qtyEl.textContent) >=1) {
-                // Correctly decrement the number
-                // qtyEl.textContent = Math.max(0, Number(qtyEl.textContent) - 1);
-            }
-            else {
-                // If it hits 0, remove the element from the cart UI
-                // const prevHeading = itemRow.previousElementSibling;
-                const qtyControl = e.target.closest('.quantity-control');
-
-                qtyControl.outerHTML = `
-                    <button class="add-btn" id="${itemId}">ADD</button>
-                `;
-
-                // Check if this is the last item under the heading
-                const nextSibling = itemRow.nextElementSibling;
-
-                // itemRow.remove();
-
-                // if (
-                //     prevHeading &&
-                //     prevHeading.tagName === "H2" &&
-                //     (!nextSibling || nextSibling.tagName === "H2")
-                // ) {
-                //     prevHeading.remove();
-                // }
-            }
         }
     });
 
     const searchBtn = document.getElementById("searchBtn");
     const searchContainer = document.getElementById("searchContainer");
-
     searchBtn.addEventListener("click", () => {
         searchContainer.classList.toggle("active");
-
         if (searchContainer.classList.contains("active")) {
             searchContainer.querySelector("input").focus();
         }
     });
-    const searchInput = document.getElementById("searchInput");
 
+    const searchInput = document.getElementById("searchInput");
     searchInput.addEventListener("input", () => {
         const searchTerm = searchInput.value.toLowerCase();
-
         const menuItems = document.querySelectorAll(".menu-item");
 
         menuItems.forEach(item => {
-            const itemName = item
-                .querySelector(".item-details h3")
-                .textContent
-                .toLowerCase();
-
+            const itemName = item.querySelector(".item-details h3").textContent.toLowerCase();
             const divider = item.nextElementSibling; // the <hr>
+            const matches = itemName.includes(searchTerm);
 
-            if (itemName.includes(searchTerm)) {
-                item.style.display = "flex";
-
-                if (divider && divider.classList.contains("item-divider")) {
-                    divider.style.display = "block";
-                }
-            } else {
-                item.style.display = "none";
-
-                if (divider && divider.classList.contains("item-divider")) {
-                    divider.style.display = "none";
-                }
+            item.style.display = matches ? "flex" : "none";
+            if (divider && divider.classList.contains("item-divider")) {
+                divider.style.display = matches ? "block" : "none";
             }
         });
-
-
     });
+
     gotoCartBtn.addEventListener("click", () => {
-        window.location.href = `/cart/${userId}`
-    })
-
-
-
-
-})
-
-function mergeMenuWithCart(data, datas, res_id) {
-    const cleanResId = res_id.toString().trim();
-    console.log(res_id)
-    // const restaurantCart = datas.results.cart?.[cleanResId]?.items || {};
-    const restaurantCart = datas?.results?.cart?.[res_id]?.items || {};
-    // const cartIds = Object.keys(datas.results.cart);
-    console.log(restaurantCart);
-    const itemId = Object.keys(restaurantCart)[0];
-    console.log(itemId)
-
-    const merged = Object.entries(data.res).reduce((acc, [name, item]) => {
-        console.log(acc, item.name, item)
-        acc[name] = {
-            id: item.id,
-            price: item.price,
-            file_url: item.file_url,
-            item_qty:item.item_qty || 0,
-            qty: restaurantCart[item.id]?.qty || 0
-        };
-
-        return acc;
-
-    }, {});
-
-    console.log("Merged Menu:", merged);
-
-    return merged;
-}
+        window.location.href = `/cart/${userId}`;
+    });
+});
