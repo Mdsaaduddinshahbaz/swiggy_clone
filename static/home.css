@@ -62,7 +62,10 @@ body {
 }
 
 .nav-container {
-    max-width: 1120px;
+
+    /* max-width: 1120px; */
+    width: 100% !important;
+    display:  block !important;
     margin: 0 auto;
     padding: 12px 20px;
     /* display: flex; */
@@ -72,6 +75,7 @@ body {
 }
 
 .left-nav {
+    display: block !important;
     justify-content: space-between;
     position: relative;
     display: flex;
@@ -86,6 +90,22 @@ body {
     flex-shrink: 0;
 }
 
+#searchBarContainer{
+    width: 100%;
+}
+#searchInput{
+    width: 100%;
+    border-radius: 22px;
+    margin-top: 17px;
+    border: 2px solid #e7991a;
+    padding: 12px;
+}
+
+#searchInput::placeholder{
+    font-size: larger;
+    font-weight: 600;
+    align-self: center;
+}
 /* Location trigger pill */
 
 .location-trigger {
@@ -163,6 +183,7 @@ body {
 .location-box.show,
 .location-box.show {
     display: flex;
+    z-index: 122;
 }
 
 #CartOrderContainer.show {
