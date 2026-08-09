@@ -232,7 +232,7 @@ async function initHomePage() {
             currentAddress.dataset.lat = userLatt;
             currentAddress.textContent = address;
             localStorage.setItem("currentAddress", address);
-            const userLocation = { latt: lat, long: lng };
+            const userLocation = { latt: userLatt, long: userLong };
             localStorage.setItem("userLocation", JSON.stringify(userLocation));
         } else {
             let locationFound = false;
