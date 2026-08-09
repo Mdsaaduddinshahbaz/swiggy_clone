@@ -223,7 +223,17 @@ async function initHomePage() {
     try {
         const fetchlocation = JSON.parse(localStorage.getItem("userLocation"));
         if (fetchlocation === null) {
-            await getLocation();
+            // await getLocation();
+            const position=await getPosition()
+            userLatt = position.coords.latitude;
+            userLong = position.coords.longitude;
+            const address = await reverseGeocode(lat, lng);
+            currentAddress.dataset.long = userLong;
+            currentAddress.dataset.lat = userLatt;
+            currentAddress.textContent = address;
+            localStorage.setItem("currentAddress", address);
+            const userLocation = { latt: lat, long: lng };
+            localStorage.setItem("userLocation", JSON.stringify(userLocation));
         } else {
             let locationFound = false;
             const previoussavedAddress = localStorage.getItem("currentAddress");
