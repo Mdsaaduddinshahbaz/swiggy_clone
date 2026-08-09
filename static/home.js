@@ -227,7 +227,7 @@ async function initHomePage() {
             const position=await getPosition()
             userLatt = position.coords.latitude;
             userLong = position.coords.longitude;
-            const address = await reverseGeocode(lat, lng);
+            const address = await reverseGeocode(userLatt, userLong);
             currentAddress.dataset.long = userLong;
             currentAddress.dataset.lat = userLatt;
             currentAddress.textContent = address;
