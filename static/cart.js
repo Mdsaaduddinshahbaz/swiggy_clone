@@ -211,11 +211,14 @@ async function initCartPage() {
     placeorder.addEventListener("click", async () => {
         const remainingItems = document.querySelectorAll(".cart-item");
         if (remainingItems.length === 0) { alert("Your cart is empty"); return; }
+        const longitude = deliveryAdrs.dataset.long;
+        const latitude = deliveryAdrs.dataset.lat;
 
+        // console.log(longitude, latitude);
         const res = await fetch("/store_orders", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, items: restaurants })
+            body: JSON.stringify({ user_id: userId, items: restaurants ,coordinates:{"long":longitude,"latt":latitude}})
         })
         const data = await res.json()
         if (data.success) {

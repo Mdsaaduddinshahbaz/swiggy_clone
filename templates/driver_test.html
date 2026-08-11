@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <H1 id="DriverId">driverid ?</H1>
+    <div id="message">Hola</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const pathParts = window.location.pathname.split("/");
+        const driver_id = window.APP_USER_ID || pathParts[pathParts.length - 1];
+        // const socket = io();
+const socket = io();   
+        socket.on("connect", () => {
+            console.log("Connected:", socket.id);
+            // const uid = window.APP_USER_ID || window.location.pathname.split("/").pop();
+            socket.emit("join_driver_room", { driver_id: driver_id });
+        });
+        socket.on("order_request", (data) => {
+            console.log(data);
+            
+            document.getElementById("message").textContent=data.driver_id + " g" + data.distance_km
+        })
+    </script>
+</body>
+</html>

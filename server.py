@@ -1,13 +1,15 @@
-from database import save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+import eventlet
+eventlet.monkey_patch()
+from database import create_new_driver, save_category,get_seller_analytics,get_resturantItem_price,accept_delivery_order,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
-from flask_socketio import SocketIO, emit,join_room
-from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
+from flask_socketio import SocketIO, emit,join_room,leave_room
+from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock,search_driver,update_driver_location,accept_order_redis
 from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
+# from verify import upload_image   
+from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -68,7 +70,9 @@ print("USER:", mail_username, flush=True)
 print("PASS EXISTS:", bool(mail_password), flush=True)
 
 brevo_api=os.getenv("brevo_api_email")
-socketio = SocketIO(app, cors_allowed_origins="*")
+REDIS_URL = f"redis://{redis_user}:{redis_pass}@{redis_host}:{redis_port}/0"
+print("in server",REDIS_URL)
+socketio = SocketIO(app, cors_allowed_origins="*",message_queue=REDIS_URL)
 # mail=Mail(app)
 
 
@@ -699,6 +703,9 @@ def seller_page(name,seller_id):
 @login_required
 def store_order():
     user_id = g.user_id
+    username=g.username
+    data=request.get_json()
+    coordinates=data["coordinates"]
     lock_key = f"lock:checkout:{user_id}"
     token = acquire_lock(lock_key, ttl_seconds=15)
 
@@ -710,13 +717,18 @@ def store_order():
     try:
         # data=request.get_json()
         user_id=g.user_id
-        resids=store_orders(user_id)
+        resids,order_id_seller=store_orders(user_id,coordinates)
+        print("after store_order from mongo",resids)
         if(resids==404):
             return({"success":False})
         if resids is False:
             return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
-        for resid in resids:
-            socketio.emit("new_order", {"msg": "refresh"}, room=resid)
+        # for resid in resids:
+        socketio.emit("new_order", {"msg": "refresh"}, room="warehouse")
+        print("after socket emit")
+
+        search_driver.delay({"lat":17.38887979415329,"lng":78.428223916555},username,coordinates,order_id_seller,10)
+        print("after search")
         return ({"success":True})
     except Exception as e:
         print(e)
@@ -779,19 +791,27 @@ def renderSellerOrders(res_name,res_id):
     except Exception as e:
         print(e)
         return({"success":False})
+@app.get("/driver/<driver_id>")
+def renderdriverOrders(driver_id):
+    try:
+        return render_template("driver_ui.html")
+    except Exception as e:
+        print(e)
+        return({"success":False})
+
 @socketio.on('join_seller_room')
 @login_required
 def handle_join(data):
     try:
         # seller_id = data['seller_id']
         seller_id=g.res_id
-        join_room(seller_id)
+        join_room("warehouse")
     except Exception as e:
         print(e)
         return({"success":False})
 def notify_new_order(seller_id, order):
     try:
-        socketio.emit('new_order', order, room=seller_id)
+        socketio.emit('new_order', order, room="warehouse")
     except Exception as e:
         print(e)
         return({"success":False})
@@ -806,6 +826,34 @@ def handle_user_join(data):
     except Exception as e:
         print(e)
         return({"success":False})
+@socketio.on("join_driver_room")
+def join_driver_room(data):
+    driver_id = data["driver_id"]
+
+    print("driver_id room:", driver_id)
+
+    room = f"driver_{driver_id}"
+    join_room(room)
+
+    print("JOINED ROOM:", room)
+
+    emit("joined", {
+        "room": room
+    })
+@socketio.on("leave_driver_room")
+def leave_drivers_room(data):
+    driver_id = data["driver_id"]
+    
+    print("driver_id room:", driver_id)
+
+    room = f"driver_{driver_id}"
+    leave_room(room)
+
+    print("LEFT ROOM:", room)
+
+    emit("left", {
+        "room": room
+    })
 @socketio.on("order_completed")
 @login_required
 def handle_order_completed(data):
@@ -2054,6 +2102,69 @@ def validate_signup(data):
         "password": password,
         "role": role
     }, None
+
+# @app.route("/search_partner",methods=["POST"])
+# def find_driver():
+#     data=request.get_json()
+#     user_location=data["user_loc"]
+#     res_location=data["res_location"]
+
+#     res=search_driver(res_location)
+#     if res["success"]:
+#         return res
+#     else:
+#         return ({"success":False})
+@app.route("/signup_driver",methods=["POST"])
+def signup_driver():
+    data=request.get_json()
+    email=data["email"]
+    username=data["username"]
+    password=data["password"]
+    res=create_new_driver(email,username,password)
+    if(res["success"]):
+        return {"success":True,"id":res["id"]}
+    else:
+        return {"success":False}
+@app.route("/partner_online",methods=["POST"])
+def set_online():
+    # driver_id=g.driver_id
+    data=request.get_json()
+    driver_id=data["driver_id"]
+    lat=float(data["lat"])
+    lng=float(data["lng"])
+    res=update_driver_location(driver_id,lat,lng)
+    print(res)
+    if(res["success"]):
+        return {"success":True}
+    else:
+        return {"success":False}
+from redis_db import delete_lock
+@app.route("/accept_order", methods=["POST"])
+def accept_order_server():
+    # driver_id = g.driver_id
+    driver_id="6a7b39442f2f1da998fb0928"
+    data = request.get_json()
+    print(data)
+    order_id = data["order_id"]
+
+    won = accept_order_redis(order_id, driver_id)
+    print("won=",won)
+    if (won==False):
+        print("won in if condition",won)
+        socketio.emit("order_taken", {"order_id": order_id}, room=f"driver_{driver_id}")
+        return {"success": False, "message": "Order already taken"}
+
+    result = accept_delivery_order(order_id, driver_id)  # Mongo
+    socketio.emit("new_order", {"msg": "refresh"}, room="warehouse")
+    if not result["success"]:
+        delete_lock(order_id)
+        # r.delete(f"order:{order_id}:lock")   # release — Mongo disagreed, don't leave it locked
+        # socketio.emit("order_taken", {"order_id": order_id}, room=f"driver_{driver_id}")
+        return {"success": False, "message": result["message"]}
+
+    # mark_driver_busy(driver_id)
+    # return {"success": True, "order": result["order"]}
+    return {"success": True}
 if __name__ == "__main__":
     socketio.run(app, debug=True)
 # from waitress import serve
