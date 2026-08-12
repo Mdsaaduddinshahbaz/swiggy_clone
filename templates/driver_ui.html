@@ -2371,10 +2371,10 @@
            ORDER DETAIL / STEP FLOW
            ============================================================ */
         const stepMeta = [
-            { status: 'Heading to pickup', badge: 'To pickup', btn: 'Navigate to pickup' },
-            { status: 'At pickup location', badge: 'At pickup', btn: 'Confirm pickup' },
-            { status: 'Heading to drop', badge: 'To drop', btn: 'Navigate to drop' },
-            { status: 'At drop location', badge: 'At drop', btn: 'Complete delivery' },
+            { status: 'Heading to pickup', badge: 'To pickup', btn: 'Navigate to pickup', id:1 },
+            { status: 'At pickup location', badge: 'At pickup', btn: 'Confirm pickup',id:2 },
+            { status: 'Heading to drop', badge: 'To drop', btn: 'Navigate to drop', id:3 },
+            { status: 'At drop location', badge: 'At drop', btn: 'Complete delivery', id:4 },
         ];
         const map = L.map("map").setView([17.385, 78.4867], 13);
 
@@ -2443,7 +2443,7 @@
                     `&travelmode=driving`;
 
                 window.open(url, "_blank");
-                 advanceStep()
+                advanceStep()
         }
 
         function dOtpMove(el, idx) {
