@@ -259,11 +259,17 @@ def remove_driver(driver_id):
 
 def accept_order_redis(order_id, driver_id):
     print(type(order_id),type(driver_id))
+    
     won = r.set(f"order:{order_id}:lock", driver_id, nx=True, ex=60)
     # mark_driver_busy(driver_id)
     if won:
+        key = f"order_request:{order_id}:{driver_id}"
+
+        raw = r.get(key)
+        request = json.loads(raw)
         mark_driver_busy(driver_id)
-    return bool(won)   # actually return the outcome
+        return bool(won),request
+    return bool(won),None   # actually return the outcome
 def delete_lock(order_id):
     r.delete(f"order:{order_id}:lock")
 # delete_lock("6a6f3511d9808c816b5d9930")
@@ -281,13 +287,15 @@ def mark_driver_available(driver_id, lat, lng):
     """Call this when a driver finishes a ride and is free again."""
     return update_driver_location(driver_id, lat, lng)
 
+
 @celery.task
-def search_driver(res_loc, username,user_coordinates,order_id,count=10):
-    print("in search driver")
+def search_driver(res_loc, username, user_coordinates, order_id, count=10):
+
+    base_pay = 20
+
     longitude = res_loc["lng"]
     latitude = res_loc["lat"]
-    print(longitude,latitude)
-    print("order_id",order_id)
+
     drivers = r.geosearch(
         "available_drivers",
         longitude=longitude,
@@ -298,33 +306,88 @@ def search_driver(res_loc, username,user_coordinates,order_id,count=10):
         sort="ASC",
         count=count
     )
-    delivery_distance=distance_km(latitude,longitude,user_coordinates["latt"],user_coordinates["long"])
+
+    delivery_distance = distance_km(
+        latitude,
+        longitude,
+        float(user_coordinates["latt"]),
+        float(user_coordinates["long"])
+    )
+
     if not drivers:
         return {
             "success": False,
             "message": "No drivers nearby"
         }
-    print(drivers)
-    for driver in drivers:
-        driver_id = driver[0]
 
+    for driver in drivers:
+
+        driver_id = driver[0]
+        warehouse_km = float(driver[1])
+
+        # Calculate on server
+        amount = (
+            base_pay
+            + (3 * warehouse_km)
+            + (8 * delivery_distance)
+        )
+
+        # Server-side order request
+        request_data = {
+            "order_id": str(order_id),
+            "driver_id": str(driver_id),
+
+            "warehouse_km": warehouse_km,
+            "customer_km": delivery_distance,
+
+            "base_pay": base_pay,
+            "pickup_rate": 3,
+            "delivery_rate": 8,
+
+            "amount": amount,
+
+            "customer_name": username,
+
+            "warehouse_lng": longitude,
+            "warehouse_lat": latitude,
+
+            "customer_lng": user_coordinates["long"],
+            "customer_lat": user_coordinates["latt"],
+
+            "status": "pending"
+        }
+
+        # Store server-side
+        key = f"order_request:{order_id}:{driver_id}"
+
+        r.set(
+            key,
+            json.dumps(request_data),
+            ex=120   # expires after 2 minutes
+        )
+
+        # Send to driver
         socketio.emit(
             "order_request",
             {
-                "driver_id": driver_id,
-                "distance_km": (float(driver[1])+delivery_distance),
-                "customer_km":delivery_distance,
-                "warehouse_km":float(driver[1]),
-                "amt":56,
-                "customer_name":username,
-                "order_id":str(order_id),
-                "warehouse_lng":res_loc["lng"],
-                "warehouse_lat":res_loc["lat"],
-                "customer_lng":user_coordinates["long"],
-                "customer_lat":user_coordinates["latt"]
+                "order_id": str(order_id),
+                "driver_id": str(driver_id),
+                "distance_km": warehouse_km + delivery_distance,
+                "customer_km": delivery_distance,
+                "warehouse_km": warehouse_km,
+                "amt": amount,
+
+                "customer_name": username,
+
+                "warehouse_lng": longitude,
+                "warehouse_lat": latitude,
+
+                "customer_lng": user_coordinates["long"],
+                "customer_lat": user_coordinates["latt"]
             },
             room=f"driver_{driver_id}"
         )
+
     return {
         "success": True,
         "drivers": [

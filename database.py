@@ -552,12 +552,27 @@ def store_orders(userid,coordinates):
 
                     for doc in seller_docs:
                         doc["parent_order_id"] = parent
-
+                    print("after order insert")
                     t = time.perf_counter()
+
+                    # if seller_docs:
+                    #     res=seller_orders.insert_one(
+                    #         seller_docs,
+                    #         session=session
+                    #     )
 
                     if seller_docs:
                         res=seller_orders.insert_one(
-                            seller_docs,
+                            {
+                                "user_id": str(userid),
+                                "token_no": token,
+                                "restaurant_id": restaurant_id,
+                                "restaurant_name": restaurant["name"],
+                                "items": verified_items,
+                                "status": "placed",
+                                "time": current_time,
+                                "user_adres":coordinates
+                            },
                             session=session
                         )
                     order_id_seller=res.inserted_id
@@ -584,7 +599,7 @@ def store_orders(userid,coordinates):
 
             print("delete cart", time.perf_counter() - t)
 
-            return restaurant_id,order_id_seller
+            return str(restaurant_id),str(order_id_seller)
 
         except OperationFailure as e:
 
@@ -1559,10 +1574,10 @@ def get_available_order_for_driver(driver_id):
     }
 
 
-def accept_delivery_order(order_id, driver_id):
+def accept_delivery_order(order_id, driver_id,redis_data):
     with client.start_session() as session:
         with session.start_transaction():
-
+            amount=redis_data["amount"]
             result = seller_orders.find_one_and_update(
                 {
                     "_id": ObjectId(order_id),
@@ -1587,9 +1602,10 @@ def accept_delivery_order(order_id, driver_id):
                 }
 
             driver_orders.insert_one(
-                {
+                {   
                     "driver_id": driver_id,
                     "order_id": order_id,
+                    "amount":amount,
                     "seller_id": str(result["restaurant_id"]),
                     "status": "pending",
                     "accepted_at": datetime.utcnow()
@@ -1602,15 +1618,19 @@ def accept_delivery_order(order_id, driver_id):
                 {"$inc": {"orders_accepted": 1}},
                 session=session
             )
+    items_seller={}
+    for id,values in result["items"].items():
+        print(id,values)
+        items_seller[values["name"]]=values["qty"]
+    print(items_seller)
     return {
-        "success": True
-        # "order": {
-        #     "order_id": str(result["_id"]),
-        #     "store": result["restaurant_name"],
-        #     "customer": result["customer_name"],
-        #     "amount": result["amount"],
-        #     "delivery_otp": result["delivery_otp"]
-        # }
+        "success": True,
+        "order": {
+            "order_id": str(result["_id"]),
+            "token_no":result["token_no"],
+            "amount":amount,
+            "items":items_seller
+        }
     }
 
 

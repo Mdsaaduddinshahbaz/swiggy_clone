@@ -146,6 +146,32 @@ socket.on("new_order", () => {
     console.log("New order received → reloading...");
     loadOrders();   // 🔥 call your API again
 });
+socket.on("driver_assigned", (data) => {
+    console.log("Driver assigned:", data.order_id);
+
+    const cards = document.querySelectorAll(".order-card");
+
+    cards.forEach(card => {
+        const orderId = card
+            .querySelector(".order-id")
+            .textContent
+            .replace("#", "")
+            .trim();
+
+        if (orderId === String(data.order_id)) {
+            // Move this card to the very top
+            ordersList.prepend(card);
+
+            // Optional: make it visually noticeable
+            card.style.transition = "background-color 0.3s";
+            card.style.backgroundColor = "#fff8e1";
+
+            setTimeout(() => {
+                card.style.backgroundColor = "";
+            }, 2000);
+        }
+    });
+});
 // Add this to seller_orders.js
 socket.on("seller_order_cancelled", (data) => {
     console.log("User cancelled order:", data.token_no);

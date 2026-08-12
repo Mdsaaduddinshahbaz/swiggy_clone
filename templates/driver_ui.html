@@ -2056,13 +2056,13 @@
                         </div>
                         <div class="ticket-bottom">
                             <span class="badge badge-orange" id="odBadge">In progress</span>
-                            <span class="mono" style="font-size:13px; font-weight:600;">+₹52</span>
+                            <span class="mono" style="font-size:13px; font-weight:600;" id="odPrice">+₹52</span>
                         </div>
                     </div>
 
                     <div class="items-card">
                         <div class="head"><span class="t">Order items</span><span class="c">3 items</span></div>
-                        <ul>
+                        <ul id="odItems">
                             <li><span>Amul Toned Milk 1L</span><span>×1</span></li>
                             <li><span>Britannia Brown Bread</span><span>×2</span></li>
                             <li><span>Farm Eggs (6 pc)</span><span>×1</span></li>
@@ -2079,7 +2079,7 @@
                                     <circle cx="12" cy="8" r="4" />
                                     <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
                                 </svg></div>
-                            <div class="lbl">Ananya Sharma</div>
+                            <div class="lbl" id="customer_name">Ananya Sharma</div>
                             <button class="icon-btn" style="width:36px; height:36px;"><svg viewBox="0 0 24 24"
                                     fill="none" stroke="currentColor" stroke-width="2">
                                     <path
@@ -2099,7 +2099,7 @@
                             <path
                                 d="M5 4h4l2 5-2.5 2.5a12 12 0 006 6L17 15l4 1v4a2 2 0 01-2 2C9.5 22 2 14.5 2 6a2 2 0 012-2z" />
                         </svg></button>
-                    <button class="btn btn-primary" style="flex:1;" id="odActionBtn" onclick="advanceStep()">Navigate to
+                    <button class="btn btn-primary" style="flex:1;" id="odActionBtn" onclick="startNavigation()">Navigate to
                         pickup</button>
                 </div>
             </section>
@@ -2352,8 +2352,8 @@
                 hideIncomingSheet();
                 
                 state.activeOrder = {
-                    id: 'VP' + (4500 + Math.floor(Math.random() * 90)),
-                    store: p.store, customer: p.customer, addr: p.addr, dist: p.dist, amt: p.amt,customer_dist:p.customer_dist,warehouse_dist:p.warehouse_dist
+                    id: 'VP' + data.order.token_no,
+                    store: p.store, customer: p.customer, addr: p.addr, dist: p.dist, amt: data.order.amount,customer_dist:p.customer_dist,warehouse_dist:p.warehouse_dist,items:data.order.items
                 };
                 state.odStep = 0;
                 renderHomeStatus();
@@ -2382,9 +2382,6 @@
             attribution: "© OpenStreetMap contributors"
         }).addTo(map);
         function renderOrderDetail() {
-            let get_cordinatess=state.recent_order
-            L.marker([get_cordinatess.warehouse_lng, get_cordinatess.warehouse_lat]).addTo(map);
-                L.marker([get_cordinatess.customer_lng, get_cordinatess.customer_lat]).addTo(map);
             const o = state.activeOrder;
             if (!o) return;
             document.getElementById('odOrderId').textContent = 'ORDER #' + o.id;
@@ -2396,14 +2393,28 @@
             document.getElementById('odStatus').textContent = meta.status;
             document.getElementById('odBadge').textContent = meta.badge;
             document.getElementById('odActionBtn').textContent = meta.btn;
-            setTimeout(() => {
-                map.invalidateSize();
+            document.getElementById('odPrice').textContent = "+₹" + o.amt;
+            document.getElementById('customer_name').textContent=o.customer
+            load_order_items(o.items)
+            setTimeout(async() => {
+                await map.invalidateSize();
             }, 500);
             const get_cordinates=state.recent_order
             console.log("get_cordinates",get_cordinates);
             
-            L.marker([get_cordinates.warehouse_lng, get_cordinates.warehouse_lat]).addTo(map);
-            L.marker([get_cordinates.customer_lng, get_cordinates.customer_lat]).addTo(map);
+            warehouse_marker=L.marker([get_cordinates.warehouse_lat, get_cordinates.warehouse_lng]).addTo(map);
+            warehouse_marker.bindPopup("Warehouse").openPopup();
+            customer_marker=L.marker([get_cordinates.customer_lat, get_cordinates.customer_lng]).addTo(map);
+            customer_marker.bindPopup("customer").openPopup();
+            drawRoute()
+            const bounds = L.latLngBounds([
+                [get_cordinates.warehouse_lat, get_cordinates.warehouse_lng],
+                [get_cordinates.customer_lat, get_cordinates.customer_lng]
+            ]);
+
+            map.fitBounds(bounds, {
+                padding: [30, 30]
+            });
         }
 
         function advanceStep() {
@@ -2418,6 +2429,21 @@
             if (state.odStep === 3) {
                 showToast('Arrived at drop location');
             }
+        }
+
+        function startNavigation(){
+                const c = state.recent_order;
+
+                const lat = c.customer_lat;
+                const lng = c.customer_lng;
+
+                const url =
+                    `https://www.google.com/maps/dir/?api=1` +
+                    `&destination=${lat},${lng}` +
+                    `&travelmode=driving`;
+
+                window.open(url, "_blank");
+                 advanceStep()
         }
 
         function dOtpMove(el, idx) {
@@ -2447,7 +2473,54 @@
             switchTab('home');
             showToast('Delivered! ₹' + amt + ' added to earnings');
         }
+        async function drawRoute() {
+    const c = state.recent_order;
 
+    const warehouse = `${c.warehouse_lng},${c.warehouse_lat}`;
+    const customer = `${c.customer_lng},${c.customer_lat}`;
+
+    const url =
+        `https://router.project-osrm.org/route/v1/driving/` +
+        `${warehouse};${customer}?overview=full&geometries=geojson`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.code !== "Ok") {
+        console.log("Route not found");
+        return;
+    }
+
+    const route = data.routes[0];
+
+    L.geoJSON(route.geometry, {
+        style: {
+            color: "#FF5D2E",
+            weight: 5,
+            opacity: 0.8
+        }
+    }).addTo(map);
+
+    console.log("Road distance:", route.distance / 1000, "km");
+    console.log("ETA:", route.duration / 60, "minutes");
+}
+        
+        function load_order_items(items){
+            const itemsList = document.getElementById("orderItems");
+
+            itemsList.innerHTML = "";
+
+            for (const [name, qty] of Object.entries(items)) {
+                const li = document.createElement("li");
+
+                li.innerHTML = `
+                    <span>${name}</span>
+                    <span>×${qty}</span>
+                `;
+
+                itemsList.appendChild(li);
+            }
+        }
         /* ============================================================
            ORDERS HISTORY
            ============================================================ */

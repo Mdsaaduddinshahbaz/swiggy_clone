@@ -107,6 +107,7 @@ def login_required(f):
             g.type = payload["type"]
             if(g.type == "user"):
                 g.user_id = payload["user_id"]
+                g.username=payload["username"]
             elif(g.type == "seller"):
                 g.res_id=payload["res_id"]
                 g.username=payload["username"]
@@ -2147,15 +2148,15 @@ def accept_order_server():
     print(data)
     order_id = data["order_id"]
 
-    won = accept_order_redis(order_id, driver_id)
+    won,redis_data = accept_order_redis(order_id, driver_id)
     print("won=",won)
     if (won==False):
         print("won in if condition",won)
         socketio.emit("order_taken", {"order_id": order_id}, room=f"driver_{driver_id}")
         return {"success": False, "message": "Order already taken"}
 
-    result = accept_delivery_order(order_id, driver_id)  # Mongo
-    socketio.emit("new_order", {"msg": "refresh"}, room="warehouse")
+    result = accept_delivery_order(order_id, driver_id,redis_data)  # Mongo
+    socketio.emit("driver_assigned", {"order_id": order_id}, room="warehouse")
     if not result["success"]:
         delete_lock(order_id)
         # r.delete(f"order:{order_id}:lock")   # release — Mongo disagreed, don't leave it locked
@@ -2163,8 +2164,8 @@ def accept_order_server():
         return {"success": False, "message": result["message"]}
 
     # mark_driver_busy(driver_id)
-    # return {"success": True, "order": result["order"]}
-    return {"success": True}
+    return {"success": True, "order": result["order"]}
+    # return {"success": True}
 if __name__ == "__main__":
     socketio.run(app, debug=True)
 # from waitress import serve
