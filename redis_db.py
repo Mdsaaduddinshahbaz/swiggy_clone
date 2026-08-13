@@ -26,6 +26,8 @@ pool = redis.BlockingConnectionPool(
     timeout=5,
     decode_responses=True,
     db=0,
+    socket_keepalive=True,
+    health_check_interval=30,
 )
 r = redis.Redis(connection_pool=pool)
 
@@ -222,54 +224,68 @@ def distance_km(lat1, lon1, lat2, lon2):
 import time
 
 def update_driver_location(driver_id, lat, lng):
+    driver_id = str(driver_id)
     pipe = r.pipeline()
     pipe.geoadd("available_drivers", (lng, lat, driver_id))
     pipe.hset(
         f"driver:{driver_id}",
         mapping={
             "status": "available",
-            "last_seen": time.time()
+            "last_seen": time.time(),
+            "last_lat": lat,
+            "last_lng": lng,
         }
     )
     pipe.execute()
-
     return {"success": True}
 
-# count = r.zcard("available_drivers")
-# print("Available drivers:", count)
-# driver_ids = r.zrange("available_drivers", 0, -1)
+def free_driver(driver_id):
+    """Call after a delivery is completed (or cancelled) so the driver
+    becomes searchable again, using their last known location."""
+    driver_id = str(driver_id)
+    details = r.hgetall(f"driver:{driver_id}")
+    lat = details.get("last_lat")
+    lng = details.get("last_lng")
 
-# for driver_id in driver_ids:
-#     socketio.emit("order_request",{"driver_id":driver_id},room=f"driver_{driver_id}")
-#     details = r.hgetall(f"driver:{driver_id}")
-#     location = r.geopos("available_drivers", driver_id)
+    if lat and lng:
+        return update_driver_location(driver_id, float(lat), float(lng))
 
-#     print({
-#         "driver_id": driver_id,
-#         "details": details,
-#         "location": location[0] if location else None
-#     })
-def remove_driver(driver_id):
+    # no location on file yet — just mark them idle; they'll reappear
+    # in the pool as soon as their next location ping comes in
+    r.hset(f"driver:{driver_id}", "status", "offline")
+    return {"success": True}
+
+
+def set_driver_offline(driver_id):
+    """Call when a driver explicitly toggles offline. Keeps their hash
+    (so last_lat/last_lng survive) but removes them from the searchable set."""
+    driver_id = str(driver_id)
     pipe = r.pipeline()
     pipe.zrem("available_drivers", driver_id)
-    pipe.delete(f"driver:{driver_id}")
+    pipe.hset(f"driver:{driver_id}", "status", "offline")
     pipe.execute()
-
     return {"success": True}
 
 def accept_order_redis(order_id, driver_id):
-    print(type(order_id),type(driver_id))
-    
-    won = r.set(f"order:{order_id}:lock", driver_id, nx=True, ex=60)
-    # mark_driver_busy(driver_id)
-    if won:
-        key = f"order_request:{order_id}:{driver_id}"
+    order_id = str(order_id)
+    driver_id = str(driver_id)
 
-        raw = r.get(key)
-        request = json.loads(raw)
-        mark_driver_busy(driver_id)
-        return bool(won),request
-    return bool(won),None   # actually return the outcome
+    won = r.set(f"order:{order_id}:lock", driver_id, nx=True, ex=60)
+    if not won:
+        return False, None
+
+    key = f"order_request:{order_id}:{driver_id}"
+    raw = r.get(key)
+
+    if not raw:
+        # request expired, or was never sent to this driver — release the lock
+        # instead of leaving the order stuck for 60s with no one able to claim it
+        r.delete(f"order:{order_id}:lock")
+        return False, None
+
+    request = json.loads(raw)
+    mark_driver_busy(driver_id)
+    return True, request
 def delete_lock(order_id):
     r.delete(f"order:{order_id}:lock")
 # delete_lock("6a6f3511d9808c816b5d9930")
@@ -398,29 +414,6 @@ def search_driver(res_loc, username, user_coordinates, order_id, count=10):
             for driver in drivers
         ]
     }
-def get_carts(uid):
-    uid = str(uid)
-    meta_key = f"cart:{uid}:meta"
-    items_key = f"cart:{uid}:items"
-
-    meta = r.hgetall(meta_key)
-    if not meta:
-        return None
-
-    raw_items = r.hgetall(items_key)
-    items = {item_id: json.loads(value) for item_id, value in raw_items.items()}
-
-    return {
-        "uid": uid,
-        "total": int(meta.get("total", 0)),
-        "cart": {
-            meta.get("restaurant"): {
-                "name": meta.get("restaurant_name"),
-                "items": items,
-            }
-        },
-    }
-
 import orjson
 
 def get_cart(uid):

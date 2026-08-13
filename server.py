@@ -1,9 +1,24 @@
 import eventlet
 eventlet.monkey_patch()
-from database import create_new_driver, save_category,get_seller_analytics,get_resturantItem_price,accept_delivery_order,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+from database import (
+    create_new_driver, save_category, get_seller_analytics, get_resturantItem_price,
+    accept_delivery_order, add_subcategory, add_resturant_items, check_existing_owner,
+    set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants,
+    add_customer_items, update_resturant_item, remove_itemss, store_orders, get_orders,
+    store_seller_orders, get_seller_ordes, check_existing_user, create_new_user,
+    update_order_status_seller, update_order_status_user, resturant_stats,
+    return_res_analytics, save_address, verify_order, check_existing_driver,
+    confirm_delivery, decline_delivery_order, advance_delivery_step,
+    get_driver_home_stats, get_driver_order_history, get_driver_earnings_summary,
+    get_weekly_earnings_chart, get_driver_documents, update_driver_vehicle,
+    set_driver_online_status, get_restaurant_location
+)
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room,leave_room
-from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock,search_driver,update_driver_location,accept_order_redis
+from redis_db import (
+    add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, search_driver,
+    update_driver_location, accept_order_redis, delete_lock, set_driver_offline
+)
 from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
@@ -26,7 +41,10 @@ mail_password=os.getenv("Mail_password")
 secret_key=os.getenv("Mail_secret_key")
 brevo_api=os.getenv("brevo_api_email")
 app=Flask(__name__)
-CORS(app)
+IS_PROD = os.getenv("FLASK_ENV") == "production"
+COOKIE_SECURE = IS_PROD
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+CORS(app, supports_credentials=True, origins=ALLOWED_ORIGINS)
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -52,7 +70,6 @@ if redis_user or redis_pass:
     storage_uri = f"redis://{redis_user}:{redis_pass}@{redis_host}:{redis_port}"
 else:
     storage_uri = f"redis://{redis_host}:{redis_port}"
-print(storage_uri)
 # limiter = Limiter(app=app, key_func=rate_limit_key, storage_uri=storage_uri, default_limits=["200 per minute"])
 app.config["MAIL_SERVER"] = mail_sever_name
 app.config["MAIL_PORT"] = mail_port
@@ -123,6 +140,25 @@ def login_required(f):
 
         return f(*args, **kwargs)
 
+    return wrapper
+def auth_driver(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        token = request.cookies.get("driver_token")
+        if not token:
+            return jsonify({"success": False, "message": "Unauthorized"}), 401
+        try:
+            payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            if payload.get("type") != "driver":
+                return jsonify({"success": False, "message": "Unauthorized"}), 401
+            g.type = "driver"
+            g.driver_id = payload["driver_id"]
+            g.username = payload.get("username")
+        except jwt.InvalidTokenError:
+            response = jsonify({"success": False, "message": "Invalid token"})
+            response.delete_cookie("driver_token")
+            return response, 401
+        return f(*args, **kwargs)
     return wrapper
 def auth_seller_res(f):
     @wraps(f)
@@ -415,7 +451,7 @@ def add_resturant():
                 "seller_token",
                 token,
                 httponly=True,
-                secure=False,      # True in production with HTTPS
+                secure=COOKIE_SECURE,      # True in production with HTTPS
                 samesite="Lax",
                 max_age=7 * 24 * 60 * 60
             )
@@ -443,7 +479,7 @@ def add_resturant():
                 "seller_token",
                 token,
                 httponly=True,
-                secure=False,      # True in production with HTTPS
+                secure=COOKIE_SECURE,      # True in production with HTTPS
                 samesite="Lax",
                 max_age=7 * 24 * 60 * 60
             )
@@ -568,6 +604,8 @@ def cartss(userid):
 @app.post("/get_cart_items")
 @login_required
 def list_cart_items():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
         print("in get cart",g.__dict__)
         data=request.get_json()
@@ -626,6 +664,8 @@ def list_cart_items():
 @login_required
 #@limiter.limit("120 per minute")
 def updateCart():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
         data = request.get_json(force=True) or {}
         item_id = data.get("item_id")
@@ -658,6 +698,8 @@ def updateCart():
 #@limiter.limit("30 per minute")
 @login_required
 def addToCart():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
         data, error = validate_add_to_cart()
         if error:
@@ -699,43 +741,133 @@ def seller_page(name,seller_id):
     except Exception as e:
         print(e)
         return({"success":False})
+@app.post("/confirm_delivery")
+@auth_driver
+def confirm_delivery_route():
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
+    # otp = str(data.get("otp", "")).strip()
+
+    # if not order_id or not otp:
+    #     return jsonify({"success": False, "message": "order_id and otp are required"}), 400
+
+    if not order_id :
+        return jsonify({"success": False, "message": "order_id"}), 400
+
+    result = confirm_delivery(order_id, g.driver_id)
+    if result["success"]:
+        return jsonify(result)
+    return jsonify(result), 400
+
+
+@app.post("/decline_order")
+@auth_driver
+def decline_order_route():
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
+    if not order_id:
+        return jsonify({"success": False, "message": "order_id is required"}), 400
+
+    decline_delivery_order(order_id, g.driver_id)
+    return jsonify({"success": True})
+
+
+@app.post("/advance_delivery_step")
+@auth_driver
+def advance_delivery_step_route():
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
+    if not order_id:
+        return jsonify({"success": False, "message": "order_id is required"}), 400
+
+    res = advance_delivery_step(order_id, g.driver_id)
+    return jsonify(res)
+
+
+@app.post("/driver/home_stats")
+@auth_driver
+def driver_home_stats_route():
+    return jsonify(get_driver_home_stats(g.driver_id))
+
+
+@app.post("/driver/history")
+@auth_driver
+def driver_history_route():
+    data = request.get_json(silent=True) or {}
+    return jsonify({"success": True, "history": get_driver_order_history(g.driver_id, data.get("range", "today"))})
+
+
+@app.post("/driver/earnings")
+@auth_driver
+def driver_earnings_route():
+    data = request.get_json(silent=True) or {}
+    return jsonify({"success": True, "summary": get_driver_earnings_summary(g.driver_id, data.get("range", "today"))})
+
+
+@app.get("/driver/earnings/weekly")
+@auth_driver
+def driver_earnings_weekly_route():
+    return jsonify({"success": True, "chart": get_weekly_earnings_chart(g.driver_id)})
+
+
+@app.get("/driver/documents")
+@auth_driver
+def driver_documents_route():
+    return jsonify({"success": True, "documents": get_driver_documents(g.driver_id)})
+
+
+@app.post("/driver/vehicle")
+@auth_driver
+def driver_vehicle_route():
+    data = request.get_json(silent=True) or {}
+    vehicle_type = data.get("vehicle_type")
+    plate = data.get("plate")
+    if not vehicle_type or not plate:
+        return jsonify({"success": False, "message": "vehicle_type and plate are required"}), 400
+    return jsonify(update_driver_vehicle(g.driver_id, vehicle_type, plate))
+
 @app.post("/store_orders")
-#@limiter.limit("5 per minute")
 @login_required
 def store_order():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
     user_id = g.user_id
-    username=g.username
-    data=request.get_json()
-    coordinates=data["coordinates"]
+    username = g.username
+    data = request.get_json(silent=True) or {}
+    coordinates = data.get("coordinates")
+    if not coordinates:
+        return jsonify({"success": False, "message": "coordinates are required"}), 400
+
     lock_key = f"lock:checkout:{user_id}"
     token = acquire_lock(lock_key, ttl_seconds=15)
-
     if not token:
-        return jsonify({
-            "success": False,
-            "message": "Your order is already being processed"
-        }), 409
-    try:
-        # data=request.get_json()
-        user_id=g.user_id
-        resids,order_id_seller=store_orders(user_id,coordinates)
-        print("after store_order from mongo",resids)
-        if(resids==404):
-            return({"success":False})
-        if resids is False:
-            return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
-        # for resid in resids:
-        socketio.emit("new_order", {"msg": "refresh"}, room="warehouse")
-        print("after socket emit")
+        return jsonify({"success": False, "message": "Your order is already being processed"}), 409
 
-        search_driver.delay({"lat":17.38887979415329,"lng":78.428223916555},username,coordinates,order_id_seller,10)
-        print("after search")
-        return ({"success":True})
+    try:
+        result = store_orders(user_id, coordinates)
+
+        if result == 404:
+            return jsonify({"success": False, "message": "Cart is empty"}), 400
+        if result is False:
+            return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
+
+        restaurant_ids, seller_order_ids = result
+        socketio.emit("new_order", {"msg": "refresh"}, room="warehouse")
+
+        for res_id, seller_order_id in zip(restaurant_ids, seller_order_ids):
+            res_location = get_restaurant_location(res_id)
+            if res_location:
+                search_driver.delay(res_location, username, coordinates, seller_order_id, 10)
+
+        return jsonify({"success": True})
     except Exception as e:
         print(e)
-        return({"success":False})
+        return jsonify({"success": False}), 500
     finally:
         release_lock(lock_key, token)
+
+
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:
@@ -746,6 +878,8 @@ def renderOrders(userid):
 @app.post("/get_orders/<userid>")
 @login_required
 def getOrders(userid):
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
         userid=g.user_id
         orders=get_orders(userid)
@@ -792,14 +926,38 @@ def renderSellerOrders(res_name,res_id):
     except Exception as e:
         print(e)
         return({"success":False})
-@app.get("/driver/<driver_id>")
-def renderdriverOrders(driver_id):
-    try:
-        return render_template("driver_ui.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
+@app.route("/accept_order", methods=["POST"])
+@auth_driver
+def accept_order_server():
+    driver_id = g.driver_id
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
 
+    if not order_id:
+        return jsonify({"success": False, "message": "order_id is required"}), 400
+
+    won, redis_data = accept_order_redis(order_id, driver_id)
+    if not won:
+        socketio.emit("order_taken", {"order_id": order_id}, room=f"driver_{driver_id}")
+        return jsonify({"success": False, "message": "Order already taken"}), 409
+
+    result = accept_delivery_order(order_id, driver_id, redis_data)
+    socketio.emit("driver_assigned", {"order_id": order_id}, room="warehouse")
+
+    if not result["success"]:
+        delete_lock(order_id)
+        return jsonify({"success": False, "message": result["message"]}), 400
+
+    return jsonify({"success": True, "order": result["order"]})
+
+@app.get("/driver/<driver_id>")
+@auth_driver
+def renderdriverOrders(driver_id):
+    return render_template("driver_ui.html")
+@app.get("/driver")
+# @auth_driver
+def renderdriverOrdersss():
+    return render_template("driver_ui.html")
 @socketio.on('join_seller_room')
 @login_required
 def handle_join(data):
@@ -829,18 +987,40 @@ def handle_user_join(data):
         return({"success":False})
 @socketio.on("join_driver_room")
 def join_driver_room(data):
-    driver_id = data["driver_id"]
-
-    print("driver_id room:", driver_id)
+    token = request.cookies.get("driver_token")
+    if not token:
+        emit("auth_error", {"message": "Not authenticated"})
+        return
+    try:
+        payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+        if payload.get("type") != "driver":
+            raise jwt.InvalidTokenError()
+        driver_id = payload["driver_id"]
+    except jwt.InvalidTokenError:
+        emit("auth_error", {"message": "Invalid token"})
+        return
 
     room = f"driver_{driver_id}"
     join_room(room)
+    emit("joined", {"room": room})
 
-    print("JOINED ROOM:", room)
 
-    emit("joined", {
-        "room": room
-    })
+@socketio.on("leave_driver_room")
+def leave_drivers_room(data):
+    token = request.cookies.get("driver_token")
+    if not token:
+        return
+    try:
+        payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+        driver_id = payload["driver_id"]
+    except jwt.InvalidTokenError:
+        return
+
+    room = f"driver_{driver_id}"
+    leave_room(room)
+    emit("left", {"room": room})
+
+
 @socketio.on("leave_driver_room")
 def leave_drivers_room(data):
     driver_id = data["driver_id"]
@@ -889,6 +1069,70 @@ def handle_order_completed(data):
 import re
 
 EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+@app.post("/validate_driver")
+def validate_driver():
+    credentials, error = validate_credentials(request.get_json(silent=True))
+    if error:
+        return error
+
+    res = check_existing_driver(credentials["email"], credentials["password"])
+
+    if res.get("success") is True:
+        token = jwt.encode(
+            {
+                "type": "driver",
+                "driver_id": res["userid"],
+                "username": res["username"],
+                "exp": datetime.utcnow() + timedelta(days=30)
+            },
+            app.config["SECRET_KEY"],
+            algorithm="HS256"
+        )
+        response = jsonify({"success": True, "driver_id": res["userid"], "username": res["username"]})
+        response.set_cookie(
+            "driver_token", token,
+            httponly=True, secure=COOKIE_SECURE, samesite="Lax",
+            max_age=30 * 24 * 60 * 60
+        )
+        return response
+
+    return jsonify({"success": False, "message": "Invalid email or password"}), 401
+
+
+@app.get("/logout/driver")
+def logout_driver():
+    response = jsonify({"success": True})
+    response.delete_cookie("driver_token")
+    return response
+
+
+@app.get("/driver/me")
+@auth_driver
+def driver_me():
+    return jsonify({"success": True, "driver_id": g.driver_id, "username": g.username})
+
+@app.post("/signup_driver")
+def signup_driver():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"success": False, "message": "Request body is required"}), 400
+
+    email = data.get("email", "").strip().lower()
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+
+    if not email or not EMAIL_REGEX.match(email):
+        return jsonify({"success": False, "message": "Valid email is required"}), 400
+    if not username or len(username) < 3:
+        return jsonify({"success": False, "message": "Username is required"}), 400
+    if not password or len(password) < 8:
+        return jsonify({"success": False, "message": "Password must be at least 8 characters"}), 400
+
+    res = create_new_driver(email, username, password)
+    if res["success"]:
+        return jsonify({"success": True, "id": res["id"]})
+    return jsonify({"success": False, "message": res.get("message", "Signup failed")}), 400
+
 @app.post("/validate_user")
 #@limiter.limit("10 per minute")
 def validate():
@@ -935,7 +1179,7 @@ def validate():
                     "user_token",
                     token,
                     httponly=True,
-                    secure=False,      # True in production with HTTPS
+                    secure=COOKIE_SECURE,      # True in production with HTTPS
                     samesite="Lax",
                     max_age=7 * 24 * 60 * 60
                 )
@@ -995,7 +1239,7 @@ def validate_owner():
                         "seller_res_token",
                         token,
                         httponly=True,
-                        secure=False,      # True in production with HTTPS
+                        secure=COOKIE_SECURE,      # True in production with HTTPS
                         samesite="Lax",
                         max_age=7 * 24 * 60 * 60
                     )
@@ -1022,7 +1266,7 @@ def validate_owner():
                     "seller_token",
                     token,
                     httponly=True,
-                    secure=False,      # True in production with HTTPS
+                    secure=COOKIE_SECURE,      # True in production with HTTPS
                     samesite="Lax",
                     max_age=7 * 24 * 60 * 60
                 )
@@ -1092,7 +1336,7 @@ def signup_user():
                         "seller_res_token",
                         token,
                         httponly=True,
-                        secure=False,      # True in production with HTTPS
+                        secure=COOKIE_SECURE,      # True in production with HTTPS
                         samesite="Lax",
                         max_age=7 * 24 * 60 * 60
                     )
@@ -1331,6 +1575,8 @@ def handle_user_cancel(data):
 @login_required
 #@limiter.limit("10 per minute")
 def save_address_type():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:    
         # data=request.get_json()
         # address=data["address"]
@@ -1360,6 +1606,8 @@ def save_address_type():
 @app.post("/fetch_address")
 @login_required
 def fetch_addresss():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
         data=request.get_json()
         # uid=data["user_id"]
@@ -2115,59 +2363,38 @@ def validate_signup(data):
 #         return res
 #     else:
 #         return ({"success":False})
-@app.route("/signup_driver",methods=["POST"])
-def signup_driver():
-    data=request.get_json()
-    email=data["email"]
-    username=data["username"]
-    password=data["password"]
-    res=create_new_driver(email,username,password)
-    if(res["success"]):
-        return {"success":True,"id":res["id"]}
-    else:
-        return {"success":False}
-@app.route("/partner_online",methods=["POST"])
+
+@app.route("/partner_online", methods=["POST"])
+@auth_driver
 def set_online():
-    # driver_id=g.driver_id
-    data=request.get_json()
-    driver_id=data["driver_id"]
-    lat=float(data["lat"])
-    lng=float(data["lng"])
-    res=update_driver_location(driver_id,lat,lng)
-    print(res)
-    if(res["success"]):
-        return {"success":True}
-    else:
-        return {"success":False}
-from redis_db import delete_lock
-@app.route("/accept_order", methods=["POST"])
-def accept_order_server():
-    # driver_id = g.driver_id
-    driver_id="6a7b39442f2f1da998fb0928"
-    data = request.get_json()
-    print(data)
-    order_id = data["order_id"]
+    data = request.get_json(silent=True) or {}
+    try:
+        lat = float(data["lat"])
+        lng = float(data["lng"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"success": False, "message": "Valid lat/lng required"}), 400
 
-    won,redis_data = accept_order_redis(order_id, driver_id)
-    print("won=",won)
-    if (won==False):
-        print("won in if condition",won)
-        socketio.emit("order_taken", {"order_id": order_id}, room=f"driver_{driver_id}")
-        return {"success": False, "message": "Order already taken"}
+    driver_id = g.driver_id
+    res = update_driver_location(driver_id, lat, lng)
+    set_driver_online_status(driver_id, True)
 
-    result = accept_delivery_order(order_id, driver_id,redis_data)  # Mongo
-    socketio.emit("driver_assigned", {"order_id": order_id}, room="warehouse")
-    if not result["success"]:
-        delete_lock(order_id)
-        # r.delete(f"order:{order_id}:lock")   # release — Mongo disagreed, don't leave it locked
-        # socketio.emit("order_taken", {"order_id": order_id}, room=f"driver_{driver_id}")
-        return {"success": False, "message": result["message"]}
+    if res["success"]:
+        return jsonify({"success": True})
+    return jsonify({"success": False}), 500
 
-    # mark_driver_busy(driver_id)
-    return {"success": True, "order": result["order"]}
-    # return {"success": True}
+
+@app.route("/partner_offline", methods=["POST"])
+@auth_driver
+def set_offline():
+    driver_id = g.driver_id
+    set_driver_offline(driver_id)
+    set_driver_online_status(driver_id, False)
+    return jsonify({"success": True})
+
+
+
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True)  # never True once FLASK_ENV=production
 # from waitress import serve
 
 # serve(

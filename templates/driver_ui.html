@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <title>VOLT Partner — Rider App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet"href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
@@ -238,8 +238,7 @@
         }
 
         /* ============ LOGIN ============ */
-        #screen-login,
-        #screen-otp {
+        #screen-login {
             padding: 0 26px;
             justify-content: center;
         }
@@ -1327,7 +1326,7 @@
             font-weight: 600;
             margin-top: 2px;
         }
-        
+
         .map-block {
             margin: 0 20px 16px;
             height: 180px;
@@ -1338,10 +1337,13 @@
                 linear-gradient(135deg, #1a2b24 0%, #182028 60%);
             border: 1px solid var(--stroke);
         }
+
         #map {
             height: 100%;
-            width: 100%;;
+            width: 100%;
+            ;
         }
+
         .map-block .grid {
             position: absolute;
             inset: 0;
@@ -1676,41 +1678,19 @@
                 <div class="auth-title">Let's get you<br>on the road.</div>
                 <div class="auth-sub">Enter your registered mobile number to sign in to your rider account.</div>
                 <div class="field">
-                    <label for="phoneInput">Mobile number</label>
+                    <label for="driverEmailInput">Email</label>
                     <div class="phone-input-wrap">
-                        <span class="code">+91</span>
-                        <input id="phoneInput" type="tel" inputmode="numeric" maxlength="10" placeholder="98765 43210">
+                        <input id="driverEmailInput" type="email" placeholder="you@example.com" style="width:100%;">
                     </div>
                 </div>
-                <button class="btn btn-primary" style="width:100%; margin-top:14px;" id="sendOtpBtn" disabled
-                    onclick="goToOtp()">Send OTP</button>
-                <p style="font-size:11px; color:var(--slate-dim); text-align:center; margin-top:20px; line-height:1.6;">
-                    By continuing, you agree to VOLT's Partner Terms<br>and Privacy Policy.</p>
-            </section>
-
-            <!-- ============ OTP ============ -->
-            <section class="screen" id="screen-otp">
-                <div class="statusbar"><span>9:41</span><span class="icons">●●●</span></div>
-                <div style="padding-top:8px;">
-                    <div class="back-link" onclick="showScreen('screen-login')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M15 18l-6-6 6-6" />
-                        </svg> Back
+                <div class="field">
+                    <label for="driverPasswordInput">Password</label>
+                    <div class="phone-input-wrap">
+                        <input id="driverPasswordInput" type="password" placeholder="••••••••" style="width:100%;">
                     </div>
-                    <div class="auth-title">Verify your<br>number</div>
-                    <div class="auth-sub">Enter the 4-digit code sent to <span id="otpPhoneShow"
-                            style="color:var(--text);">+91 98765 43210</span></div>
-                    <div class="otp-row">
-                        <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,1)">
-                        <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,2)">
-                        <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,3)">
-                        <input class="otp-box" maxlength="1" inputmode="numeric" oninput="otpMove(this,4)">
-                    </div>
-                    <button class="btn btn-primary" style="width:100%;" onclick="loginSuccess()">Verify &amp;
-                        Continue</button>
-                    <div class="resend" style="margin-top:18px;">Didn't get a code? <b>Resend</b></div>
                 </div>
+                <button class="btn btn-primary" style="width:100%; margin-top:14px;" onclick="driverLogin()">Log
+                    in</button>
             </section>
 
             <!-- ============ MAIN APP ============ -->
@@ -1744,7 +1724,7 @@
                                 <div class="lbl">Deliveries</div>
                             </div>
                             <div class="stat-card">
-                                <div class="num display-num mono">5h 20m</div>
+                                <div class="num display-num mono" id="statTime">5h 20m</div>
                                 <div class="lbl">Online time</div>
                             </div>
                         </div>
@@ -1761,7 +1741,7 @@
                                         <path d="M20 6L9 17l-5-5" />
                                     </svg></div>
                                 <div class="lbl">Acceptance rate</div>
-                                <div class="val">92%</div>
+                                <div class="val" id="statAcceptance">92%</div>
                             </div>
                             <div class="snap-row">
                                 <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1778,7 +1758,7 @@
                                         <path d="M15 9l-6 6M9 9l6 6" />
                                     </svg></div>
                                 <div class="lbl">Cancellations</div>
-                                <div class="val">1</div>
+                                <div class="val" id="statCancel">1</div>
                             </div>
                         </div>
                     </section>
@@ -1857,7 +1837,8 @@
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L6 20l2-7L2 9h7z" />
                                 </svg>
-                                4.86 rider rating
+                                <div class="val" id="statRating">4.86 rider rating</div>
+                                
                             </div>
                         </div>
 
@@ -2039,7 +2020,8 @@
                                 <div class="route-points">
                                     <div class="route-point">
                                         <div class="name" id="odPickupName">Blinkit Dark Store · Sector 21</div>
-                                        <div class="addr" id="pickupAddr">Plot 14, Industrial Area, Sector 21, Gurugram</div>
+                                        <div class="addr" id="pickupAddr">Plot 14, Industrial Area, Sector 21, Gurugram
+                                        </div>
                                         <div class="dist" id="pickupDist">PICKUP · 400m away</div>
                                     </div>
                                     <div class="route-point">
@@ -2099,7 +2081,8 @@
                             <path
                                 d="M5 4h4l2 5-2.5 2.5a12 12 0 006 6L17 15l4 1v4a2 2 0 01-2 2C9.5 22 2 14.5 2 6a2 2 0 012-2z" />
                         </svg></button>
-                    <button class="btn btn-primary" style="flex:1;" id="odActionBtn" onclick="startNavigation()">Navigate to
+                    <button class="btn btn-primary" style="flex:1;" id="odActionBtn"
+                        onclick="handleActionButton()">Navigate to
                         pickup</button>
                 </div>
             </section>
@@ -2127,26 +2110,62 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const pathParts = window.location.pathname.split("/");
-        const driver_id = window.APP_USER_ID || pathParts[pathParts.length - 1];
+        let driver_id = null;
         const socket = io({ autoConnect: false });
+
         socket.on("connect", () => {
-            console.log("Connected");
-            console.log("Connected:", socket.id);
-            socket.emit("join_driver_room", { driver_id: driver_id });
+            socket.emit("join_driver_room", {});
         });
         socket.on("disconnect", () => {
-            console.log("disconnected");
-            // toggleOnline()
-            socket.emit("leave_driver_room", { driver_id: driver_id })
+            socket.emit("leave_driver_room", {});
         });
         socket.on("order_request", (data) => {
-            console.log(data);
+            state.recent_order = data;
+            triggerIncomingOrder(data.store_name, data.amt, data.distance_km, data.customer_name, data.order_id, data.customer_km, data.warehouse_km);
+        });
+        socket.on("order_taken", (data) => {
+            if (state.pendingOrder && state.pendingOrder.order_id === data.order_id) {
+                clearInterval(state.countdownTimer);
+                hideIncomingSheet();
+                showToast('Order was taken by another rider');
+            }
+        });
+        fetchHomeStats()
+        async function driverLogin() {
+            const email = document.getElementById('driverEmailInput').value.trim();
+            const password = document.getElementById('driverPasswordInput').value;
 
-            // document.getElementById("message").textContent=data.driver_id + " g" + data.distance_km
-            state.recent_order=data
-            triggerIncomingOrder(data.store_name, data.amt, data.distance_km, data.customer_name,data.order_id,data.customer_km,data.warehouse_km)
-        })
+            if (!email || !password) {
+                showToast('Enter your email and password');
+                return;
+            }
+
+            try {
+                const res = await fetch('/validate_driver', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    driver_id = data.driver_id;
+                    document.getElementById('topbarTitle').textContent = 'Hey, ' + data.username;
+                    showScreen('main-app');
+                    switchTab('home');
+                    
+                    fetchHomeStats();
+                    renderHomeStatus();
+                    renderChart();
+                } else {
+                    showToast(data.message || 'Login failed');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Something went wrong, please try again');
+            }
+        }
+
         /* ============================================================
            STATE
            ============================================================ */
@@ -2182,6 +2201,25 @@
             document.getElementById(id).classList.add('active');
         }
 
+        async function fetchHomeStats() {
+            try {
+                const res = await fetch('/driver/home_stats', { method: 'POST' });
+                const data = await res.json();
+                console.log(data);
+                
+                if (data.success) {
+                    document.getElementById('statEarnings').textContent = '₹' + data.earnings_today;
+                    document.getElementById('statOrders').textContent = data.orders_today;
+                    document.getElementById('statTime').textContent=data.online_time
+                    document.getElementById('statRating').textContent=data.rating
+                    document.getElementById('statAcceptance').textContent=data.acceptance_rate+"%"
+                    document.getElementById('statCancel').textContent=data.cancellations
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + tab).classList.add('active');
@@ -2196,44 +2234,9 @@
             document.getElementById('topbarTitle').textContent = tab === 'home' ? 'Hey, Rahul' : titles[tab][0];
             document.getElementById('topbarSub').textContent = titles[tab][1];
 
+            if (tab === 'home') fetchHomeStats();
             if (tab === 'orders') renderHistory('today');
             if (tab === 'earnings') renderChart();
-        }
-
-        /* ============================================================
-           LOGIN FLOW
-           ============================================================ */
-        const phoneInput = document.getElementById('phoneInput');
-        phoneInput.addEventListener('input', () => {
-            phoneInput.value = phoneInput.value.replace(/\D/g, '').slice(0, 10);
-            document.getElementById('sendOtpBtn').disabled = phoneInput.value.length !== 10;
-        });
-
-        function goToOtp() {
-            const formatted = '+91 ' + phoneInput.value.slice(0, 5) + ' ' + phoneInput.value.slice(5);
-            document.getElementById('otpPhoneShow').textContent = formatted;
-            showScreen('screen-otp');
-            setTimeout(() => document.querySelector('#screen-otp .otp-box').focus(), 200);
-        }
-
-        function otpMove(el, idx) {
-            el.value = el.value.replace(/\D/g, '');
-            if (el.value && idx < 4) {
-                el.parentElement.children[idx].focus();
-            }
-        }
-
-        function loginSuccess() {
-            showScreen('main-app');
-            switchTab('home');
-            renderHomeStatus();
-            renderChart();
-        }
-
-        function logout() {
-            state.online = false;
-            updateOnlineUI();
-            showScreen('screen-login');
         }
 
         /* ============================================================
@@ -2241,17 +2244,14 @@
            ============================================================ */
         function toggleOnline() {
             state.online = !state.online;
+            socket.connect();
             updateOnlineUI();
             renderHomeStatus();
             if (state.online) {
-                socket.connect();
-                update_location()
+                update_location();
+            } else {
+                fetch('/partner_offline', { method: 'POST' }).catch(err => console.error(err));
             }
-            else socket.disconnect()
-            //   const res=update_location()
-            //   if(state.online && !state.activeOrder){
-            //     setTimeout(()=>{ if(state.online && !state.activeOrder) triggerIncomingOrder(); }, 3200);
-            //   }
         }
 
         function updateOnlineUI() {
@@ -2296,11 +2296,11 @@
         /* ============================================================
            INCOMING ORDER SHEET
            ============================================================ */
-        function triggerIncomingOrder(store, amt, distance, customer_name,order_id,customer_dist,warehouse_dist) {
-            console.log("order_id",order_id);
-            
+        function triggerIncomingOrder(store, amt, distance, customer_name, order_id, customer_dist, warehouse_dist) {
+            console.log("order_id", order_id);
+
             // const pick = incomingPool[Math.floor(Math.random() * incomingPool.length)];
-            const pick={ store: store, customer: customer_name, addr: "B-204, Palm Residency, Sector 14, Gurugram", dist: distance, amt: amt,order_id:order_id,customer_dist:customer_dist,warehouse_dist:warehouse_dist }
+            const pick = { store: store, customer: customer_name, addr: "B-204, Palm Residency, Sector 14, Gurugram", dist: distance, amt: amt, order_id: order_id, customer_dist: customer_dist, warehouse_dist: warehouse_dist }
             state.pendingOrder = pick;
             document.getElementById('sheetPickupName').textContent = store;
             document.getElementById('sheetAmt').textContent = '+₹' + amt;
@@ -2339,42 +2339,47 @@
 
         async function acceptOrder() {
             const p = state.pendingOrder;
-            const res = await fetch("/accept_order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ "order_id": p.order_id })
-            })
-            const data = await res.json()
-            console.log(data);
-            
-            if (data.success) {
-                clearInterval(state.countdownTimer);
-                hideIncomingSheet();
-                
-                state.activeOrder = {
-                    id: 'VP' + data.order.token_no,
-                    store: p.store, customer: p.customer, addr: p.addr, dist: p.dist, amt: data.order.amount,customer_dist:p.customer_dist,warehouse_dist:p.warehouse_dist,items:data.order.items
-                };
-                state.odStep = 0;
-                renderHomeStatus();
-                renderOrderDetail();
-                showToast('Order accepted — head to pickup');
-                showScreen('screen-order-detail');
-            }
-            else{
-                alert("some error has occured")
-            }
+            try {
+                const res = await fetch("/accept_order", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ order_id: p.order_id })
+                });
+                const data = await res.json();
 
+                if (data.success) {
+                    clearInterval(state.countdownTimer);
+                    hideIncomingSheet();
+
+                    state.activeOrder = {
+                        order_id: data.order.order_id,
+                        id: 'VP' + data.order.token_no,
+                        store: p.store, customer: p.customer, addr: p.addr, dist: p.dist,
+                        amt: data.order.amount, customer_dist: p.customer_dist, warehouse_dist: p.warehouse_dist,
+                        items: data.order.items
+                    };
+                    state.odStep = 0;
+                    renderHomeStatus();
+                    renderOrderDetail();
+                    showToast('Order accepted — head to pickup');
+                    showScreen('screen-order-detail');
+                } else {
+                    showToast(data.message || 'Order no longer available');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Something went wrong, please try again');
+            }
         }
 
         /* ============================================================
            ORDER DETAIL / STEP FLOW
            ============================================================ */
         const stepMeta = [
-            { status: 'Heading to pickup', badge: 'To pickup', btn: 'Navigate to pickup', id:1 },
-            { status: 'At pickup location', badge: 'At pickup', btn: 'Confirm pickup',id:2 },
-            { status: 'Heading to drop', badge: 'To drop', btn: 'Navigate to drop', id:3 },
-            { status: 'At drop location', badge: 'At drop', btn: 'Complete delivery', id:4 },
+            { status: 'Heading to pickup', badge: 'To pickup', btn: 'Navigate to pickup', id: 1 },
+            { status: 'At pickup location', badge: 'At pickup', btn: 'Confirm pickup', id: 2 },
+            { status: 'Heading to drop', badge: 'To drop', btn: 'Navigate to drop', id: 3 },
+            { status: 'At drop location', badge: 'At drop', btn: 'Complete delivery', id: 4 },
         ];
         const map = L.map("map").setView([17.385, 78.4867], 13);
 
@@ -2384,27 +2389,33 @@
         function renderOrderDetail() {
             const o = state.activeOrder;
             if (!o) return;
+            if (state.mapLayers) {
+                state.mapLayers.forEach(layer => map.removeLayer(layer));
+            }
+            state.mapLayers = [];
             document.getElementById('odOrderId').textContent = 'ORDER #' + o.id;
             document.getElementById('odPickupName').textContent = o.store;
             document.getElementById('odDropName').textContent = o.customer;
-            document.getElementById('dropDist').textContent=o.customer_dist + " km away"
-            document.getElementById('pickupDist').textContent=o.warehouse_dist
+            document.getElementById('dropDist').textContent = o.customer_dist + " km away"
+            document.getElementById('pickupDist').textContent = o.warehouse_dist
             const meta = stepMeta[state.odStep];
             document.getElementById('odStatus').textContent = meta.status;
             document.getElementById('odBadge').textContent = meta.badge;
             document.getElementById('odActionBtn').textContent = meta.btn;
             document.getElementById('odPrice').textContent = "+₹" + o.amt;
-            document.getElementById('customer_name').textContent=o.customer
+            document.getElementById('customer_name').textContent = o.customer
             load_order_items(o.items)
-            setTimeout(async() => {
+            setTimeout(async () => {
                 await map.invalidateSize();
             }, 500);
-            const get_cordinates=state.recent_order
-            console.log("get_cordinates",get_cordinates);
-            
-            warehouse_marker=L.marker([get_cordinates.warehouse_lat, get_cordinates.warehouse_lng]).addTo(map);
+            const get_cordinates = state.recent_order
+            console.log("get_cordinates", get_cordinates);
+
+            warehouse_marker = L.marker([get_cordinates.warehouse_lat, get_cordinates.warehouse_lng]).addTo(map);
+            state.mapLayers.push(warehouse_marker);
             warehouse_marker.bindPopup("Warehouse").openPopup();
-            customer_marker=L.marker([get_cordinates.customer_lat, get_cordinates.customer_lng]).addTo(map);
+            customer_marker = L.marker([get_cordinates.customer_lat, get_cordinates.customer_lng]).addTo(map);
+            state.mapLayers.push(customer_marker);
             customer_marker.bindPopup("customer").openPopup();
             drawRoute()
             const bounds = L.latLngBounds([
@@ -2417,33 +2428,74 @@
             });
         }
 
-        function advanceStep() {
+        async function advanceStep() {
+            console.log("in advanceStep");
+            
             if (state.odStep === 3) {
                 document.getElementById('deliveryOtpOverlay').classList.add('show');
                 setTimeout(() => document.querySelector('#deliveryOtpOverlay .otp-box').focus(), 150);
                 return;
             }
-            state.odStep++;
-            renderOrderDetail();
+
+            try {
+                const res = await fetch('/advance_delivery_step', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: state.activeOrder.order_id })
+                });
+                const data = await res.json();
+                console.log(data);
+                
+                if (data.success) {
+                    console.log(data.step);
+                    
+                    state.odStep = data.step;
+                } else {
+                    showToast(data.message || 'Could not update step');
+                    return;
+                }
+            } catch (err) {
+                console.error(err);
+                state.odStep++;
+            }
+            console.log("after trycatch");
+            
             renderHomeStatus();
+            renderOrderDetail();
             if (state.odStep === 3) {
                 showToast('Arrived at drop location');
             }
         }
 
-        function startNavigation(){
-                const c = state.recent_order;
+        function openNavigation(lat, lng) {
+            const url =
+                `https://www.google.com/maps/dir/?api=1` +
+                `&destination=${lat},${lng}` +
+                `&travelmode=driving`;
+            window.open(url, "_blank");
+        }
 
-                const lat = c.customer_lat;
-                const lng = c.customer_lng;
+        async function handleActionButton() {
+            const c = state.recent_order;
+            console.log(c);
+            console.log(state.odStep);
+            
+            if (!c) return;
 
-                const url =
-                    `https://www.google.com/maps/dir/?api=1` +
-                    `&destination=${lat},${lng}` +
-                    `&travelmode=driving`;
-
-                window.open(url, "_blank");
-                advanceStep()
+            if (state.odStep === 0) {
+                // heading to pickup — route to the restaurant/warehouse
+                await advanceStep();
+                // setTimeout(() => openNavigation(c.warehouse_lat, c.warehouse_lng), 2600);
+                openNavigation(c.warehouse_lat, c.warehouse_lng);
+            } else if (state.odStep === 2) {
+                // heading to drop — route to the customer
+                openNavigation(c.customer_lat, c.customer_lng);
+                advanceStep();
+            } else {
+                // step 1 "Confirm pickup" and step 3 "Complete delivery" —
+                // driver is already there, no navigation needed
+                advanceStep();
+            }
         }
 
         function dOtpMove(el, idx) {
@@ -2455,69 +2507,87 @@
             document.getElementById('deliveryOtpOverlay').classList.remove('show');
         }
 
-        function confirmDelivery() {
-            document.getElementById('deliveryOtpOverlay').classList.remove('show');
-            const amt = state.activeOrder.amt;
-            state.earningsToday += amt;
-            state.ordersToday += 1;
-            document.getElementById('statEarnings').textContent = '₹' + state.earningsToday;
-            document.getElementById('statOrders').textContent = state.ordersToday;
-            document.getElementById('earnHeroAmt').textContent = '₹' + state.earningsToday;
+        async function confirmDelivery() {
+            const otpDigits = Array.from(document.querySelectorAll('#deliveryOtpOverlay .otp-box'))
+                .map(i => i.value).join('');
 
-            historyData.unshift({ id: state.activeOrder.id, path: 'Pickup → ' + state.activeOrder.customer.split(' ')[0], time: 'Just now', amt: amt, status: 'delivered' });
+            if (otpDigits.length !== 4) {
+                showToast('Enter the full 4-digit code');
+                return;
+            }
 
-            state.activeOrder = null;
-            state.odStep = 0;
-            renderHomeStatus();
-            showScreen('main-app');
-            switchTab('home');
-            showToast('Delivered! ₹' + amt + ' added to earnings');
+            try {
+                const res = await fetch('/confirm_delivery', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: state.activeOrder.order_id })
+                });
+                const data = await res.json();
+
+                document.getElementById('deliveryOtpOverlay').classList.remove('show');
+
+                if (!data.success) {
+                    showToast(data.message || 'Invalid code, try again');
+                    return;
+                }
+
+                const amt = data.amount;
+                state.earningsToday += amt;
+                state.ordersToday += 1;
+                document.getElementById('statEarnings').textContent = '₹' + state.earningsToday;
+                document.getElementById('statOrders').textContent = state.ordersToday;
+                document.getElementById('earnHeroAmt').textContent = '₹' + state.earningsToday;
+
+                state.activeOrder = null;
+                state.odStep = 0;
+                renderHomeStatus();
+                showScreen('main-app');
+                switchTab('home');
+                showToast('Delivered! ₹' + amt + ' added to earnings');
+            } catch (err) {
+                console.error(err);
+                showToast('Something went wrong, please try again');
+            }
         }
         async function drawRoute() {
-    const c = state.recent_order;
+            const c = state.recent_order;
 
-    const warehouse = `${c.warehouse_lng},${c.warehouse_lat}`;
-    const customer = `${c.customer_lng},${c.customer_lat}`;
+            const warehouse = `${c.warehouse_lng},${c.warehouse_lat}`;
+            const customer = `${c.customer_lng},${c.customer_lat}`;
 
-    const url =
-        `https://router.project-osrm.org/route/v1/driving/` +
-        `${warehouse};${customer}?overview=full&geometries=geojson`;
+            const url =
+                `https://router.project-osrm.org/route/v1/driving/` +
+                `${warehouse};${customer}?overview=full&geometries=geojson`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+            const response = await fetch(url);
+            const data = await response.json();
 
-    if (data.code !== "Ok") {
-        console.log("Route not found");
-        return;
-    }
+            if (data.code !== "Ok") {
+                console.log("Route not found");
+                return;
+            }
 
-    const route = data.routes[0];
+            const route = data.routes[0];
 
-    L.geoJSON(route.geometry, {
-        style: {
-            color: "#FF5D2E",
-            weight: 5,
-            opacity: 0.8
+            const routeLayer = L.geoJSON(route.geometry, {
+                style: {
+                    color: "#FF5D2E",
+                    weight: 5,
+                    opacity: 0.8
+                }
+            }).addTo(map);
+            state.mapLayers.push(routeLayer);
+
+            console.log("Road distance:", route.distance / 1000, "km");
+            console.log("ETA:", route.duration / 60, "minutes");
         }
-    }).addTo(map);
 
-    console.log("Road distance:", route.distance / 1000, "km");
-    console.log("ETA:", route.duration / 60, "minutes");
-}
-        
-        function load_order_items(items){
-            const itemsList = document.getElementById("orderItems");
-
+        function load_order_items(items) {
+            const itemsList = document.getElementById("odItems");
             itemsList.innerHTML = "";
-
             for (const [name, qty] of Object.entries(items)) {
                 const li = document.createElement("li");
-
-                li.innerHTML = `
-                    <span>${name}</span>
-                    <span>×${qty}</span>
-                `;
-
+                li.innerHTML = `<span>${name}</span><span>×${qty}</span>`;
                 itemsList.appendChild(li);
             }
         }
@@ -2588,10 +2658,11 @@
 
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
+                    let lat = position.coords.latitude;
+                    let lng = position.coords.longitude;
                     console.log(lat, lng);
-
+                    lat=17.388879
+                    lng= 78.428223
                     try {
                         console.log("hello");
                         const res = await fetch("/partner_online", {
@@ -2622,9 +2693,7 @@
         /* ============================================================
            INIT
            ============================================================ */
-        updateOnlineUI();
-        renderHomeStatus();
-        renderChart();
+
     </script>
 </body>
 

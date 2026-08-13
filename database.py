@@ -4,9 +4,20 @@ from dotenv import load_dotenv
 from bson import ObjectId
 from datetime import datetime
 import time
+# def hash_password(plain_password: str) -> str:
+#     return bcrypt.hashpw(plain_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        if(plain_password==hashed_password):
+            return True
+        # return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+    except (ValueError, TypeError):
+        return False
 
 import os
-from redis_db import delete_cart,get_cart
+from redis_db import delete_cart, get_cart, free_driver, set_driver_offline
 load_dotenv(override=True)
 api=os.getenv("MONGO_URI",None)
 client = MongoClient(api)
@@ -212,328 +223,78 @@ def generate_token():
         
         if not orders.find_one({"token_no": token}):
             return token
-def store_orderss(userid):
-    try:
-        import time
-
-        start = time.perf_counter()
-        token = generate_token()
-        # order_id = "ORD_" + str(int(datetime.utcnow().timestamp()))
-
-        # ✅ 1. Insert into user_orders
-        items = get_cart(userid)
-        print("cart", time.perf_counter() - start)
-        print("items=",items)
-        if(items==None or not items.get("cart")):
-            return 404
-        # ✅ normalize structure
-        # items = normalize_cart(items)
-
-        # ✅ 2. Prepare seller_orders
-        seller_docs = []
-        res_ids=[]
-        seller_inventory=[]
-        current_time=datetime.utcnow()
-        print("items in store_orders",items["cart"])
-        cart=items["cart"]
-        print("cart=",cart)
-        for res_id, data in cart.items():
-            # print(res_id,data)
-            print(res_id,data)
-            seller_doc = {
-                # "order_id": order_id,
-                "user_id": userid,
-                "token_no":token,
-                "restaurant_id": res_id,
-                "restaurant_name": data["name"],
-
-                "items": data["items"],
-
-                "status": "placed",
-                "time": current_time
-            }
-            res_ids.append(res_id)
-            for item_id,item in data["items"].items():
-                print(item)
-                seller_inventory.append(
-                    UpdateOne(
-                        {
-                            "_id": ObjectId(item_id),
-                            "available": {"$gte": item["qty"]}
-                        },
-                        {
-                            "$inc": {
-                                 "available": -item["qty"],
-                                  "sold": item["qty"]
-                            }
-                        }
-                    )
-                )
-
-
-            seller_docs.append(seller_doc)
-
-        # ✅ 3. Insert all at once (FAST)
-        # if seller_docs:
-        #     seller_orders.insert_many(seller_docs)
-        # if seller_inventory:
-        #     resturants_items.bulk_write(seller_inventory)
-        for attempt in range(MAX_RETRIES):
-            try:
-                start_trasac = time.perf_counter()
-                with client.start_session() as session:
-                    with session.start_transaction():
-
-                        result=orders.insert_one({"user_id":userid,"token_no":token,"status":"placed","items":items,"time":current_time}, session=session)
-                        parent_id = result.inserted_id 
-
-                        # 3. Add that parent_id to every seller doc before inserting
-                        for doc in seller_docs:
-                            doc["parent_order_id"] = str(parent_id)
-                        if seller_docs:
-                            seller_orders.insert_many(seller_docs, session=session)
-
-                        if seller_inventory:
-                            result=resturants_items.bulk_write(seller_inventory, session=session)
-                            # if result.modified_count != len(seller_inventory):
-                            #     raise Exception("Failed to update all inventory items.")
-                        start = time.perf_counter()
-                        delete_cart(userid,session=session)
-                        print("delete", time.perf_counter() - start)
-                        print("Order stored successfully")
-                print("txn", time.perf_counter() - start_trasac)
-                return res_ids
-            except OperationFailure as e:
-
-                if "TransientTransactionError" in e.details.get("errorLabels", []):
-
-                    print(f"Retrying transaction ({attempt+1})")
-
-                    time.sleep(0.05)
-
-                    continue
-
-                raise
-    except Exception as e:
-        print(e)
-        return False
-from pymongo import UpdateOne
-from bson import ObjectId
-from datetime import datetime
-from pymongo.errors import OperationFailure
-import time
-
-
-def store_ordersss(userid):
-
+def store_orders(userid, coordinates):
     token = generate_token()
-
     items = get_cart(userid)
 
     if not items or not items.get("cart"):
         return 404
 
     current_time = datetime.utcnow()
-
     seller_docs = []
     inventory_updates = []
     restaurant_ids = []
 
     for restaurant_id, restaurant in items["cart"].items():
+        item_ids = [ObjectId(iid) for iid in restaurant["items"].keys()]
+
+        fresh_docs = resturants_items.find(
+            {"_id": {"$in": item_ids}},
+            {"_id": 1, "price": 1, "available": 1}
+        )
+        price_map = {str(d["_id"]): d for d in fresh_docs}
+
+        verified_items = {}
+
+        for item_id, item in restaurant["items"].items():
+            fresh = price_map.get(item_id)
+
+            if not fresh:
+                return {"success": False, "message": "Item no longer available"}
+
+            if fresh["available"] < item["qty"]:
+                return {
+                    "success": False,
+                    "message": f"{item.get('item','Item')} is out of stock"
+                }
+
+            if fresh["price"] != item["price"]:
+                print(f"PRICE MISMATCH user={userid} item={item_id} "
+                      f"cart={item['price']} actual={fresh['price']}")
+                return {
+                    "success": False,
+                    "message": f"Price changed for {item.get('item','an item')}, please review your cart"
+                }
+
+            verified_item = dict(item)
+            verified_item["price"] = fresh["price"]
+            verified_items[item_id] = verified_item
+
+            inventory_updates.append(
+                UpdateOne(
+                    {"_id": ObjectId(item_id), "available": {"$gte": item["qty"]}},
+                    {"$inc": {"available": -item["qty"], "sold": item["qty"]}}
+                )
+            )
 
         restaurant_ids.append(restaurant_id)
-
         seller_docs.append({
             "user_id": userid,
             "token_no": token,
             "restaurant_id": restaurant_id,
             "restaurant_name": restaurant["name"],
-            "items": restaurant["items"],
+            "items": verified_items,
             "status": "placed",
-            "time": current_time
+            "time": current_time,
+            "user_adres": coordinates
         })
 
-        for item_id, item in restaurant["items"].items():
-
-            inventory_updates.append(
-                UpdateOne(
-                    {
-                        "_id": ObjectId(item_id),
-                        "available": {"$gte": item["qty"]}
-                    },
-                    {
-                        "$inc": {
-                            "available": -item["qty"],
-                            "sold": item["qty"]
-                        }
-                    }
-                )
-            )
+    seller_order_ids = []
 
     for attempt in range(MAX_RETRIES):
-
         try:
-
             with client.start_session() as session:
-
                 with session.start_transaction():
-
-                    t = time.perf_counter()
-
-                    result = orders.insert_one(
-                        {
-                            "user_id": userid,
-                            "token_no": token,
-                            "status": "placed",
-                            "items": items,
-                            "time": current_time
-                        },
-                        session=session
-                    )
-
-                    print("order insert", time.perf_counter() - t)
-
-                    parent = str(result.inserted_id)
-
-                    for doc in seller_docs:
-                        doc["parent_order_id"] = parent
-
-                    t = time.perf_counter()
-
-                    if seller_docs:
-                        seller_orders.insert_many(
-                            seller_docs,
-                            session=session
-                        )
-
-                    print("seller insert", time.perf_counter() - t)
-
-                    t = time.perf_counter()
-
-                    if inventory_updates:
-                        inventory_result = resturants_items.bulk_write(
-                            inventory_updates,
-                            session=session
-                        )
-
-                        # Ensure all inventory updates succeeded
-                        # if inventory_result.modified_count != len(inventory_updates):
-                        #     raise Exception("Inventory unavailable")
-
-                    print("inventory", time.perf_counter() - t)
-
-            # Transaction committed here
-
-            t = time.perf_counter()
-
-            delete_cart(userid)
-
-            print("delete cart", time.perf_counter() - t)
-
-            return restaurant_ids
-
-        except OperationFailure as e:
-
-            if "TransientTransactionError" in e.details.get("errorLabels", []):
-
-                time.sleep(0.05)
-
-                continue
-
-            raise
-
-    return False
-
-def store_orders(userid,coordinates):
-    token = generate_token()
-    items = get_cart(userid)
-
-    if not items or not items.get("cart"):
-        return 404
-
-    current_time = datetime.utcnow()
-    seller_docs = []
-    inventory_updates = []
-
-    restaurant_id, restaurant = next(iter(items["cart"].items()))
-
-    item_ids = [ObjectId(iid) for iid in restaurant["items"].keys()]
-
-    # authoritative read — never trust cart's stored price/qty limits
-    fresh_docs = resturants_items.find(
-        {"_id": {"$in": item_ids}},
-        {"_id": 1, "price": 1, "available": 1}
-    )
-
-    price_map = {str(d["_id"]): d for d in fresh_docs}
-
-    verified_items = {}
-
-    for item_id, item in restaurant["items"].items():
-        fresh = price_map.get(item_id)
-
-        if not fresh:
-            return {"success": False, "message": "Item no longer available"}
-
-        if fresh["available"] < item["qty"]:
-            return {
-                "success": False,
-                "message": f"{item.get('item','Item')} is out of stock"
-            }
-
-        if fresh["price"] != item["price"]:
-            print(
-                f"PRICE MISMATCH user={userid} "
-                f"item={item_id} "
-                f"cart={item['price']} "
-                f"actual={fresh['price']}"
-            )
-
-            return {
-                "success": False,
-                "message": f"Price changed for {item.get('item','an item')}, please review your cart"
-            }
-
-        verified_item = dict(item)
-        verified_item["price"] = fresh["price"]
-        verified_items[item_id] = verified_item
-
-        inventory_updates.append(
-            UpdateOne(
-                {
-                    "_id": ObjectId(item_id),
-                    "available": {"$gte": item["qty"]}
-                },
-                {
-                    "$inc": {
-                        "available": -item["qty"],
-                        "sold": item["qty"]
-                    }
-                }
-            )
-        )
-
-    seller_docs.append({
-        "user_id": userid,
-        "token_no": token,
-        "restaurant_id": restaurant_id,
-        "restaurant_name": restaurant["name"],
-        "items": verified_items,
-        "status": "placed",
-        "time": current_time,
-        "user_adres":coordinates
-    })
-
-    for attempt in range(MAX_RETRIES):
-
-        try:
-
-            with client.start_session() as session:
-
-                with session.start_transaction():
-
-                    t = time.perf_counter()
-
                     result = orders.insert_one(
                         {
                             "user_id": userid,
@@ -541,74 +302,31 @@ def store_orders(userid,coordinates):
                             "status": "placed",
                             "items": items,
                             "time": current_time,
-                            "coordinates":coordinates
+                            "coordinates": coordinates
                         },
                         session=session
                     )
-
-                    print("order insert", time.perf_counter() - t)
-
                     parent = str(result.inserted_id)
 
                     for doc in seller_docs:
                         doc["parent_order_id"] = parent
-                    print("after order insert")
-                    t = time.perf_counter()
-
-                    # if seller_docs:
-                    #     res=seller_orders.insert_one(
-                    #         seller_docs,
-                    #         session=session
-                    #     )
 
                     if seller_docs:
-                        res=seller_orders.insert_one(
-                            {
-                                "user_id": str(userid),
-                                "token_no": token,
-                                "restaurant_id": restaurant_id,
-                                "restaurant_name": restaurant["name"],
-                                "items": verified_items,
-                                "status": "placed",
-                                "time": current_time,
-                                "user_adres":coordinates
-                            },
-                            session=session
-                        )
-                    order_id_seller=res.inserted_id
-                    print("seller insert", time.perf_counter() - t)
-
-                    t = time.perf_counter()
+                        insert_result = seller_orders.insert_many(seller_docs, session=session)
+                        seller_order_ids = [str(_id) for _id in insert_result.inserted_ids]
 
                     if inventory_updates:
-                        inventory_result = resturants_items.bulk_write(
-                            inventory_updates,
-                            session=session
-                        )
-
+                        inventory_result = resturants_items.bulk_write(inventory_updates, session=session)
                         if inventory_result.modified_count != len(inventory_updates):
                             raise Exception("Inventory unavailable")
 
-                    print("inventory", time.perf_counter() - t)
-
-            # Transaction committed here
-
-            t = time.perf_counter()
-
             delete_cart(userid)
-
-            print("delete cart", time.perf_counter() - t)
-
-            return str(restaurant_id),str(order_id_seller)
+            return restaurant_ids, seller_order_ids
 
         except OperationFailure as e:
-
             if "TransientTransactionError" in e.details.get("errorLabels", []):
-
                 time.sleep(0.05)
-
                 continue
-
             raise
 
     return False
@@ -653,7 +371,7 @@ def create_new_user(email,username, password,role):
             result =owners.insert_one({
                     "email": email,
                     "username":username,
-                    "password": password,
+                    "password": (password),
                     "role":role,
                     "is_setup":False,
                     "is_verified":False
@@ -668,7 +386,7 @@ def create_new_user(email,username, password,role):
             result =users.insert_one({
                     "email": email,
                     "username":username,
-                    "password": password,
+                    "password": (password),
                     "role":role,
                     "is_verified":False
                 })
@@ -687,7 +405,7 @@ def check_existing_user(email,password):
     print(user)
     if(user): 
         print("in existing user if block",password)
-        if(user["password"]==password):
+        if verify_password(password, user["password"]):
             if(user["role"]=="seller"):
                 return ({"success":True,"userid":str(user["_id"]),"username":user["username"],"is_verified":user["is_verified"],"is_setup":user["is_setup"]})
             else:
@@ -701,7 +419,7 @@ def check_existing_owner(email,password):
     owner=owners.find_one({"email":email})
     if(owner): 
         print("in existing user if block",password)
-        if(owner["password"]==password):
+        if verify_password(password, owner["password"]):
             if(owner["is_verified"]):
                 print("in existing user if if block")
                 if(owner["is_setup"]):
@@ -719,35 +437,38 @@ def check_existing_owner(email,password):
 #         with session.start_transaction():
 #             seller_orders.find_one_and_update({"_id":ObjectId(order_id)},{"$set":{"status":status}},session=session)
 #             orders.find_one_and_update({"user_id":userid},{"$set":{"status":status}},session=session)
-def update_order_status_seller(order_id,status,userid,res_id):
+def update_order_status_seller(order_id, status, userid, res_id):
     with client.start_session() as session:
         with session.start_transaction():
             updated_seller_doc = seller_orders.find_one_and_update(
-                {"_id": ObjectId(order_id),
-                 "restaurant_id":res_id},
+                {"_id": ObjectId(order_id), "restaurant_id": res_id},
                 {"$set": {"status": status}},
                 session=session,
-                return_document=ReturnDocument.AFTER 
+                return_document=ReturnDocument.AFTER
             )
             if not updated_seller_doc:
-                return ({"success": False,"message": "Order not found or unauthorized"})
-            if updated_seller_doc:
-                # 2. Grab that parent_id you stored earlier
-                parent_id = updated_seller_doc.get("parent_order_id")
+                return {"success": False, "message": "Order not found or unauthorized"}
 
-                # 3. Update the Main Order using that specific ID
-                if parent_id:
-                    parent_result=orders.find_one_and_update(
-                        {
-                            "_id": ObjectId(parent_id), 
-                            "user_id": updated_seller_doc["user_id"]
-                        },
-                        {"$set": {"status": status}},
-                        session=session
-                    )
-                if not parent_result:
-                    return {"success": False, "message": "Parent order not found"}
-                return ({"success":True})
+            parent_id = updated_seller_doc.get("parent_order_id")
+            if not parent_id:
+                return {"success": False, "message": "Parent order not found"}
+
+            parent_result = orders.find_one_and_update(
+                {"_id": ObjectId(parent_id), "user_id": updated_seller_doc["user_id"]},
+                {"$set": {"status": status}},
+                session=session
+            )
+            if not parent_result:
+                return {"success": False, "message": "Parent order not found"}
+
+            return {"success": True}
+def get_restaurant_location(res_id):
+    restaurant = restaurants_name.find_one({"_id": ObjectId(res_id)}, {"location": 1})
+    if not restaurant or "location" not in restaurant:
+        return None
+    long, latt = restaurant["location"]["coordinates"]
+    return {"lat": latt, "lng": long}
+
 def update_order_status_user(order_id,status,userid):
     with client.start_session() as session:
         with session.start_transaction():
@@ -1268,9 +989,6 @@ def get_seller_analytics(seller_id: str) -> dict:
         "inventory": inventory_data,
         "active_orders": active_orders,
     }
-reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
-print(reponse)
-# get_orders("69a959defa10620eb63cf31d")
 def save_address(address,type,uid,cordinates):
     user=users.find_one(ObjectId(uid))
     if user :
@@ -1394,7 +1112,7 @@ def check_existing_driver(email,password):
     print(driver)
     if(driver): 
         print("in existing user if block",password)
-        if(driver["password"]==password):
+        if verify_password(password, driver["password"]):
             print("in existing user if if block")
             return ({"success":True,"userid":str(driver["_id"]),"username":driver["username"],"is_verified":driver["is_verified"]})
         else:
@@ -1416,7 +1134,7 @@ def create_new_driver(email, username, password, role="driver"):
         result = drivers.insert_one({
             "email": email,
             "username": username,
-            "password": password,
+            "password": (password),
             "role": role,
             "rating": 0,
             "acceptance_rate": 0,
@@ -1608,6 +1326,7 @@ def accept_delivery_order(order_id, driver_id,redis_data):
                     "amount":amount,
                     "seller_id": str(result["restaurant_id"]),
                     "status": "pending",
+                    "step": 0,
                     "accepted_at": datetime.utcnow()
                 },
                 session=session
@@ -1641,30 +1360,27 @@ def decline_delivery_order(order_id, driver_id):
 
 
 def advance_delivery_step(order_id, driver_id):
-    order = driver_orders.find_one({"_id": ObjectId(order_id), "driver_id": driver_id})
+    order = driver_orders.find_one({"order_id": order_id, "driver_id": driver_id})
     if not order:
         return {"success": False, "message": "Order not found or unauthorized"}
     if order["step"] >= 3:
         return {"success": False, "message": "Already at final step — confirm delivery instead"}
 
     next_step = order["step"] + 1
-    driver_orders.update_one({"_id": ObjectId(order_id)}, {"$set": {"step": next_step}})
+    driver_orders.update_one({"order_id": order_id}, {"$set": {"step": next_step}})
     return {"success": True, "step": next_step}
 
-def confirm_delivery(order_id, driver_id, entered_otp):
-    order = driver_orders.find_one_and_update({"_id": ObjectId(order_id), "driver_id": driver_id},
-                    {
-                        "$set": {
-                            "delivery_status": "completed",
-                            "delivered_at": datetime.utcnow()
-                        }
-                    })
+def confirm_delivery(order_id, driver_id):
+    order = driver_orders.find_one({"order_id":order_id, "driver_id": driver_id})
+
     if not order:
         return {"success": False, "message": "Order not found or unauthorized"}
-    if order["status"] == "delivered":
+
+    if order.get("status") == "delivered":
         return {"success": False, "message": "Order already delivered"}
-    if order["delivery_otp"] != entered_otp:
-        return {"success": False, "message": "Invalid delivery code"}
+
+    # if order.get("delivery_otp") != entered_otp:
+    #     return {"success": False, "message": "Invalid delivery code"}
 
     base_pay = round(order["amount"] * 0.7, 2)
     distance_pay = round(order["amount"] * 0.3, 2)
@@ -1674,7 +1390,7 @@ def confirm_delivery(order_id, driver_id, entered_otp):
             with client.start_session() as session:
                 with session.start_transaction():
                     driver_orders.update_one(
-                        {"_id": ObjectId(order_id)},
+                        {"order_id": order_id, "driver_id": driver_id, "status": {"$ne": "delivered"}},
                         {"$set": {"status": "delivered", "delivered_at": datetime.utcnow()}},
                         session=session
                     )
@@ -1690,6 +1406,7 @@ def confirm_delivery(order_id, driver_id, entered_otp):
                         {"$inc": {"total_earnings": base_pay + distance_pay, "orders_completed": 1}},
                         session=session
                     )
+            free_driver(driver_id)
             return {"success": True, "amount": base_pay + distance_pay}
         except OperationFailure as e:
             if "TransientTransactionError" in e.details.get("errorLabels", []):
