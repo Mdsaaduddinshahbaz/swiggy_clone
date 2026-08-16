@@ -1341,7 +1341,6 @@
         #map {
             height: 100%;
             width: 100%;
-            ;
         }
 
         .map-block .grid {
@@ -1694,7 +1693,7 @@
             </section>
 
             <!-- ============ MAIN APP ============ -->
-            <div class="screen active" id="main-app">
+            <div class="screen" id="main-app">
                 <div class="statusbar"><span>9:41</span><span class="icons">●●●</span></div>
                 <div class="topbar">
                     <div class="topbar-left">
@@ -1716,15 +1715,15 @@
                     <section class="tab active" id="tab-home">
                         <div class="stat-row">
                             <div class="stat-card">
-                                <div class="num display-num mono" id="statEarnings">₹840</div>
+                                <div class="num display-num mono" id="statEarnings">₹0</div>
                                 <div class="lbl">Today's earnings</div>
                             </div>
                             <div class="stat-card">
-                                <div class="num display-num mono" id="statOrders">12</div>
+                                <div class="num display-num mono" id="statOrders">0</div>
                                 <div class="lbl">Deliveries</div>
                             </div>
                             <div class="stat-card">
-                                <div class="num display-num mono" id="statTime">5h 20m</div>
+                                <div class="num display-num mono" id="statTime">0h 0m</div>
                                 <div class="lbl">Online time</div>
                             </div>
                         </div>
@@ -1741,7 +1740,7 @@
                                         <path d="M20 6L9 17l-5-5" />
                                     </svg></div>
                                 <div class="lbl">Acceptance rate</div>
-                                <div class="val" id="statAcceptance">92%</div>
+                                <div class="val" id="statAcceptance">0%</div>
                             </div>
                             <div class="snap-row">
                                 <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1749,7 +1748,7 @@
                                         <path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L6 20l2-7L2 9h7z" />
                                     </svg></div>
                                 <div class="lbl">Rider rating</div>
-                                <div class="val">4.86</div>
+                                <div class="val" id="statRatingHome">—</div>
                             </div>
                             <div class="snap-row">
                                 <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1758,7 +1757,7 @@
                                         <path d="M15 9l-6 6M9 9l6 6" />
                                     </svg></div>
                                 <div class="lbl">Cancellations</div>
-                                <div class="val" id="statCancel">1</div>
+                                <div class="val" id="statCancel">0</div>
                             </div>
                         </div>
                     </section>
@@ -1778,8 +1777,7 @@
                     <section class="tab" id="tab-earnings">
                         <div class="earn-hero">
                             <div class="eyebrow">Total earnings · today</div>
-                            <div class="amt display-num mono" id="earnHeroAmt">₹840</div>
-                            <div class="delta">↑ 18% vs yesterday</div>
+                            <div class="amt display-num mono" id="earnHeroAmt">₹0</div>
                         </div>
                         <div class="segment" style="margin-top:0;">
                             <button class="active">Today</button>
@@ -1792,53 +1790,32 @@
                             <div class="bars" id="barsChart"></div>
                         </div>
 
-                        <div class="incentive-card">
-                            <div class="head"><span class="title">Peak hour bonus</span><span class="bonus">+₹150</span>
-                            </div>
-                            <p>Complete 3 more orders before 4:00 PM to unlock this bonus.</p>
-                            <div class="progress-track">
-                                <div class="progress-fill" style="width:64%;"></div>
-                            </div>
-                        </div>
-
-                        <div class="payout-row">
-                            <div class="payout-card">
-                                <div class="lbl">Cash in hand</div>
-                                <div class="val mono">₹340</div>
-                            </div>
-                            <div class="payout-card">
-                                <div class="lbl">Next payout</div>
-                                <div class="val">Tomorrow, 6 PM</div>
-                            </div>
-                        </div>
-
                         <div class="section-head">
                             <h3>Earnings breakdown</h3>
                         </div>
-                        <div class="breakdown">
-                            <div class="breakdown-row"><span class="slate">Base pay</span><span class="n">₹520</span>
+                        <div class="breakdown" id="earningsBreakdown">
+                            <div class="breakdown-row"><span class="slate">Base pay</span><span class="n" id="bdBase">₹0</span>
                             </div>
                             <div class="breakdown-row"><span class="slate">Distance pay</span><span
-                                    class="n">₹180</span></div>
-                            <div class="breakdown-row"><span class="slate">Peak bonus</span><span class="n">₹90</span>
+                                    class="n" id="bdDistance">₹0</span></div>
+                            <div class="breakdown-row"><span class="slate">Bonus</span><span class="n" id="bdBonus">₹0</span>
                             </div>
-                            <div class="breakdown-row"><span class="slate">Tips</span><span class="n">₹50</span></div>
-                            <div class="breakdown-row"><span>Total</span><span class="n">₹840</span></div>
+                            <div class="breakdown-row"><span class="slate">Tips</span><span class="n" id="bdTip">₹0</span></div>
+                            <div class="breakdown-row"><span>Total</span><span class="n" id="bdTotal">₹0</span></div>
                         </div>
                     </section>
 
                     <!-- ---- PROFILE TAB ---- -->
                     <section class="tab" id="tab-profile">
                         <div class="profile-head">
-                            <div class="profile-avatar">RK</div>
-                            <h2>Rahul Kumar</h2>
-                            <div class="rid">RIDER ID · VP-40218</div>
+                            <div class="profile-avatar" id="profileAvatar">–</div>
+                            <h2 id="profileName">—</h2>
+                            <div class="rid" id="profileId">RIDER ID · —</div>
                             <div class="rating-pill">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L6 20l2-7L2 9h7z" />
                                 </svg>
-                                <div class="val" id="statRating">4.86 rider rating</div>
-                                
+                                <div class="val" id="statRating">— rider rating</div>
                             </div>
                         </div>
 
@@ -1850,30 +1827,16 @@
                                     <path d="M6 17l3.5-8h4l3.5 6M9.5 9h4" />
                                 </svg></div>
                             <div>
-                                <div class="t1">Electric Scooter</div>
-                                <div class="t2">DL 4S AB 1234</div>
+                                <div class="t1" id="vehicleType">No vehicle on file</div>
+                                <div class="t2" id="vehiclePlate">—</div>
                             </div>
                         </div>
 
                         <div class="section-head">
                             <h3>Documents</h3>
                         </div>
-                        <div class="snap-list">
-                            <div class="doc-row"><span class="t">Driving licence</span><svg viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l7 4v6c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" />
-                                    <path d="M9 12l2 2 4-4" />
-                                </svg></div>
-                            <div class="doc-row"><span class="t">Vehicle RC</span><svg viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l7 4v6c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" />
-                                    <path d="M9 12l2 2 4-4" />
-                                </svg></div>
-                            <div class="doc-row"><span class="t">Insurance</span><svg viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l7 4v6c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" />
-                                    <path d="M9 12l2 2 4-4" />
-                                </svg></div>
+                        <div class="snap-list" id="documentsList">
+                            <div class="doc-row"><span class="t">Loading documents…</span></div>
                         </div>
 
                         <div class="section-head">
@@ -1998,10 +1961,6 @@
 
                 <div class="map-block">
                     <div class="grid"></div>
-                    <!-- <svg class="route-svg" viewBox="0 0 300 180">
-                        <path d="M50 55 C 120 20, 150 140, 250 130" stroke="#FF5D2E" stroke-width="2.5"
-                            stroke-dasharray="1 8" stroke-linecap="round" fill="none" />
-                    </svg> -->
                     <div id="map"></div>
                     <div class="pin a"><span></span></div>
                     <div class="pin b"><span></span></div>
@@ -2043,11 +2002,8 @@
                     </div>
 
                     <div class="items-card">
-                        <div class="head"><span class="t">Order items</span><span class="c">3 items</span></div>
+                        <div class="head"><span class="t">Order items</span><span class="c" id="odItemCount">0 items</span></div>
                         <ul id="odItems">
-                            <li><span>Amul Toned Milk 1L</span><span>×1</span></li>
-                            <li><span>Britannia Brown Bread</span><span>×2</span></li>
-                            <li><span>Farm Eggs (6 pc)</span><span>×1</span></li>
                         </ul>
                     </div>
 
@@ -2110,6 +2066,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        /* ============================================================
+           SOCKET SETUP (connects only once we know we're authenticated)
+           ============================================================ */
         let driver_id = null;
         const socket = io({ autoConnect: false });
 
@@ -2130,7 +2089,80 @@
                 showToast('Order was taken by another rider');
             }
         });
-        fetchHomeStats()
+
+        /* ============================================================
+           STATE
+           ============================================================ */
+        const state = {
+            online: false,
+            activeOrder: null,
+            earningsToday: 0,
+            ordersToday: 0,
+            countdown: 15,
+            countdownTimer: null,
+            odStep: 0, // 0=to pickup,1=at pickup,2=to drop,3=at drop(otp)
+            mapLayers: [],
+            recent_order: null,
+            pendingOrder: null
+        };
+
+        /* ============================================================
+           SESSION PERSISTENCE (survives reload within the same tab —
+           e.g. when Google Maps hands control back to the browser)
+           ============================================================ */
+        const STORAGE_KEY = 'volt_active_session';
+
+        function saveSession() {
+            try {
+                sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    activeOrder: state.activeOrder,
+                    odStep: state.odStep,
+                    recent_order: state.recent_order,
+                    online: state.online
+                }));
+            } catch (err) {
+                console.error('saveSession failed', err);
+            }
+        }
+
+        function restoreSession() {
+            try {
+                const raw = sessionStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                state.activeOrder = saved.activeOrder || null;
+                state.odStep = saved.odStep || 0;
+                state.recent_order = saved.recent_order || null;
+                state.online = saved.online || false;
+            } catch (err) {
+                console.error('restoreSession failed', err);
+            }
+        }
+
+        function clearSession() {
+            sessionStorage.removeItem(STORAGE_KEY);
+        }
+
+        /* ============================================================
+           AUTH
+           ============================================================ */
+        async function checkAuth() {
+            try {
+                const res = await fetch('/driver/me');
+                const data = await res.json();
+                if (data.success) {
+                    driver_id = data.driver_id;
+                    document.getElementById('topbarTitle').textContent = 'Hey, ' + data.username;
+                    document.getElementById('profileName').textContent = data.username;
+                    document.getElementById('profileAvatar').textContent = (data.username || '?').slice(0, 2).toUpperCase();
+                    return true;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+            return false;
+        }
+
         async function driverLogin() {
             const email = document.getElementById('driverEmailInput').value.trim();
             const password = document.getElementById('driverPasswordInput').value;
@@ -2151,12 +2183,15 @@
                 if (data.success) {
                     driver_id = data.driver_id;
                     document.getElementById('topbarTitle').textContent = 'Hey, ' + data.username;
+                    document.getElementById('profileName').textContent = data.username;
+                    document.getElementById('profileAvatar').textContent = (data.username || '?').slice(0, 2).toUpperCase();
+
+                    socket.connect();
                     showScreen('main-app');
                     switchTab('home');
-                    
+                    updateOnlineUI();
                     fetchHomeStats();
                     renderHomeStatus();
-                    renderChart();
                 } else {
                     showToast(data.message || 'Login failed');
                 }
@@ -2166,32 +2201,16 @@
             }
         }
 
-        /* ============================================================
-           STATE
-           ============================================================ */
-        const state = {
-            online: false,
-            activeOrder: null,
-            earningsToday: 840,
-            ordersToday: 12,
-            countdown: 15,
-            countdownTimer: null,
-            odStep: 0, // 0=to pickup,1=at pickup,2=to drop,3=at drop(otp)
-        };
-
-        const incomingPool = [
-            { store: "Blinkit Dark Store · Sector 21", customer: "Ananya Sharma", addr: "B-204, Palm Residency, Sector 14, Gurugram", dist: "1.8 km", amt: 52 },
-            { store: "FreshMart Express · Sector 18", customer: "Vikram Rao", addr: "C-12, Green Meadows, Sector 22, Gurugram", dist: "1.2 km", amt: 44 },
-            { store: "QuickCart Hub · MG Road", customer: "Priya Desai", addr: "Flat 302, Orchid Towers, MG Road, Gurugram", dist: "2.4 km", amt: 63 },
-        ];
-
-        const historyData = [
-            { id: "VP4498", path: "Sector 21 → Sector 14", time: "Today · 2:14 PM", amt: 52, status: "delivered" },
-            { id: "VP4491", path: "MG Road → Sector 29", time: "Today · 1:02 PM", amt: 47, status: "delivered" },
-            { id: "VP4483", path: "Sector 18 → Sector 22", time: "Today · 11:40 AM", amt: 38, status: "cancelled" },
-            { id: "VP4470", path: "Sector 21 → DLF Phase 3", time: "Yesterday · 7:10 PM", amt: 58, status: "delivered" },
-            { id: "VP4462", path: "MG Road → Sector 14", time: "Yesterday · 4:22 PM", amt: 44, status: "delivered" },
-        ];
+        function logout() {
+            fetch('/logout/driver').catch(() => {});
+            clearSession();
+            driver_id = null;
+            state.activeOrder = null;
+            state.online = false;
+            state.odStep = 0;
+            socket.disconnect();
+            showScreen('screen-login');
+        }
 
         /* ============================================================
            SCREEN / TAB NAVIGATION
@@ -2203,6 +2222,8 @@
 
         async function fetchHomeStats() {
             try {
+                console.log("in fetch home stats");
+                
                 const res = await fetch('/driver/home_stats', { method: 'POST' });
                 const data = await res.json();
                 console.log(data);
@@ -2210,10 +2231,37 @@
                 if (data.success) {
                     document.getElementById('statEarnings').textContent = '₹' + data.earnings_today;
                     document.getElementById('statOrders').textContent = data.orders_today;
-                    document.getElementById('statTime').textContent=data.online_time
-                    document.getElementById('statRating').textContent=data.rating
-                    document.getElementById('statAcceptance').textContent=data.acceptance_rate+"%"
-                    document.getElementById('statCancel').textContent=data.cancellations
+                    document.getElementById('statTime').textContent = data.online_time;
+                    document.getElementById('statRating').textContent = data.rating + ' rider rating';
+                    document.getElementById('statRatingHome').textContent = data.rating;
+                    document.getElementById('statAcceptance').textContent = data.acceptance_rate + '%';
+                    document.getElementById('statCancel').textContent = data.cancellations;
+
+                    state.earningsToday = data.earnings_today;
+                    state.ordersToday = data.orders_today;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function fetchProfileData() {
+            try {
+                const [docsRes] = await Promise.all([
+                    fetch('/driver/documents')
+                ]);
+                const docsData = await docsRes.json();
+
+                const list = document.getElementById('documentsList');
+                if (docsData.success && docsData.documents.length) {
+                    list.innerHTML = docsData.documents.map(d => `
+                        <div class="doc-row">
+                          <span class="t">${d.type}</span>
+                          <span class="badge ${d.status === 'approved' ? 'badge-green' : 'badge-slate'}">${d.status}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="doc-row"><span class="t">No documents uploaded yet</span></div>';
                 }
             } catch (err) {
                 console.error(err);
@@ -2226,27 +2274,30 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
 
             const titles = {
-                home: ['Hey, Rahul', 'Ready to ride?'],
+                home: [document.getElementById('topbarTitle').textContent, 'Ready to ride?'],
                 orders: ['Order history', 'Your recent deliveries'],
                 earnings: ['Earnings', 'Track your income'],
                 profile: ['Profile', 'Account & settings'],
             };
-            document.getElementById('topbarTitle').textContent = tab === 'home' ? 'Hey, Rahul' : titles[tab][0];
             document.getElementById('topbarSub').textContent = titles[tab][1];
 
             if (tab === 'home') fetchHomeStats();
             if (tab === 'orders') renderHistory('today');
             if (tab === 'earnings') renderChart();
+            if (tab === 'profile') fetchProfileData();
         }
 
         /* ============================================================
            ONLINE TOGGLE + HOME STATUS
            ============================================================ */
         function toggleOnline() {
+            console.log("online now");
+            
             state.online = !state.online;
-            socket.connect();
             updateOnlineUI();
             renderHomeStatus();
+            saveSession();
+
             if (state.online) {
                 update_location();
             } else {
@@ -2280,7 +2331,6 @@
         <div class="radar"><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="dot"></div></div>
         <h4>Looking for orders near you…</h4>
         <p>Stay near your zone. We'll alert you the moment<br>a new order comes in.</p>
-        <span class="demo-link" onclick="triggerIncomingOrder()">Simulate incoming order (demo)</span>
       </div>`;
             } else {
                 area.innerHTML = `
@@ -2297,10 +2347,7 @@
            INCOMING ORDER SHEET
            ============================================================ */
         function triggerIncomingOrder(store, amt, distance, customer_name, order_id, customer_dist, warehouse_dist) {
-            console.log("order_id", order_id);
-
-            // const pick = incomingPool[Math.floor(Math.random() * incomingPool.length)];
-            const pick = { store: store, customer: customer_name, addr: "B-204, Palm Residency, Sector 14, Gurugram", dist: distance, amt: amt, order_id: order_id, customer_dist: customer_dist, warehouse_dist: warehouse_dist }
+            const pick = { store: store, customer: customer_name, addr: "", dist: distance, amt: amt, order_id: order_id, customer_dist: customer_dist, warehouse_dist: warehouse_dist };
             state.pendingOrder = pick;
             document.getElementById('sheetPickupName').textContent = store;
             document.getElementById('sheetAmt').textContent = '+₹' + amt;
@@ -2330,11 +2377,23 @@
             document.getElementById('incomingOverlay').classList.remove('show');
         }
 
-        function declineOrder() {
+        async function declineOrder() {
             clearInterval(state.countdownTimer);
+            const p = state.pendingOrder;
             hideIncomingSheet();
             showToast('Order declined');
-            //   setTimeout(()=>{ if(state.online && !state.activeOrder) triggerIncomingOrder(); }, 4000);
+
+            if (p && p.order_id) {
+                try {
+                    await fetch('/decline_order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order_id: p.order_id })
+                    });
+                } catch (err) {
+                    console.error(err);
+                }
+            }
         }
 
         async function acceptOrder() {
@@ -2359,6 +2418,7 @@
                         items: data.order.items
                     };
                     state.odStep = 0;
+                    saveSession();
                     renderHomeStatus();
                     renderOrderDetail();
                     showToast('Order accepted — head to pickup');
@@ -2376,94 +2436,80 @@
            ORDER DETAIL / STEP FLOW
            ============================================================ */
         const stepMeta = [
-            { status: 'Heading to pickup', badge: 'To pickup', btn: 'Navigate to pickup', id: 1 },
-            { status: 'At pickup location', badge: 'At pickup', btn: 'Confirm pickup', id: 2 },
-            { status: 'Heading to drop', badge: 'To drop', btn: 'Navigate to drop', id: 3 },
-            { status: 'At drop location', badge: 'At drop', btn: 'Complete delivery', id: 4 },
+            { status: 'Heading to pickup', badge: 'To pickup', btn: 'Navigate to pickup' },
+            { status: 'At pickup location', badge: 'At pickup', btn: 'Confirm pickup' },
+            { status: 'Heading to drop', badge: 'To drop', btn: 'Navigate to drop' },
+            { status: 'At drop location', badge: 'At drop', btn: 'Complete delivery' },
         ];
-        const map = L.map("map").setView([17.385, 78.4867], 13);
 
+        const map = L.map("map").setView([17.385, 78.4867], 13);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: "© OpenStreetMap contributors"
         }).addTo(map);
+
         function renderOrderDetail() {
             const o = state.activeOrder;
             if (!o) return;
-            if (state.mapLayers) {
-                state.mapLayers.forEach(layer => map.removeLayer(layer));
-            }
+
+            state.mapLayers.forEach(layer => map.removeLayer(layer));
             state.mapLayers = [];
+
             document.getElementById('odOrderId').textContent = 'ORDER #' + o.id;
             document.getElementById('odPickupName').textContent = o.store;
             document.getElementById('odDropName').textContent = o.customer;
-            document.getElementById('dropDist').textContent = o.customer_dist + " km away"
-            document.getElementById('pickupDist').textContent = o.warehouse_dist
+            document.getElementById('dropDist').textContent = o.customer_dist + " km away";
+            document.getElementById('pickupDist').textContent = o.warehouse_dist;
+            document.getElementById('customer_name').textContent = o.customer;
+
             const meta = stepMeta[state.odStep];
             document.getElementById('odStatus').textContent = meta.status;
             document.getElementById('odBadge').textContent = meta.badge;
             document.getElementById('odActionBtn').textContent = meta.btn;
             document.getElementById('odPrice').textContent = "+₹" + o.amt;
-            document.getElementById('customer_name').textContent = o.customer
-            load_order_items(o.items)
+
+            load_order_items(o.items);
+
             setTimeout(async () => {
                 await map.invalidateSize();
             }, 500);
-            const get_cordinates = state.recent_order
-            console.log("get_cordinates", get_cordinates);
 
-            warehouse_marker = L.marker([get_cordinates.warehouse_lat, get_cordinates.warehouse_lng]).addTo(map);
+            const coords = state.recent_order;
+            console.log(state);
+            
+            if (!coords) return;
+            console.log('holla',coords);
+            // ('holla')
+            const warehouse_marker = L.marker([coords.warehouse_lat, coords.warehouse_lng]).addTo(map);
             state.mapLayers.push(warehouse_marker);
             warehouse_marker.bindPopup("Warehouse").openPopup();
-            customer_marker = L.marker([get_cordinates.customer_lat, get_cordinates.customer_lng]).addTo(map);
+            console.log("after warehouse");
+            
+            const customer_marker = L.marker([coords.customer_lat, coords.customer_lng]).addTo(map);
             state.mapLayers.push(customer_marker);
-            customer_marker.bindPopup("customer").openPopup();
-            drawRoute()
-            const bounds = L.latLngBounds([
-                [get_cordinates.warehouse_lat, get_cordinates.warehouse_lng],
-                [get_cordinates.customer_lat, get_cordinates.customer_lng]
-            ]);
+            customer_marker.bindPopup("Customer").openPopup();
 
-            map.fitBounds(bounds, {
-                padding: [30, 30]
-            });
+            drawRoute();
+
+            const bounds = L.latLngBounds([
+                [coords.warehouse_lat, coords.warehouse_lng],
+                [coords.customer_lat, coords.customer_lng]
+            ]);
+            map.fitBounds(bounds, { padding: [30, 30] });
         }
 
-        async function advanceStep() {
-            console.log("in advanceStep");
-            
-            if (state.odStep === 3) {
-                document.getElementById('deliveryOtpOverlay').classList.add('show');
-                setTimeout(() => document.querySelector('#deliveryOtpOverlay .otp-box').focus(), 150);
-                return;
-            }
-
+        async function persistStepInBackground(order_id) {
             try {
                 const res = await fetch('/advance_delivery_step', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order_id: state.activeOrder.order_id })
+                    body: JSON.stringify({ order_id })
                 });
                 const data = await res.json();
-                console.log(data);
-                
-                if (data.success) {
-                    console.log(data.step);
-                    
-                    state.odStep = data.step;
-                } else {
-                    showToast(data.message || 'Could not update step');
-                    return;
+                if (!data.success) {
+                    console.error('advance_delivery_step rejected:', data.message);
                 }
             } catch (err) {
-                console.error(err);
-                state.odStep++;
-            }
-            console.log("after trycatch");
-            
-            renderHomeStatus();
-            renderOrderDetail();
-            if (state.odStep === 3) {
-                showToast('Arrived at drop location');
+                console.error('advance_delivery_step failed', err);
             }
         }
 
@@ -2475,27 +2521,32 @@
             window.open(url, "_blank");
         }
 
-        async function handleActionButton() {
+        function handleActionButton() {
             const c = state.recent_order;
-            console.log(c);
-            console.log(state.odStep);
-            
-            if (!c) return;
+            if (!c || !state.activeOrder) return;
 
-            if (state.odStep === 0) {
-                // heading to pickup — route to the restaurant/warehouse
-                await advanceStep();
-                // setTimeout(() => openNavigation(c.warehouse_lat, c.warehouse_lng), 2600);
-                openNavigation(c.warehouse_lat, c.warehouse_lng);
-            } else if (state.odStep === 2) {
-                // heading to drop — route to the customer
-                openNavigation(c.customer_lat, c.customer_lng);
-                advanceStep();
-            } else {
-                // step 1 "Confirm pickup" and step 3 "Complete delivery" —
-                // driver is already there, no navigation needed
-                advanceStep();
+            if (state.odStep === 3) {
+                document.getElementById('deliveryOtpOverlay').classList.add('show');
+                setTimeout(() => document.querySelector('#deliveryOtpOverlay .otp-box').focus(), 150);
+                return;
             }
+
+            let destination = null;
+            if (state.odStep === 0) destination = [c.warehouse_lat, c.warehouse_lng];
+            if (state.odStep === 2) destination = [c.customer_lat, c.customer_lng];
+
+            // Update UI + persist BEFORE handing off to the Maps app — mobile
+            // browsers can suspend/reload this tab while Maps has focus, so we
+            // can't rely on anything async running after window.open().
+            state.odStep++;
+            saveSession();
+            renderHomeStatus();
+            renderOrderDetail();
+            if (state.odStep === 3) showToast('Arrived at drop location');
+
+            persistStepInBackground(state.activeOrder.order_id);
+
+            if (destination) openNavigation(destination[0], destination[1]);
         }
 
         function dOtpMove(el, idx) {
@@ -2537,9 +2588,10 @@
                 document.getElementById('statEarnings').textContent = '₹' + state.earningsToday;
                 document.getElementById('statOrders').textContent = state.ordersToday;
                 document.getElementById('earnHeroAmt').textContent = '₹' + state.earningsToday;
-
+                // document
                 state.activeOrder = null;
                 state.odStep = 0;
+                clearSession();
                 renderHomeStatus();
                 showScreen('main-app');
                 switchTab('home');
@@ -2549,8 +2601,10 @@
                 showToast('Something went wrong, please try again');
             }
         }
+
         async function drawRoute() {
             const c = state.recent_order;
+            if (!c) return;
 
             const warehouse = `${c.warehouse_lng},${c.warehouse_lat}`;
             const customer = `${c.customer_lng},${c.customer_lat}`;
@@ -2559,38 +2613,37 @@
                 `https://router.project-osrm.org/route/v1/driving/` +
                 `${warehouse};${customer}?overview=full&geometries=geojson`;
 
-            const response = await fetch(url);
-            const data = await response.json();
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
 
-            if (data.code !== "Ok") {
-                console.log("Route not found");
-                return;
-            }
-
-            const route = data.routes[0];
-
-            const routeLayer = L.geoJSON(route.geometry, {
-                style: {
-                    color: "#FF5D2E",
-                    weight: 5,
-                    opacity: 0.8
+                if (data.code !== "Ok") {
+                    console.log("Route not found");
+                    return;
                 }
-            }).addTo(map);
-            state.mapLayers.push(routeLayer);
 
-            console.log("Road distance:", route.distance / 1000, "km");
-            console.log("ETA:", route.duration / 60, "minutes");
+                const route = data.routes[0];
+                const routeLayer = L.geoJSON(route.geometry, {
+                    style: { color: "#FF5D2E", weight: 5, opacity: 0.8 }
+                }).addTo(map);
+                state.mapLayers.push(routeLayer);
+            } catch (err) {
+                console.error('drawRoute failed', err);
+            }
         }
 
         function load_order_items(items) {
             const itemsList = document.getElementById("odItems");
             itemsList.innerHTML = "";
-            for (const [name, qty] of Object.entries(items)) {
+            const entries = Object.entries(items || {});
+            document.getElementById('odItemCount').textContent = entries.length + ' item' + (entries.length === 1 ? '' : 's');
+            for (const [name, qty] of entries) {
                 const li = document.createElement("li");
                 li.innerHTML = `<span>${name}</span><span>×${qty}</span>`;
                 itemsList.appendChild(li);
             }
         }
+
         /* ============================================================
            ORDERS HISTORY
            ============================================================ */
@@ -2600,11 +2653,24 @@
             renderHistory(range);
         }
 
-        function renderHistory(range) {
+        async function renderHistory(range) {
             const list = document.getElementById('historyList');
-            let data = historyData;
-            if (range === 'today') data = historyData.filter(h => h.time.startsWith('Today') || h.time === 'Just now');
-            list.innerHTML = data.map(h => `
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--slate);">Loading…</div>';
+
+            try {
+                const res = await fetch('/driver/history', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ range })
+                });
+                const data = await res.json();
+
+                if (!data.success || !data.history.length) {
+                    list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--slate);">No orders yet</div>';
+                    return;
+                }
+
+                list.innerHTML = data.history.map(h => `
     <div class="history-row">
       <div class="route-mini">
         <div class="id">#${h.id}</div>
@@ -2617,24 +2683,60 @@
       </div>
     </div>
   `).join('');
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--slate);">Couldn\'t load history</div>';
+            }
         }
 
         /* ============================================================
-           EARNINGS CHART
+           EARNINGS CHART + BREAKDOWN
            ============================================================ */
-        function renderChart() {
-            const days = [
-                { l: 'Mon', v: 38 }, { l: 'Tue', v: 52 }, { l: 'Wed', v: 44 }, { l: 'Thu', v: 61 },
-                { l: 'Fri', v: 70 }, { l: 'Sat', v: 85 }, { l: 'Sun', v: 58, today: true },
-            ];
-            const max = Math.max(...days.map(d => d.v));
+        async function renderChart() {
             const wrap = document.getElementById('barsChart');
-            wrap.innerHTML = days.map(d => `
-    <div class="bar-col ${d.today ? 'today' : ''}">
+
+            try {
+                const chartRes = await fetch('/driver/earnings/weekly');
+                const chartData = await chartRes.json();
+
+                if (chartData.success && chartData.chart.length) {
+                    const days = chartData.chart.map(d => ({ l: d.date.slice(5), date: d.date, v: d.total }));
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const max = Math.max(...days.map(d => d.v), 1);
+
+                    wrap.innerHTML = days.map(d => `
+    <div class="bar-col ${d.date === todayStr ? 'today' : ''}">
       <div class="bar" style="height:${(d.v / max * 100).toFixed(0)}%;"></div>
       <div class="lbl">${d.l}</div>
     </div>
   `).join('');
+                } else {
+                    wrap.innerHTML = '<div style="text-align:center; padding:20px; color:var(--slate); width:100%;">No earnings yet</div>';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
+            try {
+                const summaryRes = await fetch('/driver/earnings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ range: 'today' })
+                });
+                const summaryData = await summaryRes.json();
+
+                if (summaryData.success) {
+                    const s = summaryData.summary;
+                    document.getElementById('bdBase').textContent = '₹' + s.base_pay;
+                    document.getElementById('bdDistance').textContent = '₹' + s.distance_pay;
+                    document.getElementById('bdBonus').textContent = '₹' + s.bonus;
+                    document.getElementById('bdTip').textContent = '₹' + s.tip;
+                    document.getElementById('bdTotal').textContent = '₹' + s.total;
+                    document.getElementById('earnHeroAmt').textContent = '₹' + s.total;
+                }
+            } catch (err) {
+                console.error(err);
+            }
         }
 
         /* ============================================================
@@ -2648,52 +2750,117 @@
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
         }
+
         /* ============================================================
-           live Location
+           LIVE LOCATION
            ============================================================ */
         async function update_location() {
-            // const currentAddress = document.getElementById("currentAddress");
-            // if (!currentAddress || !map) return;
             if (!navigator.geolocation) return;
 
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     let lat = position.coords.latitude;
                     let lng = position.coords.longitude;
-                    console.log(lat, lng);
-                    lat=17.388879
+                    lat= 17.388879
                     lng= 78.428223
+                    console.log(lat,lng);
+                    
                     try {
-                        console.log("hello");
                         const res = await fetch("/partner_online", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ "driver_id": driver_id, "lat": lat, "lng": lng })
-                        })
+                            body: JSON.stringify({ lat, lng })
+                        });
                         const data = await res.json();
-                        console.log(data);
 
                         if (!data.success) {
-                            alert("failed to go online try again")
+                            showToast('Failed to go online, try again');
                         }
-                        else {
-                            return { "success": true }
-                        }
-
-                    }
-                    catch (error) {
+                    } catch (error) {
                         console.log("error", error.message);
-
                     }
+                },
+                (error) => {
+                    console.error('geolocation error', error);
+                    showToast('Enable location to go online');
+                    state.online = false;
+                    updateOnlineUI();
+                    renderHomeStatus();
+                    saveSession();
                 }
-            )
+            );
         }
 
-
         /* ============================================================
-           INIT
+           INIT — resolve auth, then restore any in-progress delivery
            ============================================================ */
+        (async function init() {
+            showScreen('screen-login');
 
+            const loggedIn = await checkAuth();
+            if (!loggedIn) {
+                showScreen('screen-login');
+                return;
+            }
+
+            restoreSession();
+
+            // if nothing survived in sessionStorage (fresh tab / app reopen),
+            // fall back to asking the backend if there's an order in flight
+            // if (state.activeOrder) {
+                
+            // }
+
+            socket.connect();
+            fetchHomeStats();
+            updateOnlineUI();
+
+            if (state.activeOrder) {
+                renderOrderDetail();
+                showScreen('screen-order-detail');
+            } else {
+                showScreen('main-app');
+                switchTab('home');
+                renderHomeStatus();
+            }
+            try {
+                    const res = await fetch('/driver/active_order');
+                    const data = await res.json();
+                    console.log(data);
+                    
+                    if (data.success && data.order) {
+                        const o = data.order;
+                        state.activeOrder = {
+                            order_id: o.order_id,
+                            id: 'VP' + o.token_no,
+                            store: o.store,
+                            customer: o.customer,
+                            amt: o.amount,
+                            customer_dist: o.customer_km,
+                            warehouse_dist: o.warehouse_km,
+                            items: o.items || {}
+                        };
+                        state.odStep = o.step || 0;
+                        state.recent_order = {
+                            warehouse_lat: o.warehouse_lat,
+                            warehouse_lng: o.warehouse_lng,
+                            customer_lat: o.customer_lat,
+                            customer_lng: o.customer_lng
+                        };
+                        state.online = true;
+                        saveSession();
+                    }else {
+                        // Server says there is no active order
+                        state.activeOrder = null;
+                        state.recent_order = null;
+                        state.odStep = 0;
+                        saveSession();
+                    }
+                    
+                } catch (err) {
+                    console.error('active_order lookup failed', err);
+                }
+        })();
     </script>
 </body>
 

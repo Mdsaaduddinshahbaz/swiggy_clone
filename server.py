@@ -1,7 +1,8 @@
-import eventlet
-eventlet.monkey_patch()
+import time
+# import eventlet
+# eventlet.monkey_patch()
 from database import (
-    create_new_driver, save_category, get_seller_analytics, get_resturantItem_price,
+    create_new_driver, get_active_driver_order, save_category, get_seller_analytics, get_resturantItem_price,
     accept_delivery_order, add_subcategory, add_resturant_items, check_existing_owner,
     set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants,
     add_customer_items, update_resturant_item, remove_itemss, store_orders, get_orders,
@@ -79,17 +80,22 @@ app.config["MAIL_USERNAME"] = mail_username
 app.config["MAIL_PASSWORD"] = mail_password
 app.config["SECRET_KEY"]=secret_key
 
-print("SERVER:", mail_sever_name, flush=True)
-print("PORT:", mail_port, flush=True)
-print("TLS:", mail_use_tls, flush=True)
-print("SSL:", mail_use_ssl, flush=True)
-print("USER:", mail_username, flush=True)
-print("PASS EXISTS:", bool(mail_password), flush=True)
+#print("SERVER:", mail_sever_name, flush=True)
+#print("PORT:", mail_port, flush=True)
+#print("TLS:", mail_use_tls, flush=True)
+#print("SSL:", mail_use_ssl, flush=True)
+#print("USER:", mail_username, flush=True)
+#print("PASS EXISTS:", bool(mail_password), flush=True)
 
 brevo_api=os.getenv("brevo_api_email")
-REDIS_URL = f"redis://{redis_user}:{redis_pass}@{redis_host}:{redis_port}/0"
-print("in server",REDIS_URL)
+if redis_user and redis_pass:
+    REDIS_URL = f"redis://{redis_user}:{redis_pass}@127.0.0.1:6379/0"
+else:
+    REDIS_URL = "redis://127.0.0.1:6379/0"
+# REDIS_URL = f"redis://{redis_user}:{redis_pass}@{redis_host}:{redis_port}/0"
+#print("in server",REDIS_URL)
 socketio = SocketIO(app, cors_allowed_origins="*",message_queue=REDIS_URL)
+#print("ASYNC MODE:", socketio.async_mode)
 # mail=Mail(app)
 
 
@@ -105,7 +111,7 @@ def login_required(f):
             request.cookies.get("seller_token")
         )
         if not token:
-            print(request.endpoint)
+            #print(request.endpoint)
             if(request.endpoint=="home"):
                 return redirect(url_for("login", role="seller"))
             elif(request.endpoint=="sellerTemplate"):
@@ -120,7 +126,7 @@ def login_required(f):
                 app.config["SECRET_KEY"],
                 algorithms=["HS256"]
             )
-            print(payload)
+            # #print(payload)
             g.type = payload["type"]
             if(g.type == "user"):
                 g.user_id = payload["user_id"]
@@ -144,17 +150,23 @@ def login_required(f):
 def auth_driver(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
+        # #print("in auth driver")
         token = request.cookies.get("driver_token")
+        # pri
         if not token:
+            #print("unauthorized",token)
             return jsonify({"success": False, "message": "Unauthorized"}), 401
         try:
             payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            # #print(payload)
             if payload.get("type") != "driver":
                 return jsonify({"success": False, "message": "Unauthorized"}), 401
             g.type = "driver"
             g.driver_id = payload["driver_id"]
             g.username = payload.get("username")
+            #print("after assignment")
         except jwt.InvalidTokenError:
+            #print("invalid_token",request.endpoint)
             response = jsonify({"success": False, "message": "Invalid token"})
             response.delete_cookie("driver_token")
             return response, 401
@@ -176,7 +188,7 @@ def auth_seller_res(f):
                 app.config["SECRET_KEY"],
                 algorithms=["HS256"]
             )
-            print(payload)
+            #print(payload)
             g.type = payload["type"]
             g.owner_id = payload["owner_id"]
             g.username = payload["username"]
@@ -199,16 +211,16 @@ def generate_verification_token(email,role):
         }, salt="email-verification")
 
 def send_verification_email(user_email,role):
-    print("in send varification")
-    print("generating token")
+    #print("in send varification")
+    #print("generating token")
     token = generate_verification_token(user_email,role)
-    print("verify url")
+    #print("verify url")
     verify_url = url_for(
         "verify_email",
         token=token,
         _external=True
     )
-    print("msg")
+    #print("msg")
     # msg = Message(
     #     subject="Verify Your Email",
     #     sender=app.config["MAIL_USERNAME"],
@@ -232,16 +244,16 @@ def send_verification_email(user_email,role):
             """
         }
     )
-    print(response.status_code,flush=True)
-    print(response.text,flush=True)
+    #print(response.status_code,flush=True)
+    #print(response.text,flush=True)
     if(response.status_code==201):
-        print("done sending email")
+        #print("done sending email")
         return 1
     else:
         return 0
 
 
-# print("Email sent")
+# #print("Email sent")
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify({
@@ -266,7 +278,7 @@ def home(userid):
     try:
         return render_template('home.html',page="home")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.route("/logout/seller", methods=["GET"])
 def logout_seller():
@@ -287,11 +299,11 @@ def logout_seller():
 #         lowat=data["lowAt"]
 #         available=data["available"]
 
-#         # print(res_id,itm)
+#         # #print(res_id,itm)
 #         res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
 #         return ({"success":True,"id":res})
 #     except Exception as e:
-        # print(e)
+        # #print(e)
 #         return({"success":False})
 @app.post("/add_res_items")
 @login_required
@@ -334,7 +346,7 @@ def add_itemss():
             )
         # if (photo):
         #     file_id=upload_image(photo)
-        #     print(file_id)
+        #     #print(file_id)
         #     res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available,file_id)
             # return ({"success":True,"id":res["id"],"img_url":res["url"]})
         else:
@@ -351,12 +363,12 @@ def add_itemss():
                 data["available"]
             )
         return ({"success":True,"id":res["id"],"img_url":res["url"]})
-        # print(res_id,itm)
+        # #print(res_id,itm)
         # res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
         # return ({"success":True,"id":res})
     except Exception as e:
-        print("add itemss")
-        print(e) 
+        #print("add itemss")
+        #print(e) 
         return({"success":False})
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 def allowed_file(filename):
@@ -377,7 +389,7 @@ def add_resturant():
                 app.config["SECRET_KEY"],
                 algorithms=["HS256"]
             )
-        print(payload)
+        #print(payload)
         owner_id = payload["owner_id"]
         name = request.form.get("name")
         address = request.form.get("address")
@@ -426,7 +438,7 @@ def add_resturant():
                     "message": "Only png, jpg, jpeg and webp files are allowed"
                 }), 400
             file_id=upload_image(photo)
-            print(file_id)
+            #print(file_id)
             id=add_resturants(name,address,phone,owner_id,long,latt,file_id)
             # return ({"success":True,"res_id":id})
             response=jsonify({"success":True,"res_id":id})
@@ -485,7 +497,7 @@ def add_resturant():
             )
             return response
     except Exception as e:
-        print(e)
+        #print(e)
         return jsonify({
     "success": False,
     "message": "Internal server error"
@@ -501,7 +513,7 @@ def remove_item():
         remove_itemss(item_id,res_id)
         return({"success":True})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 
 @app.post("/list_resturants")
@@ -515,7 +527,7 @@ def list_resturantss():
         res=list_resturants(long,latt,dist)
         return ({"success":True,"results":res})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/list_items")
 @login_required
@@ -533,7 +545,7 @@ def list_item():
         return ({"success":True,"res":res["item_name"]})
     # try:
     # except Exception as e:
-    #     print(e)
+    #     #print(e)
     #     return({"success":False})
 @app.post("/update_item_details")
 @login_required
@@ -561,7 +573,7 @@ def update_items():
         else:
             return ({"success":False,"message":res["message"]})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/add_item_carts")
 def carts():
@@ -573,7 +585,7 @@ def carts():
         add_customer_items(itm_name,res_id,itm_id)
         return({"success":True})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 
 @app.get("/menu/<name>/<address>/<res_id>/<user_id>")
@@ -585,15 +597,15 @@ def list_items(name,address,res_id,user_id):
         # return ({"success":True,"res":res})
         return render_template("menu.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.get("/menu/sel/<id>")
 def s_me(id):
-    print("running s_me")
+    #print("running s_me")
     try:
         return render_template("menu_seller.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.get("/cart/<userid>")
 def cartss(userid):
@@ -607,21 +619,21 @@ def list_cart_items():
     if g.type != "user":
         return jsonify({"success": False, "message": "Unauthorized"}), 403
     try:
-        print("in get cart",g.__dict__)
+        #print("in get cart",g.__dict__)
         data=request.get_json()
         # userid=data["userid"]
         userid=g.user_id
         res=get_cart(userid)
         return ({"success":True,"results":res})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 # @app.post("/add_to_cart")
 # @login_required
 # def addToCart():
 #     try:
-#         print("in addTOCart")
-#         print("userid in add to cart",g.__dict__)
+#         #print("in addTOCart")
+#         #print("userid in add to cart",g.__dict__)
 #         data, error = validate_add_to_cart()
 #         if error:
 #             return error
@@ -632,12 +644,12 @@ def list_cart_items():
 #         #     available_qty=response["available_qty"]
 #         price=data["price"]
 #         available_qty=10
-#         # print(response)
+#         # #print(response)
 #         try:
 #             replace =data["replace"]
-#             print("in replace",replace)
+#             #print("in replace",replace)
 #         except Exception as e:
-#             print(e)
+#             #print(e)
 #             replace=False
 #         res = add_cart(
 #             data["resid"],
@@ -656,7 +668,7 @@ def list_cart_items():
 #             return({"success":True,"Total":res["total"]})
 #         return jsonify({"success": False,"message": res.get("message", "Unable to add item to cart")}), 400
 #     except Exception as e:
-#         print(e)
+#         #print(e)
 #         return({"success":False ,"error":str(e)})
 
 
@@ -690,7 +702,7 @@ def updateCart():
         return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
 
     except Exception as e:
-        print("update_cart error:", e)
+        #print("update_cart error:", e)
         return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
 
 
@@ -732,14 +744,14 @@ def addToCart():
         return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
 
     except Exception as e:
-        print("add_to_cart error:", e)
+        #print("add_to_cart error:", e)
         return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
 @app.get("/seller/menu/<name>/<seller_id>")
 def seller_page(name,seller_id):
     try:
         return render_template("menu_seller.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/confirm_delivery")
 @auth_driver
@@ -829,6 +841,7 @@ def driver_vehicle_route():
 @app.post("/store_orders")
 @login_required
 def store_order():
+    start=time.perf_counter()
     if g.type != "user":
         return jsonify({"success": False, "message": "Unauthorized"}), 403
 
@@ -851,18 +864,20 @@ def store_order():
             return jsonify({"success": False, "message": "Cart is empty"}), 400
         if result is False:
             return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
-
+        # #print("after result",result)
         restaurant_ids, seller_order_ids = result
         socketio.emit("new_order", {"msg": "refresh"}, room="warehouse")
 
         for res_id, seller_order_id in zip(restaurant_ids, seller_order_ids):
+            # #print("resid",res_id)
             res_location = get_restaurant_location(res_id)
-            if res_location:
-                search_driver.delay(res_location, username, coordinates, seller_order_id, 10)
-
-        return jsonify({"success": True})
+            # if res_location:
+            #     search_driver.delay(res_location, username, coordinates, seller_order_id, 10)
+        #print("/store_order completed at",time.perf_counter()-start)
+        seller_order_id = str(seller_order_ids[0])
+        return jsonify({"success": True,"id":seller_order_id})
     except Exception as e:
-        print(e)
+        #print(e)
         return jsonify({"success": False}), 500
     finally:
         release_lock(lock_key, token)
@@ -873,7 +888,7 @@ def renderOrders(userid):
     try:
         return render_template("orders.html",page="orders")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/get_orders/<userid>")
 @login_required
@@ -883,10 +898,10 @@ def getOrders(userid):
     try:
         userid=g.user_id
         orders=get_orders(userid)
-        print("oorders in server",orders)
+        #print("oorders in server",orders)
         return({"success":True,"orders":orders})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.route("/seller/orders",methods=["POST","GET"])
 @login_required
@@ -900,12 +915,12 @@ def getsellerOrders():
                 "message": "Unauthorized"
             }), 403
         res_id=g.res_id
-        print(res_id)
+        #print(res_id)
         orders=get_seller_ordes(res_id)
-        print("orders in server",orders)
+        #print("orders in server",orders)
         return({"success":True,"orders":orders})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 # @app.post("/seller_orders")
 # def store_seller_orde():
@@ -917,18 +932,19 @@ def getsellerOrders():
 #         store_seller_orders(res_id,items,user_id)
 #         return({"success":True})
 #     except Exception as e:
-        print(e)
+        #print(e)
 #         return({"success":False})
 @app.get("/seller/orders/<res_name>/<res_id>")
 def renderSellerOrders(res_name,res_id):
     try:
         return render_template("seller_orders.html",page="orders")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.route("/accept_order", methods=["POST"])
 @auth_driver
 def accept_order_server():
+    start=time.perf_counter()
     driver_id = g.driver_id
     data = request.get_json(silent=True) or {}
     order_id = data.get("order_id")
@@ -947,9 +963,17 @@ def accept_order_server():
     if not result["success"]:
         delete_lock(order_id)
         return jsonify({"success": False, "message": result["message"]}), 400
-
+    #print("accept_order_server",time.perf_counter()-start)
     return jsonify({"success": True, "order": result["order"]})
-
+@app.route("/driver/active_order",methods=["POST","GET"])
+@auth_driver
+def return_active_order():
+    #print("in return active order")
+    driver_id=g.driver_id
+    res=get_active_driver_order(driver_id)
+    if(res==None):
+        return {"success":False,"order":None}
+    return {"success":True,"order":res}
 @app.get("/driver/<driver_id>")
 @auth_driver
 def renderdriverOrders(driver_id):
@@ -966,13 +990,13 @@ def handle_join(data):
         seller_id=g.res_id
         join_room("warehouse")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 def notify_new_order(seller_id, order):
     try:
         socketio.emit('new_order', order, room="warehouse")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @socketio.on('join_user_room')
 @login_required
@@ -981,9 +1005,9 @@ def handle_user_join(data):
         # user_id = data['user_id']
         user_id=g.user_id
         join_room(user_id)
-        print(f"User joined: {user_id}")
+        #print(f"User joined: {user_id}")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @socketio.on("join_driver_room")
 def join_driver_room(data):
@@ -1025,12 +1049,12 @@ def leave_drivers_room(data):
 def leave_drivers_room(data):
     driver_id = data["driver_id"]
     
-    print("driver_id room:", driver_id)
+    #print("driver_id room:", driver_id)
 
     room = f"driver_{driver_id}"
     leave_room(room)
 
-    print("LEFT ROOM:", room)
+    #print("LEFT ROOM:", room)
 
     emit("left", {
         "room": room
@@ -1039,7 +1063,7 @@ def leave_drivers_room(data):
 @login_required
 def handle_order_completed(data):
     try:
-        print("Order completed:", data)
+        #print("Order completed:", data)
 
         token_no = data.get("token_no")
         # user_id=data.get("userid")
@@ -1064,7 +1088,7 @@ def handle_order_completed(data):
         )
         return({"success":True})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False,"message":str(e)})
 import re
 
@@ -1129,8 +1153,16 @@ def signup_driver():
         return jsonify({"success": False, "message": "Password must be at least 8 characters"}), 400
 
     res = create_new_driver(email, username, password)
+    token=jwt.encode({
+        "username":username,
+        "driver_id":res["id"],
+        "type":"driver"
+    },app.config["SECRET_KEY"],
+    algorithm="HS256")
+    response=jsonify({"success": True, "id": res["id"],})
+    response.set_cookie("user_token",token,httponly=True,secure=COOKIE_SECURE,max_age=7 * 24 * 60 * 60)
     if res["success"]:
-        return jsonify({"success": True, "id": res["id"]})
+        return response
     return jsonify({"success": False, "message": res.get("message", "Signup failed")}), 400
 
 @app.post("/validate_user")
@@ -1153,7 +1185,7 @@ def validate():
             credentials["email"],
             credentials["password"]
         )
-        print("res",res)
+        #print("res",res)
         if(res["success"]==False): return jsonify({
                 "success": False,
                 "message": "Invalid email or password"
@@ -1162,7 +1194,7 @@ def validate():
             if(res["is_verified"]): 
                 userid=str(res["userid"])
                 username=res["username"]
-                print(userid)
+                #print(userid)
                 token = jwt.encode(
                     {   
                         "type":"user",
@@ -1200,7 +1232,7 @@ def validate():
                 # else: return ({"success":False,"msg":"Internal Server occured Please Try Again"})
         else: return({"success":False,"message":"Not_found"})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/validate_owner")
 #@limiter.limit("10 per minute")
@@ -1209,7 +1241,7 @@ def validate_owner():
         data=request.get_json()
         if not data:
             return ({"success":False})
-        # print("data in login",data)
+        # #print("data in login",data)
         # email,password=validate_credentials(data)
         credentials, error = validate_credentials(data)
 
@@ -1219,7 +1251,7 @@ def validate_owner():
         email = credentials["email"]
         password = credentials["password"]
         res=check_existing_owner(email,password)
-        print("res",res)
+        #print("res",res)
         if(res["success"]==False): return({"success":False})
         elif(res["success"]==True):
             if(res["is_verified"]): 
@@ -1278,16 +1310,16 @@ def validate_owner():
                 else: return({"success":False,"msg":"Internal Server occured Please Try again"})
         else: return({"success":False,"msg":"Not_found"})
     except Exception as e:
-        print("in exception validate owner")
-        print(e)
+        #print("in exception validate owner")
+        #print(e)
         return {"success": False}
 @app.post("/signup_user")
 #@limiter.limit("5 per minute")
 def signup_user():
     try:
-        # print(signup)
+        # #print(signup)
         data=request.get_json()
-        # print("data in signup",data)
+        # #print("data in signup",data)
         # email=data["email"]
         # username=data["username"]
         # password=data["password"]
@@ -1304,8 +1336,8 @@ def signup_user():
 
         if error:
             return error
-        # print(email)
-        # print("mail sent",role)
+        # #print(email)
+        # #print("mail sent",role)
         res = create_new_user(
             signup_data["email"],
             signup_data["username"],
@@ -1316,7 +1348,7 @@ def signup_user():
         email=signup_data["email"]
         role=signup_data["role"]
         # if(verify)
-        print(res)
+        #print(res)
         if(res["success"]):
             res_email=send_verification_email(email,role)
             if (res_email==1):
@@ -1347,8 +1379,8 @@ def signup_user():
         else:
             return ({"success":False,"msg":"user already exists!"})
     except Exception as e:
-        print("in exception signup user")
-        print(e)
+        #print("in exception signup user")
+        #print(e)
         return({"success":False,"msg":"Internal Error occured Please Try Again"})
 
 @app.route("/verify/<token>")
@@ -1410,45 +1442,45 @@ def renderSetup(seller_id):
     try:
         return render_template("resturant_setup.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.route("/login/<role>")
 def login(role):
     try:
         return render_template("auth.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.route("/signup/<role>")
 def signup(role):
     try:
         return render_template("signup.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 # @app.get("/seller/<name>/<seller_id>")
 # def sellerTemplate(name,seller_id):
 #     try:
 #         return render_template("seller.html")
 #     except Exception as e:
-#         print(e)
+#         #print(e)
 #         return({"success":False})
 @app.get("/seller/<name>/<seller_id>")
 @login_required
 def sellerTemplate(name,seller_id):
     try:
         username=g.username
-        print(username)
+        #print(username)
         return render_template("seller_dashboard.html",page="dashboard",username=username)
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.get("/landing")
 def renderLanding():
     try:
         return render_template("landing.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/update_order")
 @login_required
@@ -1466,7 +1498,7 @@ def update_status():
         else:
             return({"success":False,"message":res["message"]})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/update_order_user")
 @login_required
@@ -1484,7 +1516,7 @@ def update_status_user():
 
         return jsonify(result), 403
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/stats")
 @login_required
@@ -1496,15 +1528,15 @@ def returnstats():
         res=resturant_stats(res_id)
         return({"success":True,"stats":res})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.get("/seller/analytics/<res_id>")
 def render_analytics_template(res_id):
     try:
-        print("seller_anlytics")
+        #print("seller_anlytics")
         return render_template("analytics.html")
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/seller/analytics")
 @login_required
@@ -1516,7 +1548,7 @@ def return_seller_stats():
         stats=return_res_analytics(res_id)
         return({"success":True,"stats":stats})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
     
 @app.post("/seller/stats")
@@ -1527,7 +1559,7 @@ def return_seller_statistics():
         stats=get_seller_analytics(res_id)
         return({"success":True,"stats":stats})
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 # @app.post("/update_cart")
 # @login_required
@@ -1545,12 +1577,12 @@ def return_seller_statistics():
 
 #         userid = g.user_id
 #         res = update_cart_qty(userid,data["item_id"],data["qty"])
-#         print(res)
+#         #print(res)
 #         if not res["success"]:
 #             return jsonify({"success": False,"message": res.get("message", "Unable to update cart")}), 400
 #         return ({"success":True,"total":res["total"]})
 #     except Exception as e:
-#         print(e)
+#         #print(e)
 #         return({"success":False})
 # @app.post("/update_cart")
 # @login_required
@@ -1569,7 +1601,7 @@ def handle_user_cancel(data):
         for res_id in res_list:
             emit("seller_order_cancelled", data, room=res_id)
     except Exception as e:
-        print(e)
+        #print(e)
         return({"success":False})
 @app.post("/save_address")
 @login_required
@@ -1601,7 +1633,7 @@ def save_address_type():
         else:
             return ({"success":False})
     except Exception as e:
-        print(e)
+        #print(e)
         return jsonify({"success": False,"message": "Internal server error"}), 500
 @app.post("/fetch_address")
 @login_required
@@ -1652,10 +1684,10 @@ def sve_cate():
         data["subcats"]
     )
     if(res["success"]):
-        print(res)
+        #print(res)
         return({"success":True,"category":res["category_data"]})
     else:
-        print(res)
+        #print(res)
         return({"success":False,"error":res["error"]})
     
 
@@ -1763,7 +1795,7 @@ from flask import jsonify, request
 
 def validate_update_item():
     data = request.get_json(silent=True)
-    print("data=",data)
+    #print("data=",data)
     if not data:
         return None, (jsonify({
             "success": False,
@@ -1856,8 +1888,8 @@ from flask import request, jsonify
 
 def validate_add_to_cart():
     data = request.get_json(silent=True)
-    print(data)
-    print("validate_add to cart",data)
+    # #print(data)
+    # #print("validate_add to cart",data)
     if not data:
         return None, (jsonify({
             "success": False,
@@ -1930,7 +1962,7 @@ def validate_add_to_cart():
         resid = (data["resid"])
         item_id = (data["item_id"])
     except Exception as e:
-        print(e)
+        #print(e)
         return None, (jsonify({
             "success": False,
             "message": "Invalid restaurant or item id"
@@ -1947,7 +1979,7 @@ def validate_add_to_cart():
     }, None
 def validate_update_cart():
     data = request.get_json(silent=True)
-    print("valid update cart",data)
+    #print("valid update cart",data)
     if not data:
         return None, (jsonify({
             "success": False,
@@ -2394,7 +2426,7 @@ def set_offline():
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)  # never True once FLASK_ENV=production
+    socketio.run(app, debug=False)  # never True once FLASK_ENV=production
 # from waitress import serve
 
 # serve(

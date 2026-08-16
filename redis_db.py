@@ -2,7 +2,7 @@ import os
 import json
 import redis
 from dotenv import load_dotenv
-from celery_worker import celery
+# from celery_worker import celery
 from flask_socketio import SocketIO
 load_dotenv(override=True)
 
@@ -10,20 +10,24 @@ HOST = os.getenv("Redis_uri")
 PORT = os.getenv("Redis_port")
 USERNAME = os.getenv("Redis_USERNAME")
 PASSWORD = os.getenv("Redis_PASSWORD")
-REDIS_URL = f"redis://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/0"
-print("in redis",REDIS_URL)
+if USERNAME and PASSWORD:
+    REDIS_URL = f"redis://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/0"
+else:
+    REDIS_URL = "redis://127.0.0.1:6379/0"
+# REDIS_URL = f"redis://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/0"
+#print("in redis",REDIS_URL)
 socketio=SocketIO(message_queue=REDIS_URL)
 
 # -------------------------
 # Pooled connection (create once, reuse everywhere)
 # -------------------------
-pool = redis.BlockingConnectionPool(
+pool = redis.ConnectionPool(
     host=HOST,
     port=PORT,
-    username=USERNAME,
-    password=PASSWORD,
-    max_connections=30,
-    timeout=5,
+    # username=USERNAME,
+    # password=PASSWORD,
+    # max_connections=30,
+    # timeout=5,
     decode_responses=True,
     db=0,
     socket_keepalive=True,
@@ -267,16 +271,20 @@ def set_driver_offline(driver_id):
     return {"success": True}
 
 def accept_order_redis(order_id, driver_id):
+    total=time.perf_counter()
     order_id = str(order_id)
     driver_id = str(driver_id)
-
+    t = time.perf_counter()
     won = r.set(f"order:{order_id}:lock", driver_id, nx=True, ex=60)
+
+    set_time = time.perf_counter() - t
     if not won:
         return False, None
 
     key = f"order_request:{order_id}:{driver_id}"
+    t = time.perf_counter()
     raw = r.get(key)
-
+    get_time = time.perf_counter() - t
     if not raw:
         # request expired, or was never sent to this driver — release the lock
         # instead of leaving the order stuck for 60s with no one able to claim it
@@ -284,7 +292,16 @@ def accept_order_redis(order_id, driver_id):
         return False, None
 
     request = json.loads(raw)
+    t = time.perf_counter()
     mark_driver_busy(driver_id)
+    busy_time = time.perf_counter() - t
+    #print(
+    #     f"REDIS "
+    #     f"SET={set_time:.6f}s "
+    #     f"GET={get_time:.6f}s "
+    #     f"BUSY={busy_time:.6f}s"
+    # )
+    #print("accept_redis",time.perf_counter()-total)
     return True, request
 def delete_lock(order_id):
     r.delete(f"order:{order_id}:lock")
@@ -304,7 +321,7 @@ def mark_driver_available(driver_id, lat, lng):
     return update_driver_location(driver_id, lat, lng)
 
 
-@celery.task
+# @celery.task
 def search_driver(res_loc, username, user_coordinates, order_id, count=10):
 
     base_pay = 20
@@ -465,7 +482,7 @@ def add_json(userid, key, data, expiry=None):
             r.set(key, value)
         return True
     except Exception as e:
-        print("Error:", e)
+        #print("Error:", e)
         return False
     
 import uuid
