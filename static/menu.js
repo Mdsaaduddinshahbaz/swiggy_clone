@@ -439,6 +439,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     gotoCartBtn.addEventListener("click", () => {
-        window.location.href = `/cart/${userId}`;
+        window.location.href=`/user/${userId}#cart`
+        // window.location.href = `/cart/${userId}`;
     });
 });

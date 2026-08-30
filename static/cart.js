@@ -1,20 +1,11 @@
-function getPosition() {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            reject("Geolocation is not supported by your browser");
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-    });
-}
-
-async function reverseGeocode(lat, lon) {
-    const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
-    );
-    const data = await response.json();
-    const address = data.address;
-    return `${address.suburb || ""}, ${address.city || address.town || ""}`;
-}
+// NOTE: getPosition() and reverseGeocode() are intentionally NOT defined
+// here anymore. home.js already defines both as globals, and since
+// home.js and cart.js now load together on the same page, having two
+// competing definitions meant whichever script loaded second silently
+// overwrote the other's version (with different address formatting, and
+// this file's copy was missing a bugfix home.js's has). We rely on
+// home.js's versions instead — make sure home.js's <script> tag comes
+// before this one in the HTML.
 
 async function initCartPage() {
     const cart_items_container = document.getElementById("cart_items");
@@ -30,7 +21,7 @@ async function initCartPage() {
     const toPay = document.getElementById("toPay")
     const addressChgBtn = document.getElementById("ChangeAdrs")
     const deliveryAdrs = document.getElementById("Deliveryaddress")
-    const livelocationBtn = document.getElementById("liveLocationBtn")
+    const livelocationBtn = document.getElementById("cart-liveLocationBtn")
     const loading_container = document.getElementById("loading_container")
     const typeaddrs = document.getElementById("type")
     const address_container = document.getElementById("addressOptions");

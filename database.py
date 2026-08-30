@@ -1282,7 +1282,16 @@ def fetch_address(uid):
     if(user):
         # print("addd",user["addresses"])
         if "addresses" in user:
-            return {"success":True,"address":user["addresses"],"status":200}
+            addresses=[]
+            for address in user["addresses"]:
+                addr={
+                    "_id":str(address["_id"]),
+                    "address":address["address"],
+                    "adrs_type":address["adrs_type"],
+                    "coordinates":address["coordinates"]
+                }
+                addresses.append(addr)
+            return {"success":True,"address":addresses,"status":200}
         else:
             return {"success":True,"address":"not_found","status":404}
     else:
