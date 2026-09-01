@@ -90,7 +90,7 @@ body {
     flex-shrink: 0;
 }
 
-#searchBarContainer{
+.searchBarContainer{
     width: 100%;
 }
 #searchInput{
@@ -180,7 +180,6 @@ body {
     color: var(--ink);
 }
 
-.location-box.show,
 .location-box.show {
     display: flex;
     z-index: 122;
@@ -971,8 +970,8 @@ footer{
    ============================================================ */
 
 .type-tabs {
-    justify-content: space-between;
     position: relative;
+    justify-content: space-between;
     display: flex;
     gap: 4px;
     margin-top: 10px;
@@ -1028,6 +1027,16 @@ footer{
         font-size: 11.5px;
         padding: 7px 12px;
     }
+}
+
+/* The search bar and type filter only make sense while browsing
+   restaurants on Home. The header they live in is shared and stays
+   mounted on Orders/Cart/Profile too (per the "always live in the DOM"
+   note on the header), so without this they'd show everywhere.
+   home.js sets body[data-page] on every SPA navigation. */
+body:not([data-page="home"]) .searchBarContainer,
+body:not([data-page="home"]) .type-tabs {
+    display: none;
 }
 
 /* ============================================================

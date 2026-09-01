@@ -15,7 +15,11 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 
-<body>
+<body data-page="home">
+    <!-- data-page defaults to "home" to match the Home nav-item's initial
+         "active" state below. home.js updates this on every SPA navigation
+         so page-scoped chrome (search bar, type filter) can be hidden via
+         CSS on Orders/Cart/Profile instead of just staying visible forever. -->
 
     <!-- ============================================================
          SHARED HEADER — always live in the DOM, never swapped.

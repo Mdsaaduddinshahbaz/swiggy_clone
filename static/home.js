@@ -576,6 +576,14 @@ async function initHomePage() {
     });
 }
 
+// Keep the shared header's page-scoped chrome (search bar, type filter
+// tabs) in sync with whichever page is actually showing. The header never
+// gets swapped out by the router, so without this it would stay visible
+// on Orders/Cart/Profile too. Runs for every navigation, not just Home.
+document.addEventListener("spa:pageload", (e) => {
+    document.body.dataset.page = e.detail.page;
+});
+
 // Run on this page's first real load...
 initHomePage();
 // ...and re-run every time the SPA router swaps Home back into view
