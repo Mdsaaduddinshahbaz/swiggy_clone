@@ -1,5 +1,6 @@
 async function setupRestaurant() {
     const name = document.getElementById("name").value;
+    const type = document.getElementById("type").value;
     const address = document.getElementById("address").value;
     const phone = document.getElementById("phone").value;
     const lat = document.getElementById("lat").value;
@@ -8,7 +9,7 @@ async function setupRestaurant() {
     const sellerId = path.split("/")[3]
 
     // const sellerId = localStorage.getItem("seller_id");
-    console.log(name, address, phone, lat, lng)
+    console.log(name, type, address, phone, lat, lng)
     // const res = await fetch("/add_resturant", {
     //     method: "POST",
     //     headers: { "Content-Type": "application/json" },
@@ -24,6 +25,7 @@ async function setupRestaurant() {
     const formData = new FormData();
 
     formData.append("name", name);
+    formData.append("type", type);
     formData.append("address", address);
     formData.append("phone", phone);
     formData.append("lat", lat);

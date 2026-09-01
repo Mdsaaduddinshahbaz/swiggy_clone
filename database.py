@@ -33,12 +33,12 @@ users.create_index("email", unique=True)
 owners.create_index("email", unique=True)
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
-def add_resturants(name,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
+def add_resturants(name,shop_type,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
     # res=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]}})
     with client.start_session() as session:
         with session.start_transaction():
 
-            result=restaurants_name.insert_one({"name":name,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]},"file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"},session=session)
+            result=restaurants_name.insert_one({"name":name,"type":shop_type,"address":address,"phone_no":phone,"ownerId":owner_id,"location":{"type":"Point","coordinates":[long,latt]},"file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"},session=session)
             # parent_id = result.inserted_id 
             
             # 3. Add that parent_id to every seller doc before inserting
@@ -62,8 +62,8 @@ def list_resturant_items(resturant_id,types):
     if(types=="seller"):
         res=resturants_items.find({"resturant_id":resturant_id})
         cat=categories.find_one({"restaurant_id":resturant_id}, {"_id": 0})
-        for c in cat:
-            print("c=",c)
+        # for c in cat:
+        #     print("c=",c)
         # print("cat",cat)
         item_name={}
         for r in res:
@@ -153,7 +153,7 @@ def list_resturants(long,latt,dist:int=5):
     #     res_names[r["name"]]={"res_id":str(r["_id"]),"address":r["address"],"file_url":r["file_url"]}
     for r in restaurants:
         print(r["name"])
-        res_names[str(r["_id"])]={"res_name":r["name"],"address":r["address"],"file_url":r["file_url"]}
+        res_names[str(r["_id"])]={"res_name":r["name"],"address":r["address"],"file_url":r["file_url"],"type":r.get("type","restaurant")}
         # res_names.append(r["name"])
     return res_names
 def add_new_customer(username,password):
@@ -693,7 +693,7 @@ def check_existing_owner(email,password):
                 if(owner["is_setup"]):
                     return ({"success":True,"res_id":owner["resturant_id"],"username":owner["username"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
                 else:
-                    return ({"success":True,"id":str(owner["_id"]),"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
+                    return ({"success":True,"id":str(owner["_id"]),"username":owner["username"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
                 # return ({"success":True,"res_id":owner["resturant_id"],"resturant_name":owner["restaurant_name"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})
             else:
                 return ({"success":True,"user_id":str(owner["_id"]),"username":owner["username"],"is_verified":owner["is_verified"],"is_setup":owner["is_setup"]})

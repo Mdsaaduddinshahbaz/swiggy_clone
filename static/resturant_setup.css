@@ -68,7 +68,20 @@ button {
 button:hover {
   background: #0ea5e9;
 }
-
+select {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+select option {
+  background: rgba(255,255,255,0.1);
+  color: black;
+}
 #photo::file-selector-button {
   background: #40bff5;
   color: white;

@@ -339,6 +339,7 @@ def add_resturant():
         print(payload)
         owner_id = payload["owner_id"]
         name = request.form.get("name")
+        shop_type = request.form.get("type")
         address = request.form.get("address")
         phone = request.form.get("phone")
         lat = request.form.get("lat")
@@ -352,7 +353,10 @@ def add_resturant():
 
         if not name:
             return jsonify({"success": False, "message": "Restaurant name is required"}), 400
-
+        
+        if not shop_type:
+            return jsonify({"success": False, "message": "Restaurant type is required"}), 400
+        
         if not address:
             return jsonify({"success": False, "message": "Address is required"}), 400
 
@@ -386,7 +390,7 @@ def add_resturant():
                 }), 400
             file_id=upload_image(photo)
             print(file_id)
-            id=add_resturants(name,address,phone,owner_id,long,latt,file_id)
+            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt,file_id)
             # return ({"success":True,"res_id":id})
             response=jsonify({"success":True,"res_id":id})
             response.delete_cookie("seller_res_token")
@@ -416,7 +420,7 @@ def add_resturant():
             )
             return response
         else:
-            id=add_resturants(name,address,phone,owner_id,long,latt)
+            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt)
             response=jsonify({"success":True,"res_id":id})
             response.delete_cookie("seller_res_token")
             # return response
@@ -427,6 +431,7 @@ def add_resturant():
                     "type":"seller",
                     "res_id": str(res_id),
                     "res_name":res_name,
+                    "username":g.username,
                     "exp": datetime.utcnow() + timedelta(days=7)
                 },
                 app.config["SECRET_KEY"],

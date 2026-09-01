@@ -1,0 +1,223 @@
+/* ============================================================
+   PROFILE.CSS — same "order ticket" language as home.css/cart.css.
+   Loads after home.css on the page, so it reuses its :root vars
+   (--flame, --card, --ink, etc.) without redefining them here.
+   ============================================================ */
+
+.profile-container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 28px 20px 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.profile-loading {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--card);
+    border-radius: 10px;
+}
+
+.profile-loading.show { display: flex; }
+
+.profile-loading img {
+    width: 22px;
+    height: 22px;
+    animation: spin 0.9s linear infinite;
+}
+
+.profile-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    padding: 20px;
+}
+
+.profile-avatar {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--flame);
+    color: var(--white);
+    font-family: var(--font-display);
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.profile-input {
+    border: none;
+    border-bottom: 1px dashed var(--line);
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    padding: 4px 2px;
+    outline: none;
+}
+
+.profile-input:disabled {
+    color: var(--ink);
+    border-bottom-color: transparent;
+}
+
+.profile-input:not(:disabled) {
+    border-bottom-color: var(--flame);
+}
+
+.edit-profile-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px dashed var(--flame);
+    background: var(--card);
+    color: var(--flame-dark);
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.edit-profile-btn:hover { background: var(--card-hover); }
+
+.profile-save-row {
+    display: none;
+    gap: 10px;
+}
+
+.profile-save-row.show { display: flex; }
+
+.save-profile-btn,
+.cancel-profile-btn {
+    flex: 1;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 13.5px;
+    padding: 11px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    border: none;
+}
+
+.save-profile-btn {
+    background: var(--flame);
+    color: var(--white);
+    box-shadow: 0 3px 0 var(--flame-dark);
+}
+
+.save-profile-btn:active { transform: translateY(3px); box-shadow: 0 0 0 var(--flame-dark); }
+
+.cancel-profile-btn {
+    background: var(--card);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+}
+
+.profile-section h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 0 0 12px;
+}
+
+.profile-address-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.profile-address-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.profile-address-type {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--flame);
+}
+
+.profile-address-text {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.4;
+}
+
+.profile-empty-hint {
+    display: none;
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 10px 2px;
+}
+
+.profile-links {
+    display: flex;
+    gap: 10px;
+}
+
+.profile-link-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 12px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.profile-link-btn:hover { background: var(--card-hover); }
+.profile-link-btn i { color: var(--flame); }
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: none;
+    border: 1px dashed var(--ink-soft);
+    color: var(--maroon);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 13.5px;
+    padding: 13px 0;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.logout-btn:hover { background: var(--card); }

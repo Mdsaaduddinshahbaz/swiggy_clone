@@ -221,17 +221,8 @@ body {
     }
 }
 
-/* @media (max-width: 360px) {
-    .right-nav:has(.search-container.active) {
-        display: block;
-    }
-} */
-
 @media (max-width: 340px) {
 
-    /* .nav-container{
-        display: block;
-    } */
     .right-nav {
         justify-self: right;
     }
@@ -546,8 +537,6 @@ body {
     position: relative; 
     width:96vw;
     display: flex;
-    /* gap: 10px;
-     */
      justify-content: space-between;
 }
 .nav-btn{
@@ -563,23 +552,6 @@ body {
     align-items: center;
 }
 
-/* .active-indicator{
-        content: "";
-    position: absolute;
-    width: 128px;
-    height: 61px;
-    top: 1px;
-    background: url(/static/active-tab.svg) center / 100% 100% no-repeat;
-    mask: none;
-    z-index: -1;
-    -webkit-mask: none;
-    transition:
-        transform .35s cubic-bezier(.22,1,.36,1),
-        left .35s cubic-bezier(.22,1,.36,1);
-} */
-    /* .nav-btn.active .active-indicator{
-        transform: translateX(calc(var(--active-index) * 100%));
-    } */
 .active-indicator{
     position: absolute;
     top: 0;
@@ -592,19 +564,8 @@ body {
 .nav-btn.active{
     color:#f5a81c;
 }
-/* .nav-btn.active::before {
-    content: "";
-    position: absolute;
-    width: 137px;
-    height: 61px;
-    top: 1px;
-    background: url(/static/active-tab.svg) center / 100% 100% no-repeat;
-    mask: none;
-    z-index: -1;
-    -webkit-mask: none;
-} */
+
 .search-container {
-    /* max-width: 0; */
     width: 100%;
     margin-top:15px;
     overflow: hidden;
@@ -614,7 +575,6 @@ body {
 }
 
 .search-container.active {
-    /* max-width: 220px; */
     width: 100%;
 }
 
@@ -1006,6 +966,70 @@ footer{
 }
 
 /* ============================================================
+   TYPE FILTER TABS — sliding pill, same visual language as the
+   Home/Orders/Cart nav indicator (.navbar-indicator)
+   ============================================================ */
+
+.type-tabs {
+    position: relative;
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    padding: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.type-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.type-tabs-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: calc(100% - 8px);
+    width: 0;
+    background: var(--mustard);
+    border-radius: 999px;
+    z-index: 0;
+    transition: transform 0.3s cubic-bezier(.22, 1, .36, 1),
+                width 0.3s cubic-bezier(.22, 1, .36, 1);
+}
+
+.type-tab {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--white);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.type-tab.active {
+    color: var(--maroon);
+}
+
+@media (max-width: 420px) {
+    .type-tab {
+        font-size: 11.5px;
+        padding: 7px 12px;
+    }
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 
@@ -1047,8 +1071,6 @@ footer{
     }
 
     .location-box {
-        /* left: 50%;
-        transform: translateX(-50%); */
         width: 92vw;
     }
 }
@@ -1061,17 +1083,9 @@ footer{
 }
 
 @media (max-width: 420px) {
-    /* .search-container.active {
-        max-width: 150px;
-    } */
-
-    /* .search-container input {
-        width: 130px;
-    } */
 
     .location-trigger {
         max-width: 220px;
-        /* adjust as needed */
         overflow: hidden;
         white-space: nowrap;
         transition: max-width 0.28s ease, padding 0.28s ease;
@@ -1097,14 +1111,10 @@ footer{
 @media (max-width:800px) {
     .location-trigger {
         max-width: 220px;
-        /* adjust as needed */
         overflow: hidden;
         white-space: nowrap;
         transition: max-width 0.28s ease, padding 0.28s ease;
     }
-
-    /* When search is active */
-
 }
 
 * {

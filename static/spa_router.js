@@ -2,12 +2,12 @@
 //
 // Content-swap router: exactly one page's markup lives inside
 // #spa-content at any time (cloned from a <template>). This matches
-// what home.js / cart.js / orders.js already assume — e.g. their
-// `if (!someElement) return;` guards, and the comment in home.js
-// about the old map DOM node being "discarded by the router's
-// content swap".
+// what home.js / cart.js / orders.js / profile.js already assume —
+// e.g. their `if (!someElement) return;` guards, and the comment in
+// home.js about the old map DOM node being "discarded by the
+// router's content swap".
 
-const SPA_PAGES = ["home", "orders", "cart"];
+const SPA_PAGES = ["home", "orders", "cart", "profile"];
 const spaContent = document.getElementById("spa-content");
 const navLinks = document.querySelectorAll(".nav-item");
 const navIndicator = document.getElementById("navbarIndicator");
@@ -22,7 +22,7 @@ function getTemplate(page) {
 function moveNavIndicator(page) {
     if (!navIndicator) return;
     const activeLink = document.querySelector(`.nav-item[data-page="${page}"]`);
-    if (!activeLink) return;
+    if (!activeLink) return; // e.g. "profile" has no bottom-tab link — indicator just stays put
     navIndicator.style.width = `${activeLink.offsetWidth}px`;
     navIndicator.style.transform = `translateX(${activeLink.offsetLeft}px)`;
 }
@@ -87,11 +87,19 @@ navLinks.forEach((link) => {
     });
 });
 
+// Profile isn't in the bottom tab bar — it's opened from the header
+// avatar/logo instead.
+const profileLogo = document.getElementById("profileLogo");
+if (profileLogo) {
+    profileLogo.style.cursor = "pointer";
+    profileLogo.addEventListener("click", () => renderPage("profile"));
+}
+
 window.addEventListener("popstate", (e) => {
     const page = (e.state && e.state.page) || "home";
     renderPage(page, { pushState: false });
 });
 
-// Initial render — respects a deep link like /#cart, defaults to home.
+// Initial render — respects a deep link like /#cart or /#profile, defaults to home.
 const initialPage = window.location.hash.replace("#", "") || "home";
 renderPage(initialPage, { pushState: false });

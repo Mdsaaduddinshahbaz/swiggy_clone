@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="../static/cart.css">
     <link rel="stylesheet" href="../static/orders.css">
     <link rel="stylesheet" href="../static/home.css">
+    <link rel="stylesheet" href="../static/profile.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -34,6 +35,16 @@
                     </div>
                     <div class="searchBarContainer">
                         <input type="text" placeholder="Enter Resturant Name..." id="searchInput">
+                    </div>
+
+                    <!-- Type filter — sliding pill tabs, same visual language as the
+                         Home/Orders/Cart nav indicator below -->
+                    <div class="type-tabs" id="typeTabs">
+                        <div class="type-tabs-indicator" id="typeTabsIndicator"></div>
+                        <button class="type-tab active" data-type="all" type="button">All</button>
+                        <button class="type-tab" data-type="restaurant" type="button">Restaurant</button>
+                        <button class="type-tab" data-type="medical" type="button">Medical</button>
+                        <button class="type-tab" data-type="general_store" type="button">General Store</button>
                     </div>
                 </div>
 
@@ -90,8 +101,8 @@
          PAGE TEMPLATES — inert until spa_router.js clones one of
          these into #spa-content. Only ONE page's markup is ever
          live in the document at a time, which is what home.js /
-         cart.js / orders.js already assume (see their `if (!el)
-         return;` guards).
+         cart.js / orders.js / profile.js already assume (see their
+         `if (!el) return;` guards).
     ============================================================= -->
     <template id="tpl-home">
         <main class="container">
@@ -275,6 +286,52 @@
         </main>
     </template>
 
+    <template id="tpl-profile">
+        <main class="profile-container">
+            <div id="profile_loading" class="profile-loading">
+                <img src="../static/loading-spinner.svg" alt="Loading">
+            </div>
+            <div id="profileBackBtn">Profile</div>
+            <section class="profile-card">
+                <div class="profile-avatar" id="profileAvatar">U</div>
+                <div class="profile-info">
+                    <input type="text" id="profileNameInput" class="profile-input" disabled placeholder="Name">
+                    <input type="text" id="profilePhoneInput" class="profile-input" disabled placeholder="Phone number">
+                </div>
+                <button id="editProfileBtn" class="edit-profile-btn" title="Edit profile">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </section>
+
+            <div id="profileSaveRow" class="profile-save-row">
+                <button id="saveProfileBtn" class="save-profile-btn">Save Changes</button>
+                <button id="cancelProfileBtn" class="cancel-profile-btn">Cancel</button>
+            </div>
+
+            <section class="profile-section">
+                <h3>Saved Addresses</h3>
+                <div id="profileAddressList" class="profile-address-list"></div>
+                <div id="profileNoAddress" class="profile-empty-hint">No saved addresses yet.</div>
+            </section>
+
+            <section class="profile-section">
+                <h3>Quick Links</h3>
+                <div class="profile-links">
+                    <button class="profile-link-btn" id="profileOrdersBtn">
+                        <i class="fa-solid fa-bag-shopping"></i> My Orders
+                    </button>
+                    <button class="profile-link-btn" id="profileHomeBtn">
+                        <i class="fa-solid fa-house"></i> Back to Home
+                    </button>
+                </div>
+            </section>
+
+            <button id="logoutBtn" class="logout-btn">
+                <i class="fa-solid fa-right-from-bracket"></i> Log Out
+            </button>
+        </main>
+    </template>
+
     <!-- ============================================================
          Router clones exactly one template's content in here.
     ============================================================= -->
@@ -283,6 +340,7 @@
     <script src="../static/spa_router.js"></script>
     <script src="../static/home.js"></script>
     <script src="../static/cart.js"></script>
+    <script src="../static/profile.js"></script>
     <script src="../static/user_navbar.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <script>

@@ -41,7 +41,7 @@ function renderRestaurants(results, containers) {
 
     no_results_container.style.display = "none";
     const html = Object.entries(results).map(([id, detail]) => `
-        <div class="card" id=${escapeHtml(id)}>
+        <div class="card" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}">
             <div class="card-img">
                 <img src=${escapeHtml(detail.file_url)} alt="Food">
             </div>
@@ -110,12 +110,13 @@ async function change(latt, long) {
         });
         if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
         const data = await res.json();
-
+        console.log(data);
         if (data.success) {
             if (loading) loading.style.display = "none";
             if (Note) Note.style.display = "block";
             renderRestaurants(data.results, { display_resturants, no_results_container });
             sessionStorage.setItem(getRestaurantCacheKey(userId), JSON.stringify(data.results));
+            if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
         } else {
             alert("error loading resturants");
         }
@@ -208,9 +209,11 @@ async function initHomePage() {
             });
             if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
             const data = await res.json();
+            console.log(data);
             if (data.success) {
                 renderRestaurants(data.results, renderContainers);
                 sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.results));
+                if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
             } else {
                 alert("error loading resturants");
             }
@@ -306,6 +309,7 @@ async function initHomePage() {
         });
         if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
         const data = await res.json();
+        console.log(data)
         if (data.success) {
             if (loading) loading.style.display = "none";
             if (Note) Note.style.display = "block";
@@ -326,6 +330,11 @@ async function initHomePage() {
         });
         addListenerOnce(cartBtn, "click", () => { window.location.href = `/cart/${userId}`; });
         addListenerOnce(orderBtn, "click", () => { window.location.href = `/orders/${userId}`; });
+
+        // Type tabs may have loaded with a non-"all" active tab from a previous
+        // page visit (dataset flags survive since these are shared header nodes),
+        // so re-apply filters against whatever just got rendered.
+        if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
     } catch (e) {
         console.error("initHomePage location/restaurant load failed", e);
         if (!cachedRestaurants && Note) Note.style.display = "none";
@@ -460,17 +469,57 @@ async function initHomePage() {
             currentAddress.textContent = addressType + " - " + address;
         });
     });
-     const searchInput = document.getElementById("searchInput");
-    searchInput.addEventListener("input", () => {
-        const searchTerm = searchInput.value.toLowerCase();
+
+    // ---- Search box + type-filter tabs, combined ----
+    // Both act on the already-rendered .card elements: text search matches
+    // the restaurant name, the tab filter matches data-type. Exposed on
+    // window so change()/distance-filter re-renders can re-apply the
+    // currently active filters without needing to re-bind listeners.
+    const searchInput = document.getElementById("searchInput");
+    const typeTabs = document.getElementById("typeTabs");
+    const typeTabsIndicator = document.getElementById("typeTabsIndicator");
+
+    function moveTypeIndicator(btn) {
+        if (!typeTabsIndicator || !btn) return;
+        typeTabsIndicator.style.width = btn.offsetWidth + "px";
+        typeTabsIndicator.style.transform = `translateX(${btn.offsetLeft - 4}px)`;
+    }
+
+    function applyHomeFilters() {
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
+        const activeTab = typeTabs ? typeTabs.querySelector(".type-tab.active") : null;
+        const activeType = activeTab ? activeTab.dataset.type : "all";
+
         document.querySelectorAll(".card").forEach(card => {
-            const restaurantName = card.querySelector(".resturant_name").textContent.toLowerCase();
-            card.style.display = restaurantName.includes(searchTerm) ? "block" : "none";
+            const nameEl = card.querySelector(".resturant_name");
+            const restaurantName = nameEl ? nameEl.textContent.toLowerCase() : "";
+            const cardType = card.dataset.type || "";
+            const matchesSearch = restaurantName.includes(searchTerm);
+            const matchesType = activeType === "all" || cardType === activeType;
+            card.style.display = (matchesSearch && matchesType) ? "block" : "none";
         });
-    });
+    }
+    window.__applyHomeFilters = applyHomeFilters;
+
+    addListenerOnce(searchInput, "input", applyHomeFilters);
+
+    if (typeTabs) {
+        addListenerOnce(typeTabs, "click", (e) => {
+            const btn = e.target.closest(".type-tab");
+            if (!btn) return;
+            typeTabs.querySelector(".type-tab.active")?.classList.remove("active");
+            btn.classList.add("active");
+            moveTypeIndicator(btn);
+            applyHomeFilters();
+        });
+
+        // Position the pill correctly once layout has settled, and keep it
+        // aligned to the active tab if the window is resized.
+        requestAnimationFrame(() => moveTypeIndicator(typeTabs.querySelector(".type-tab.active")));
+        window.addEventListener("resize", () => moveTypeIndicator(typeTabs.querySelector(".type-tab.active")));
+    }
+
     addListenerOnce(livelocationBtn, "click", async () => {
-        // console.log("in live location btn");
-        
         box.classList.remove("show");
         loading_container.classList.add("show");
         try {
@@ -478,12 +527,10 @@ async function initHomePage() {
             const userLocation = { latt: livelctn.coords.latitude, long: livelctn.coords.longitude };
             localStorage.setItem("userLocation", JSON.stringify(userLocation));
             await change(livelctn.coords.latitude, livelctn.coords.longitude);
-            // document.getElementById("addressTagModal").classList.add("show");
         } catch (err) {
             console.error("live location failed", err);
             alert("Location access denied");
         } finally {
-            
             document.getElementById("addressTagModal").classList.add("show");
             loading_container.classList.remove("show");
             overlay.classList.remove("show");
