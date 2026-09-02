@@ -91,11 +91,21 @@ creds = None
 # if os.path.exists(TOKEN_FILE):
 #     with open(TOKEN_FILE, "rb") as token:
 #         creds = pickle.load(token)
-creds=Credentials.from_authorized_user_file(
-    "/etc/secrets/token.json",
-    SCOPES
-)
-
+# creds=Credentials.from_authorized_user_file(
+#     "/etc/secrets/token.json",
+#     SCOPES
+# ) or Credentials.from_authorized_user_file(
+#     "token.json",
+#     SCOPES
+# )
+try:
+    creds = Credentials.from_authorized_user_file(
+        "/etc/secrets/token.json",
+        SCOPES
+    )
+except FileNotFoundError:
+    with open("token.pickle", "rb") as token:
+        creds = pickle.load(token)
 if not creds:
     raise Exception(
         "token.pickle not found. Generate it locally and upload it as a Render Secret File."

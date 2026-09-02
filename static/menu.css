@@ -610,7 +610,7 @@ hr.divider::after {
 
 .subcategory-tab.active {
     color: var(--maroon);
-
+    background: transparent;
     border-color: transparent;
 }
 
