@@ -59,9 +59,9 @@ def add_resturant_items(resturant_id,item_name,item_qty,price,sub_id,desc,unit,l
     ret=resturants_items.insert_one({"resturant_id":resturant_id,"item_name":item_name,"item_qty":item_qty,"price":price,"sub_id":sub_id,"desc":desc,"unit":unit,"lowat":lowat,"available":available,"sold":sold,"file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"})
     return ({"id":str(ret.inserted_id),"url":f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"})
 def list_resturant_items(resturant_id,types):
+    cat=categories.find_one({"restaurant_id":resturant_id}, {"_id": 0})
     if(types=="seller"):
         res=resturants_items.find({"resturant_id":resturant_id})
-        cat=categories.find_one({"restaurant_id":resturant_id}, {"_id": 0})
         # for c in cat:
         #     print("c=",c)
         # print("cat",cat)
@@ -89,9 +89,10 @@ def list_resturant_items(resturant_id,types):
                         "price": r["price"],
                         "id": str(r["_id"]),
                         "item_qty":(int(r["item_qty"])-int(r["sold"])),
-                        "file_url":r["file_url"]
+                        "file_url":r["file_url"],
+                        "sub_id":r["sub_id"]
                     }
-        return ({"item_name":item_name})
+        return ({"item_name":item_name,"categories":cat})
 def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available,res_id=None):
     result=resturants_items.find_one_and_update({
         "_id": ObjectId(item_id),

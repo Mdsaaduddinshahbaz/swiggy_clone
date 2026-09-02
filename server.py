@@ -494,7 +494,7 @@ def list_item():
     if(types=="seller"):
         return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
     else:
-        return ({"success":True,"res":res["item_name"]})
+        return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
     # try:
     # except Exception as e:
     #     print(e)
@@ -684,7 +684,7 @@ def addToCart():
             available_qty,
             replace
         )
-
+        print("add_cart result:", res)
         if res["success"]:
             return jsonify({"success": True, "Total": res["total"]})
         return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
