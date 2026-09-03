@@ -127,6 +127,7 @@ async function loadOrders(userId, { background = false } = {}) {
         return;
     }
     const data = await res.json();
+    console.log(data)
     if (!data.success) {
         if (!sessionStorage.getItem(cacheKey)) ordersList.innerHTML = "<p>Error loading orders</p>";
         return;

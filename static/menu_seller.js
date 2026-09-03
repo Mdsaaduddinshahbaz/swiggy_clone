@@ -410,20 +410,33 @@ async function saveItem() {
         formData.append("photo", file);
     }
   if (state.editingItem) {
+    formData.append("item_id", item.id)
+    formData.append("name", item.name)
+    formData.append("unit", item.unit)
+    formData.append("price", item.price)
+    formData.append("lowAt", item.lowAt)
+    formData.append("desc", item.desc)
+    formData.append("subId", item.subId)
+    formData.append("stock", item.stock)
+    formData.append("available", item.available)
+    if (file) {
+        formData.append("photo", file);
+    }
     const res = await fetch("/update_item_details", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        "item_id": item.id,
-        "name": item.name,
-        "unit": item.unit,
-        "price": item.price,
-        "lowAt": item.lowAt,
-        "desc": item.desc,
-        "subId": item.subId,
-        "stock": item.stock,
-        "available": item.available
-      })
+      // body: JSON.stringify({
+      //   "item_id": item.id,
+      //   "name": item.name,
+      //   "unit": item.unit,
+      //   "price": item.price,
+      //   "lowAt": item.lowAt,
+      //   "desc": item.desc,
+      //   "subId": item.subId,
+      //   "stock": item.stock,
+      //   "available": item.available
+      // })
+      body: formData
     })
     const data = await res.json()
     if (data.success) {

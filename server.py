@@ -279,6 +279,7 @@ def add_itemss():
         if data["photo"]:
             res_id=g.res_id
             file_id = upload_image(data["photo"])
+            print(file_id)
             res = add_resturant_items(
                 res_id,
                 data["itm_name"],
@@ -289,8 +290,9 @@ def add_itemss():
                 data["unit"],
                 data["lowat"],
                 data["available"],
-                file_id
+                file_id=file_id
             )
+            print("res after adding item with photo:", res)
         # if (photo):
         #     file_id=upload_image(photo)
         #     print(file_id)
@@ -715,7 +717,10 @@ def store_order():
     try:
         # data=request.get_json()
         user_id=g.user_id
+        # data=request.get_json(force=True) or {}
+        # pickup_time=data.get("pickup_time")
         resids=store_orders(user_id)
+        print("resids in server",resids)
         if(resids==404):
             return({"success":False})
         if resids is False:
@@ -1546,18 +1551,29 @@ def validate_update_item():
             "message": "available must be true or false"
         }), 400)
 
+    # validated = {
+    #     "item_id": data["item_id"],
+    #     "name": name,
+    #     "price": price,
+    #     "unit": str(data["unit"]).strip(),
+    #     "lowAt": low_at,
+    #     "desc": str(data["desc"]).strip(),
+    #     "subId": data["subId"],
+    #     "stock": stock,
+    #     "available": data["available"]
+    # }
     validated = {
-        "item_id": data["item_id"],
-        "name": name,
-        "price": price,
-        "unit": str(data["unit"]).strip(),
-        "lowAt": low_at,
-        "desc": str(data["desc"]).strip(),
-        "subId": data["subId"],
-        "stock": stock,
-        "available": data["available"]
-    }
-
+            "item_id": request.form.get("item_id"),
+            "name": request.form.get("name"),
+            "price": request.form.get("price"),
+            "unit": request.form.get("unit"),
+            "lowAt": request.form.get("lowAt"),
+            "desc": request.form.get("desc"),
+            "subId": request.form.get("subId"),
+            "stock": request.form.get("stock"),
+            "available": request.form.get("available"),
+            "photo": request.files.get("photo")
+        }
     return validated, None
 ####################33333333333333333333333######################
 from flask import request, jsonify
