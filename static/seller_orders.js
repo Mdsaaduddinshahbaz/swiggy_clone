@@ -218,7 +218,7 @@ async function loadOrders() {
                 </div>
                 <div class="token-no">Token No: ${order.token_no}</div>
                 <div class="order-date">${order.time}</div>
-
+                <div class="order-date">Pickup Time: ${order.pickup_time}</div>
                 ${restaurantsHTML}
 
                 <div class="total">Total: ₹${total}</div>

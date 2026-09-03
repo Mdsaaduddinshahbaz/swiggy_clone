@@ -74,6 +74,7 @@ function renderOrders(orders, ordersList, no_order_container) {
                 </div>
                 <div class="token-no">Token No: ${order.token_no}</div>
                 <div class="order-date">${order.date}</div>
+                <div class="order-date">Pickup Time: ${order.pickup_time}</div>
                 ${restaurantsHTML}
                 <div class="total">Total: ₹${total}</div>
                 <button class="cancelBtn" style="

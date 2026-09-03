@@ -717,9 +717,10 @@ def store_order():
     try:
         # data=request.get_json()
         user_id=g.user_id
-        # data=request.get_json(force=True) or {}
-        # pickup_time=data.get("pickup_time")
-        resids=store_orders(user_id)
+        data=request.get_json(force=True) or {}
+        pickup_time=data.get("pickup_time")
+        print(pickup_time)
+        resids=store_orders(user_id,pickup_time)
         print("resids in server",resids)
         if(resids==404):
             return({"success":False})

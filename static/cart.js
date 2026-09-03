@@ -19,6 +19,8 @@ async function initCartPage() {
     const orderBtn = document.getElementById("orderBtn")
     const totalPrice = document.getElementById("totalPrice")
     const toPay = document.getElementById("toPay")
+    const box = document.getElementById("addressOptions");
+    const overlay = document.getElementById("locationOverlay");
     const addressChgBtn = document.getElementById("ChangeAdrs")
     const deliveryAdrs = document.getElementById("Deliveryaddress")
     const livelocationBtn = document.getElementById("cart-liveLocationBtn")
@@ -198,31 +200,83 @@ async function initCartPage() {
             } else { alert("failed removing item") }
         }
     });
+    // New refs — add alongside your other getElementById calls in initCartPage
+    const pickupOverlay = document.getElementById("pickupOverlay");
+    const pickupSheet = document.getElementById("pickupSheet");
+    const pickupTimeInput = document.getElementById("pickupTimeInput");
+    const pickupError = document.getElementById("pickupError");
+    const confirmPickupBtn = document.getElementById("confirmPickupBtn");
 
-    placeorder.addEventListener("click", async () => {
+    // Replace the old placeorder listener with this:
+    placeorder.addEventListener("click", () => {
         const remainingItems = document.querySelectorAll(".cart-item");
         if (remainingItems.length === 0) { alert("Your cart is empty"); return; }
+
+        pickupError.classList.remove("show");
+        pickupSheet.classList.add("show");
+        overlay.classList.add("show");
+    });
+
+    overlay.addEventListener("click", () => {
+        pickupSheet.classList.remove("show");
+        overlay.classList.remove("show");
+    });
+
+    confirmPickupBtn.addEventListener("click", async () => {
+        console.log("Confirm pickup clicked");
+        const pickupTime = pickupTimeInput.value; // "HH:MM" 24hr, or "" if unset
+        console.log("Pickup time:", pickupTime);
+        if (!pickupTime) {
+            pickupError.classList.add("show");
+            return;
+        }
+
+        confirmPickupBtn.disabled = true;
 
         const res = await fetch("/store_orders", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, items: restaurants })
-        })
-        const data = await res.json()
+            body: JSON.stringify({ user_id: userId, items: restaurants, pickup_time: pickupTime })
+        });
+        const data = await res.json();
+
+        confirmPickupBtn.disabled = false;
+
         if (data.success) {
-            alert("order placed")
+            pickupSheet.classList.remove("show");
+            //pickupOverlay.classList.remove("show");
+            alert("order placed");
             sessionStorage.removeItem(CART_CACHE_KEY);
             sessionStorage.removeItem(`cachedOrders_${userId}`);
-            window.location.href = `/orders/${userId}`
+            window.location.href = `/orders/${userId}`;
         } else {
-            alert("error while placing order")
+            alert("error while placing order");
             initCartPage();
         }
-    })
+    });
+    // placeorder.addEventListener("click", async () => {
+    //     const remainingItems = document.querySelectorAll(".cart-item");
+    //     if (remainingItems.length === 0) { alert("Your cart is empty"); return; }
+
+    //     const res = await fetch("/store_orders", {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json" },
+    //         body: JSON.stringify({ user_id: userId, items: restaurants })
+    //     })
+    //     const data = await res.json()
+    //     if (data.success) {
+    //         alert("order placed")
+    //         sessionStorage.removeItem(CART_CACHE_KEY);
+    //         sessionStorage.removeItem(`cachedOrders_${userId}`);
+    //         window.location.href = `/orders/${userId}`
+    //     } else {
+    //         alert("error while placing order")
+    //         initCartPage();
+    //     }
+    // })
     if (orderBtn) orderBtn.addEventListener("click", () => { window.location.href = `/orders/${userId}` })
 
-    const box = document.getElementById("addressOptions");
-    const overlay = document.getElementById("locationOverlay");
+    
     addressChgBtn.addEventListener("click", async () => {
         box.classList.add("show");
         overlay.classList.add("show");

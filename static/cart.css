@@ -366,7 +366,9 @@ body {
 .address-options.show {
     display: flex;
 }
-
+#pickupSheet{
+    z-index:1000
+}
 .address-options h2 {
     margin: 4px 0 2px;
     font-size: 13px;
@@ -644,7 +646,48 @@ body {
     color: var(--ink-soft);
     font-weight: 700;
 }
+/* Pickup time picker */
 
+.pickup-time-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 2px 6px;
+}
+
+.pickup-time-row i {
+    color: var(--flame);
+    font-size: 15px;
+}
+
+.pickup-time-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    outline: none;
+}
+
+.pickup-time-input:focus {
+    border-color: var(--flame);
+}
+
+.pickup-error {
+    display: none;
+    margin: 2px 2px 8px;
+    font-size: 12.5px;
+    color: var(--flame-dark);
+    font-weight: 700;
+}
+
+.pickup-error.show {
+    display: block;
+}
 .bill-row {
     display: flex;
     align-items: center;

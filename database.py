@@ -444,7 +444,7 @@ def store_ordersss(userid):
 
     return False
 
-def store_orders(userid):
+def store_orders(userid,pickup_time=None):
     token = generate_token()
     items = get_cart(userid)
 
@@ -502,7 +502,8 @@ def store_orders(userid):
             "restaurant_name": restaurant["name"],
             "items": verified_items,
             "status": "placed",
-            "time": current_time
+            "time": current_time,
+            "pickup_time": pickup_time
         })
 
         for item_id, item in restaurant["items"].items():
@@ -538,7 +539,8 @@ def store_orders(userid):
                                 "token_no": token,
                                 "status": "placed",
                                 "items": items,
-                                "time": current_time
+                                "time": current_time,
+                                "pickup_time": pickup_time
                             },
                             session=session
                         )
@@ -608,7 +610,8 @@ def get_orders(userid):
             "token_no":order["token_no"],
             "resturants":order["items"],
             "status":order["status"],
-            "date":order["time"]
+            "date":order["time"],
+            "pickup_time":order["pickup_time"]
         }
 
         final_orders.append(data)
@@ -627,7 +630,8 @@ def get_seller_ordes(res_id):
             "user_id":order['user_id'],
             "items":order["items"],
             "status":order["status"],
-            "time":order["time"]
+            "time":order["time"],
+            "pickup_time":order["pickup_time"]
         }
         final_orders.append(data)
     return final_orders

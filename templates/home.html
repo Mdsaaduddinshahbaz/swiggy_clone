@@ -28,6 +28,19 @@
         <div class="nav-container">
             <div class="left-nav">
                 <div class="location-overlay" id="locationOverlay"></div>
+                <div class="pickup-overlay" id="pickupOverlay"></div>
+                <div class="address-options" id="pickupSheet">
+                    <h2>Pickup Time</h2>
+                    <div class="pickup-time-row">
+                        <i class="fa-regular fa-clock"></i>
+                        <input type="time" id="pickupTimeInput" class="pickup-time-input">
+                    </div>
+                    <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
+                    <button class="live-location-btn" id="confirmPickupBtn">
+                        <i class="fa-solid fa-check"></i>
+                        Confirm & Place Order
+                    </button>
+                </div>
                 <div style="display: flex;flex-direction: column;">
                     <div style="display: flex; justify-content: space-between;">
                         <div class="location-trigger" id="locationTrigger">
@@ -63,7 +76,8 @@
                         <input type="text" id="addressInput" placeholder="Search for area, street, city...">
                     </div>
                     <div id="savedAddress">
-                        <h2 style="color: black; top: 10px; font-size: 22px; left: 5px; position: relative;">Saved Address</h2>
+                        <h2 style="color: black; top: 10px; font-size: 22px; left: 5px; position: relative;">Saved
+                            Address</h2>
                     </div>
                     <button id="liveLocationBtn" class="live-location-btn">
                         <i class="fa-solid fa-location-crosshairs"></i>
@@ -150,7 +164,8 @@
                     It looks like we don't have any partners within 5km of your location.
                     Try checking a different area.
                 </p>
-                <button onclick="location.reload()" style="background: #ff4757; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                <button onclick="location.reload()"
+                    style="background: #ff4757; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold;">
                     Try Again / Refresh
                 </button>
             </div>
@@ -243,7 +258,9 @@
                 <div class="checkout-card">
                     <div class="step-header">
                         <i class="fa-solid fa-wallet"></i>
-                        <div><h3>Payment</h3></div>
+                        <div>
+                            <h3>Payment</h3>
+                        </div>
                     </div>
                     <p class="payment-hint">Select your payment method after reviewing the items.</p>
 
@@ -267,8 +284,11 @@
             <div class="cart-right">
                 <div class="order-summary-card">
                     <div class="res-mini-header">
-                        <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80" alt="Res">
-                        <div class="res-info"><h4>Burger King</h4></div>
+                        <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80"
+                            alt="Res">
+                        <div class="res-info">
+                            <h4>Burger King</h4>
+                        </div>
                     </div>
                     <div class="cart-items" id="cart_items"></div>
                 </div>
