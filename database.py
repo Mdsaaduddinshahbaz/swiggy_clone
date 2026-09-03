@@ -210,8 +210,9 @@ def generate_token():
     while True:
         token = str(uuid.uuid4())[:6].upper()
         
-        if not orders.find_one({"token_no": token}):
-            return token
+        # if not orders.find_one({"token_no": token}):
+        #     return token
+        return token
 def store_orderss(userid):
     try:
         import time
