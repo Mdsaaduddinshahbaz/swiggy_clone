@@ -28,24 +28,10 @@
 
         <nav class="right-nav">
 
-            <div class="search-container" id="searchContainer">
-                <input
-                    type="text"
-                    id="searchInput"
-                    placeholder="Search restaurant name...."
-                    autocomplete="off"
-                >
-            </div>
-
             <ul>
 
-                <li id="searchBtn">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    Search
-                </li>
-
                 <li id="hideCartOrderBtn" class="menu-toggle">
-                    ☰
+                    <i class="fa-solid fa-bars"></i>
                 </li>
 
                 <div id="CartOrderContainer" class="hide">
@@ -58,6 +44,7 @@
                     <li id="cartBtn">
                         <i class="fa-solid fa-cart-shopping"></i>
                         Cart
+                        <span class="badge" id="navCartBadge">0</span>
                     </li>
 
                 </div>
@@ -79,89 +66,114 @@
         id="loading"
     >
 
-    <nav class="breadcrumbs">
-        Home / Hyderabad / <span>Burger King</span>
-    </nav>
+    <!-- RESTAURANT STRIP -->
 
+    <section class="res-strip">
 
-    <!-- Restaurant information -->
+        <nav class="breadcrumbs">
+            Home / Hyderabad / <span>Burger King</span>
+        </nav>
 
-    <section class="res-header">
+        <div class="res-header">
 
-        <div class="res-info">
+            <div class="res-info">
+                <h1>Burger King</h1>
+                <p class="res-location">Banjara Hills, 2.5 km</p>
+            </div>
 
-            <h1>Burger King</h1>
+        </div>
 
-            <p class="res-location">
-                Banjara Hills, 2.5 km
-            </p>
+        <div class="res-delivery-info">
+
+            <span>
+                <i class="fa-solid fa-clock"></i>
+                25-30 MINS
+            </span>
+
+            <span>
+                <i class="fa-solid fa-indian-rupee-sign"></i>
+                ₹350 for two
+            </span>
 
         </div>
 
     </section>
 
 
-    <div class="res-delivery-info">
+    <!-- SEARCH -->
 
-        <span>
-            <i class="fa-solid fa-clock"></i>
-            25-30 MINS
-        </span>
+    <div class="search-bar">
 
-        <span>
-            <i class="fa-solid fa-indian-rupee-sign"></i>
-            ₹350 for two
-        </span>
+        <div class="search-shell">
+
+            <button class="search-back" id="searchBackBtn" type="button" aria-label="Go back">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+
+            <i class="fa-solid fa-magnifying-glass"></i>
+
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search for items"
+                autocomplete="off"
+            >
+
+            <button class="search-clear" id="searchClearBtn" type="button" aria-label="Clear search">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+        </div>
 
     </div>
 
 
-    <hr class="divider">
+    <!-- CATEGORY RAIL -->
 
-
-    <!-- CATEGORY TABS -->
-
-    <div
-        class="category-tabs"
+    <nav
+        class="category-rail"
         id="categoryTabs"
         role="tablist"
         aria-label="Food categories"
     >
+        <!-- "All" chip + dynamic category chips injected here -->
+    </nav>
 
-        <div
-            class="category-tabs-indicator"
-            id="categoryTabsIndicator"
-        ></div>
 
-        <button
-            class="category-tab active"
-            type="button"
-            data-cat-id="all"
-        >
-            All
+    <!-- FILTER ROW -->
+
+    <div class="filter-row" id="filterRow">
+
+        <select class="filter-select" id="sortSelect" aria-label="Sort items">
+            <option value="default">Sort: Recommended</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="name-asc">Name: A to Z</option>
+        </select>
+
+        <button class="filter-toggle" id="stockToggle" type="button">
+            <i class="fa-solid fa-circle-check"></i>
+            In stock only
         </button>
 
-    </div>
+        <div class="filter-divider" id="subDivider" style="display:none;"></div>
 
-
-    <!-- SUBCATEGORY TABS -->
-
-    <div
-        class="subcategory-tabs"
-        id="subcategoryTabs"
-        role="tablist"
-        aria-label="Food subcategories"
-    >
+        <!-- SUBCATEGORY CHIPS -->
 
         <div
-            class="subcategory-tabs-indicator"
-            id="subcategoryTabsIndicator"
+            class="subcategory-tabs"
+            id="subcategoryTabs"
+            role="tablist"
+            aria-label="Food subcategories"
         ></div>
 
     </div>
 
 
-    <!-- MENU -->
+    <p class="result-meta" id="resultMeta"></p>
+
+
+    <!-- MENU GRID -->
 
     <section
         class="menu-section"
@@ -209,17 +221,13 @@
     <div id="goToCartContainer">
 
         <div id="TotalPrice">
-
-            <span>Total:</span>
-
-            <span id="amount">
-                0
-            </span>
-
+            <span>Total</span>
+            <span id="amount">0</span>
         </div>
 
         <span id="GoCartBtn">
-            Go To Cart ▶
+            View cart
+            <i class="fa-solid fa-chevron-right"></i>
         </span>
 
     </div>
