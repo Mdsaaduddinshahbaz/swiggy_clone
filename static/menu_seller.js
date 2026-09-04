@@ -411,6 +411,7 @@ async function saveItem() {
     }
   if (state.editingItem) {
     formData.append("item_id", item.id)
+    // console.log(formData)
     formData.append("name", item.name)
     formData.append("unit", item.unit)
     formData.append("price", item.price)
@@ -424,7 +425,7 @@ async function saveItem() {
     }
     const res = await fetch("/update_item_details", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // headers: { "Content-Type": "application/json" },
       // body: JSON.stringify({
       //   "item_id": item.id,
       //   "name": item.name,
@@ -439,6 +440,7 @@ async function saveItem() {
       body: formData
     })
     const data = await res.json()
+    console.log(data)
     if (data.success) {
 
       state.items =

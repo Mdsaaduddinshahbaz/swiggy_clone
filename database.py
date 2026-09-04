@@ -93,7 +93,7 @@ def list_resturant_items(resturant_id,types):
                         "sub_id":r["sub_id"]
                     }
         return ({"item_name":item_name,"categories":cat})
-def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available,res_id=None):
+def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,available,res_id=None,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
     result=resturants_items.find_one_and_update({
         "_id": ObjectId(item_id),
         "resturant_id": res_id
@@ -106,7 +106,11 @@ def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,availab
                 "desc":desc,
                 "sub_id":subId,
                 "item_qty":stock,
-                "available":available}
+                "available":available,
+                "file_id":file_id,
+                "file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+
+    }
     }
     )
     if(result):

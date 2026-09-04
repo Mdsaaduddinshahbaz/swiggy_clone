@@ -509,19 +509,37 @@ def update_items():
         res_id=g.res_id
         data, error = validate_update_item()
         if error:
+            print("validation error:", error)
             return error
-        res = update_resturant_item(
-            data["item_id"],
-            data["name"],
-            data["price"],
-            data["unit"],
-            data["lowAt"],
-            data["desc"],
-            data["subId"],
-            data["stock"],
-            data["available"],
-            res_id
-        ) 
+        if(data["photo"]):
+            file_id = upload_image(data["photo"])
+            print(file_id)
+            res = update_resturant_item(
+                data["item_id"],
+                data["name"],
+                data["price"],
+                data["unit"],
+                data["lowAt"],
+                data["desc"],
+                data["subId"],
+                data["stock"],
+                data["available"],
+                res_id,
+                file_id=file_id
+            )
+        else:
+            res = update_resturant_item(
+                data["item_id"],
+                data["name"],
+                data["price"],
+                data["unit"],
+                data["lowAt"],
+                data["desc"],
+                data["subId"],
+                data["stock"],
+                data["available"],
+                res_id
+            ) 
         if(res["success"]):
             return ({"success":True})
         else:
@@ -1476,36 +1494,40 @@ def validate_item_form():
 from flask import jsonify, request
 
 def validate_update_item():
-    data = request.get_json(silent=True)
-    print("data=",data)
-    if not data:
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid JSON payload"
-        }), 400)
+    # Get form data
+    # print("data in validate_update_item",data.items())
+    item_id = request.form.get("item_id", "").strip()
+    name = request.form.get("name", "").strip()
+    price_raw = request.form.get("price", "").strip()
+    unit = request.form.get("unit", "").strip()
+    low_at_raw = request.form.get("lowAt", "").strip()
+    desc = request.form.get("desc", "").strip()
+    sub_id = request.form.get("subId", "").strip()
+    stock_raw = request.form.get("stock", "").strip()
+    available_raw = request.form.get("available", "").strip()
+    photo = request.files.get("photo")
 
     # Required fields
-    required = [
-        "item_id",
-        "name",
-        "price",
-        "unit",
-        "lowAt",
-        "desc",
-        "subId",
-        "stock",
-        "available"
-    ]
+    required = {
+        "item_id": item_id,
+        "name": name,
+        "price": price_raw,
+        "unit": unit,
+        "lowAt": low_at_raw,
+        "desc": desc,
+        "subId": sub_id,
+        "stock": stock_raw,
+        "available": available_raw
+    }
 
-    for field in required:
-        if field not in data:
+    for field, value in required.items():
+        if not value:
             return None, (jsonify({
                 "success": False,
                 "message": f"{field} is required"
             }), 400)
 
     # Name
-    name = str(data["name"]).strip()
     if not name:
         return None, (jsonify({
             "success": False,
@@ -1514,7 +1536,7 @@ def validate_update_item():
 
     # Price
     try:
-        price = int(data["price"])
+        price = int(price_raw)
         if price < 0:
             raise ValueError
     except (ValueError, TypeError):
@@ -1525,7 +1547,7 @@ def validate_update_item():
 
     # Stock
     try:
-        stock = float(data["stock"])
+        stock = float(stock_raw)
         if stock < 0:
             raise ValueError
     except (ValueError, TypeError):
@@ -1536,7 +1558,7 @@ def validate_update_item():
 
     # Low stock alert
     try:
-        low_at = float(data["lowAt"])
+        low_at = float(low_at_raw)
         if low_at < 0:
             raise ValueError
     except (ValueError, TypeError):
@@ -1546,35 +1568,28 @@ def validate_update_item():
         }), 400)
 
     # Available
-    if not isinstance(data["available"], bool):
+    if available_raw.lower() not in ("true", "false"):
         return None, (jsonify({
             "success": False,
             "message": "available must be true or false"
         }), 400)
 
-    # validated = {
-    #     "item_id": data["item_id"],
-    #     "name": name,
-    #     "price": price,
-    #     "unit": str(data["unit"]).strip(),
-    #     "lowAt": low_at,
-    #     "desc": str(data["desc"]).strip(),
-    #     "subId": data["subId"],
-    #     "stock": stock,
-    #     "available": data["available"]
-    # }
+    available = available_raw.lower() == "true"
+
+    # Build validated data
     validated = {
-            "item_id": request.form.get("item_id"),
-            "name": request.form.get("name"),
-            "price": request.form.get("price"),
-            "unit": request.form.get("unit"),
-            "lowAt": request.form.get("lowAt"),
-            "desc": request.form.get("desc"),
-            "subId": request.form.get("subId"),
-            "stock": request.form.get("stock"),
-            "available": request.form.get("available"),
-            "photo": request.files.get("photo")
-        }
+        "item_id": item_id,
+        "name": name,
+        "price": price,
+        "unit": unit,
+        "lowAt": low_at,
+        "desc": desc,
+        "subId": sub_id,
+        "stock": stock,
+        "available": available,
+        "photo": photo
+    }
+
     return validated, None
 ####################33333333333333333333333######################
 from flask import request, jsonify
