@@ -839,7 +839,7 @@ async function renderCards() {
     object-fit: cover;
     width: 86px;
       ">
-      <h3>
+      <h3 style="display: block;word-wrap: anywhere;width: 60%;">
         ${item.name}
       </h3>
 
