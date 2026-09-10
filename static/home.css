@@ -66,7 +66,7 @@ body[data-theme="restaurant"] {
     --surface: #FFFFFF;
     --surface-2: #F5E3D0;
 
-    --ink: #2B1B12;
+    --ink: #42003c;
     --ink-soft: #6E5847;
     --ink-faint: #9C8B7B;
 
@@ -319,6 +319,7 @@ select:focus-visible,
    ============================================================ */
 
 .type-tabs {
+
     position: relative;
     display: flex;
     gap: 4px;
@@ -327,6 +328,7 @@ select:focus-visible,
     padding: 4px;
     overflow-x: auto;
     scrollbar-width: none;
+    justify-content: space-between;
 }
 
 .type-tabs::-webkit-scrollbar {
