@@ -140,6 +140,16 @@ def update_resturant_item(item_id,name,price,unit,lowAt,desc,subId,stock,availab
 #         res_names[r["name"]]=str(r["_id"])
 #         # res_names.append(r["name"])
 #     return res_names
+def fetch_profiles(user_id):
+    user = users.find_one({"_id": ObjectId(user_id)}, {"_id": 0, "password": 0,"role":0,"is_verified":0})
+    if user:
+        print("user=",user)
+        for key in user["addresses"]:
+            print("key=",key)
+            key["_id"]=str(key["_id"])
+        return {"success": True, "profile": user}
+    else:
+        return {"success": False, "message": "User not found"}
 def list_resturants(long,latt,dist:int=5):
     restaurants = restaurants_name.find({
         "location": {

@@ -7,7 +7,7 @@
 //   POST /fetch_profile  { user_id }               -> { success, user: {name, phone}, address: [...] }
 //   POST /update_profile { user_id, name, phone }   -> { success }
 // Address shape reused as-is from home.js's /fetch_address response.
-
+console.log("profile.js loaded");
 function getProfileUserId() {
     const pathParts = window.location.pathname.split("/");
     return window.APP_USER_ID || pathParts[pathParts.length - 1];
@@ -34,14 +34,15 @@ function addListenerOnceProfile(el, event, handler) {
 }
 
 function renderProfileAddresses(addresses, listEl, emptyEl) {
-    if (!addresses || addresses.length === 0) {
-        listEl.innerHTML = "";
-        emptyEl.style.display = "block";
-        return;
-    }
+    // if (!addresses || addresses.length === 0) {
+    //     listEl.innerHTML = "";
+    //     emptyEl.style.display = "block";
+    //     return;
+    // }
+    console.log("Rendering profile addresses:", addresses);
     emptyEl.style.display = "none";
     listEl.innerHTML = addresses.map(addr => `
-        <div class="profile-address-card">
+        <div class="profile-address-card" data-address-id="${escapeHtmlProfile(addr._id)}">
             <span class="profile-address-type">${escapeHtmlProfile(addr.adrs_type)}</span>
             <span class="profile-address-text">${escapeHtmlProfile(addr.address)}</span>
         </div>
@@ -135,11 +136,13 @@ async function initProfilePage() {
 
     try {
         if (loading) loading.classList.add("show");
-        const res = await fetch("/fetch_profile", {
+        console.log("Fetching profile for user_id:", userId);
+        const res = await fetch("/user/fetch_profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: userId })
         });
+        console.log("fetch_profile response status:", res);
         if (res.status === 401) {
             alert("Please log in.");
             localStorage.clear();
@@ -148,13 +151,14 @@ async function initProfilePage() {
         }
         if (!res.ok) throw new Error(`fetch_profile failed: ${res.status}`);
         const data = await res.json();
+        console.log("fetch_profile response:", data);
         if (data.success) {
-            originalName = data.user?.name || "";
-            originalPhone = data.user?.phone || "";
+            originalName = data.profile?.username || "";
+            originalPhone = data.profile?.phone || "";
             nameInput.value = originalName;
             phoneInput.value = originalPhone;
             avatar.textContent = (originalName.charAt(0) || "U").toUpperCase();
-            renderProfileAddresses(data.address, addressList, noAddress);
+            renderProfileAddresses(data.profile.addresses, addressList, noAddress);
         }
     } catch (e) {
         console.error("initProfilePage failed", e);
