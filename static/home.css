@@ -1,37 +1,147 @@
 /* ============================================================
-   HOME.CSS — "Order Ticket" system, discovery chapter
-   Same paper-ticket language as menu.css / cart.css. The
-   restaurant grid reads like a stack of menu cards; the location
-   picker is a ticket-counter panel you fill out before ordering.
+   HOME.CSS — shared header + Home (restaurant discovery) page
+
+   Design system matches menu.css so the app feels like one
+   product: soft sage paper background, deep teal accent, a
+   serif display face for restaurant/section names, and mono
+   for small numeric/meta labels (distance, ETA).
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+/* ============================================================
+   COLOR THEMES
+
+   Each type-filter tab owns a full palette. home.js sets
+   body[data-theme] to the clicked tab's data-type ("all",
+   "restaurant", "medical", "general_store") — since every other
+   rule in this file reads colors from these custom properties,
+   switching the attribute re-themes the whole page for free.
+
+   :root holds the "All" palette as the default (it's the tab
+   that's active on first load); the other three are overrides.
+   ============================================================ */
 
 :root {
-    --bg: #FFF8EF;
-    --ink: #241C1A;
-    --ink-soft: #6b5f58;
-    --flame: #E8491D;
-    --flame-dark: #C23A15;
-    --mustard: #F5A81C;
-    --maroon: #6E1B12;
-    --card: #FFF1DE;
-    --card-hover: #FFE6C7;
-    --line: #E7D8C3;
-    --white: #FFFDF9;
-    --green: #1F8A4C;
+    /* ALL — neutral indigo, the default/browse-everything theme */
+    --bg: #F1F0F7;
+    --surface: #FFFFFF;
+    --surface-2: #E8E4F3;
 
-    --font-display: 'Anton', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --ink: #201B32;
+    --ink-soft: #5C5570;
+    --ink-faint: #8B84A0;
 
-    --radius: 14px;
-    --shadow-card: 0 2px 0 var(--line), 0 10px 24px -18px rgba(36, 28, 26, 0.45);
-    --shadow-panel: 0 18px 44px -18px rgba(36, 28, 26, 0.5);
+    --accent: #5B3DF0;
+    --accent-dark: #4527D6;
+    --accent-soft: #E9E4FB;
+
+    --sun: #E9A62D;
+    --sun-ink: #4A3106;
+
+    --coral: #E15A45;
+    --coral-soft: #FCE7E2;
+
+    --line: #DCD7EC;
+    --white: #FFFFFF;
+
+    --font-display: 'Fraunces', serif;
+    --font-body: 'Public Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+
+    --shadow-card: 0 1px 0 var(--line), 0 14px 28px -20px rgba(23, 36, 26, 0.45);
+    --shadow-pop: 0 18px 40px -16px rgba(23, 36, 26, 0.35);
+
+    /* Reserve space so the fixed bottom tab bar never overlaps content */
+    --tabbar-h: 64px;
+}
+
+/* RESTAURANT — warm citrus, food-forward */
+body[data-theme="restaurant"] {
+    --bg: #FBF1E7;
+    --surface: #FFFFFF;
+    --surface-2: #F5E3D0;
+
+    --ink: #2B1B12;
+    --ink-soft: #6E5847;
+    --ink-faint: #9C8B7B;
+
+    --accent: #E8491D;
+    --accent-dark: #C23A15;
+    --accent-soft: #FBE1D6;
+
+    --line: #EBD9C4;
+}
+
+/* MEDICAL — the deep forest/teal theme this app started with */
+body[data-theme="medical"] {
+    --bg: #F1F3EC;
+    --surface: #FFFFFF;
+    --surface-2: #E7EEE0;
+
+    --ink: #17241A;
+    --ink-soft: #5C6A5D;
+    --ink-faint: #8B978A;
+
+    --accent: #0F6E5C;
+    --accent-dark: #0A5344;
+    --accent-soft: #DEF0EA;
+
+    --line: #DEE4D5;
+}
+
+/* GENERAL STORE — cool blue slate */
+body[data-theme="general_store"] {
+    --bg: #EEF1F5;
+    --surface: #FFFFFF;
+    --surface-2: #DDE4EC;
+
+    --ink: #101A2B;
+    --ink-soft: #52607A;
+    --ink-faint: #8896AC;
+
+    --accent: #1D5FBF;
+    --accent-dark: #164A96;
+    --accent-soft: #DCE8FA;
+
+    --line: #D7DEE8;
+}
+
+/* Cross-fade the surfaces that actually carry theme color, instead of
+   a hard cut, whenever body[data-theme] changes. */
+body,
+.navbar,
+.searchBarContainer,
+.type-tab,
+.location-box,
+.location-trigger,
+.avatar-btn,
+.app-navbar,
+.nav-item,
+.card,
+.card-img,
+.filters h2,
+#distancediv select,
+.access_container,
+.modal-content,
+.address-options,
+button,
+input,
+select {
+    transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 * {
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html {
+    scroll-behavior: smooth;
 }
 
 body {
@@ -40,6 +150,19 @@ body {
     color: var(--ink);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    padding-bottom: var(--tabbar-h);
+}
+
+button, input, select {
+    font-family: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+img {
+    max-width: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -49,75 +172,63 @@ body {
     }
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+
 /* ============================================================
-   NAVBAR
+   NAVBAR SHELL
    ============================================================ */
 
 .navbar {
     position: sticky;
     top: 0;
     z-index: 40;
-    background: var(--maroon);
-    border-bottom: 3px solid var(--flame);
+    background: var(--ink);
 }
 
-.nav-container {
-
-    /* max-width: 1120px; */
-    width: 100% !important;
-    display:  block !important;
-    margin: 0 auto;
-    padding: 12px 20px;
-    /* display: flex; */
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-}
-
-.left-nav {
-    display: block !important;
-    justify-content: space-between;
+.nav-shell {
     position: relative;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 12px 20px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.brand-row {
     display: flex;
     align-items: center;
-    gap: 18px;
-    min-width: 0;
+    justify-content: space-between;
+    gap: 12px;
 }
 
-.left-nav .logo {
-    height: 32px;
-    width: auto;
-    flex-shrink: 0;
-}
 
-.searchBarContainer{
-    width: 100%;
-}
-#searchInput{
-    width: 100%;
-    border-radius: 22px;
-    margin-top: 17px;
-    border: 2px solid #e7991a;
-    padding: 12px;
-}
-
-#searchInput::placeholder{
-    font-size: larger;
-    font-weight: 600;
-    align-self: center;
-}
-/* Location trigger pill */
+/* ============================================================
+   LOCATION TRIGGER + AVATAR
+   ============================================================ */
 
 .location-trigger {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
-    cursor: pointer;
-    color: var(--white);
-    padding: 7px 12px;
+    max-width: 78%;
+    padding: 9px 14px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
-    max-width: 260px;
+    border: none;
+    color: var(--white);
     transition: background 0.15s ease;
 }
 
@@ -126,7 +237,7 @@ body {
 }
 
 .location-trigger i:first-child {
-    color: var(--mustard);
+    color: var(--sun);
     font-size: 13px;
     flex-shrink: 0;
 }
@@ -141,98 +252,179 @@ body {
 
 .location-trigger i:last-child {
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.65);
     flex-shrink: 0;
 }
 
-/* Overlay backdrop */
-
-.location-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(36, 28, 26, 0.5);
-    z-index: 45;
+.avatar-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: var(--surface-2);
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.location-overlay.show {
+.avatar-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
 }
 
-/* Location picker panel */
+
+/* ============================================================
+   SEARCH BAR
+   ============================================================ */
+
+.searchBarContainer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: 11px 14px;
+}
+
+.searchBarContainer i {
+    color: var(--ink-faint);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.searchBarContainer input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.searchBarContainer input::placeholder {
+    color: var(--ink-faint);
+    font-weight: 400;
+}
+
+
+/* ============================================================
+   TYPE FILTER TABS
+   ============================================================ */
+
+.type-tabs {
+    position: relative;
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    padding: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.type-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.type-tabs-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: calc(100% - 8px);
+    width: 0;
+    background: var(--sun);
+    border-radius: 999px;
+    z-index: 0;
+    transition: transform 0.3s cubic-bezier(.22, 1, .36, 1), width 0.3s cubic-bezier(.22, 1, .36, 1);
+}
+
+.type-tab {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.01em;
+    padding: 8px 16px;
+    border-radius: 999px;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.type-tab.active {
+    color: var(--sun-ink);
+}
+
+@media (max-width: 420px) {
+    .type-tab {
+        font-size: 11.5px;
+        padding: 7px 12px;
+    }
+}
+
+/* Search bar + type tabs are Home-only chrome living in the shared,
+   never-unmounted header. home.js sets body[data-page] on every SPA
+   navigation so this can hide them elsewhere. */
+body:not([data-page="home"]) .searchBarContainer,
+body:not([data-page="home"]) .type-tabs {
+    display: none;
+}
+
+
+/* ============================================================
+   OVERLAYS (location picker / pickup sheet)
+   ============================================================ */
+
+.location-overlay,
+.pickup-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(23, 36, 26, 0.55);
+    z-index: 45;
+}
+
+.location-overlay.show,
+.pickup-overlay.show {
+    display: block;
+}
+
+
+/* ============================================================
+   LOCATION PICKER PANEL
+   ============================================================ */
 
 .location-box {
     display: none;
     flex-direction: column;
     position: absolute;
-    top: calc(100% + 14px);
-    /* left: 0; */
-    width: 380px;
-    max-width: 88vw;
+    top: calc(100% + 10px);
+    left: 20px;
+    width: 420px;
+    max-width: calc(92vw - 40px);
     max-height: 78vh;
     overflow-y: auto;
-    background: var(--white);
-    border-radius: var(--radius);
+    background: var(--surface);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--line);
-    box-shadow: var(--shadow-panel);
-    padding: 18px 18px 16px;
-    z-index: 46;
+    box-shadow: var(--shadow-pop);
+    padding: 20px 20px 18px;
+    z-index: 56;
     color: var(--ink);
 }
 
 .location-box.show {
     display: flex;
-    z-index: 122;
-}
-
-#CartOrderContainer.show {
-    display: flex;
-}
-
-#CartOrderContainer {
-    display: flex;
-}
-
-#hideCartOrderBtn {
-    display: none;
-}
-
-@media (max-width: 503px) {
-    #CartOrderContainer.hide {
-        display: none;
-    }
-
-    #CartOrderContainer.show {
-        display: block;
-        position: absolute;
-        top: 72px;
-        right: 1px;
-    }
-
-    #orderBtn {
-        margin-bottom: 10px;
-    }
-
-    #hideCartOrderBtn {
-        display: block;
-        color: white;
-        margin: 0;
-    }
-}
-
-@media (max-width: 340px) {
-
-    .right-nav {
-        justify-self: right;
-    }
-
-    .location-trigger {
-        min-width: 10px
-    }
-
-    .location-box.show {
-        overflow-x: clip;
-    }
 }
 
 .location-header {
@@ -245,27 +437,28 @@ body {
 }
 
 .location-header i {
-    color: var(--flame);
+    color: var(--accent);
     font-size: 15px;
 }
 
 .location-header span {
-    font-weight: 700;
-    font-size: 15px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 16px;
 }
 
 .location-search {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: var(--card);
-    border-radius: 10px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
     padding: 11px 14px;
     margin-bottom: 6px;
 }
 
 .location-search i {
-    color: var(--flame);
+    color: var(--accent);
     font-size: 13px;
 }
 
@@ -274,13 +467,12 @@ body {
     border: none;
     outline: none;
     background: transparent;
-    font-family: var(--font-body);
     font-size: 14px;
     color: var(--ink);
 }
 
 .location-search input::placeholder {
-    color: var(--ink-soft);
+    color: var(--ink-faint);
 }
 
 #suggestions {
@@ -294,18 +486,17 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    padding: 10px 6px;
-    border-radius: 8px;
-    cursor: pointer;
+    padding: 10px 8px;
+    border-radius: var(--radius-sm);
     transition: background 0.12s ease;
 }
 
 .suggestion-item:hover {
-    background: var(--card);
+    background: var(--surface-2);
 }
 
 .suggestion-item i {
-    color: var(--flame);
+    color: var(--accent);
     font-size: 12px;
     margin-top: 3px;
     flex-shrink: 0;
@@ -335,17 +526,13 @@ body {
 }
 
 #savedAddress h2 {
-    font-family: var(--font-body) !important;
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--ink-soft) !important;
-    margin: 4px 0 4px !important;
-    padding: 0 !important;
-    position: static !important;
-    top: auto !important;
-    left: auto !important;
+    color: var(--ink-faint);
+    margin: 4px 0;
 }
 
 .address {
@@ -354,22 +541,22 @@ body {
     gap: 3px;
     padding: 11px 12px;
     border: 1px solid var(--line);
-    border-radius: 9px;
-    cursor: pointer;
+    border-radius: var(--radius-sm);
     transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .address:hover {
-    background: var(--card);
-    border-color: var(--flame);
+    background: var(--surface-2);
+    border-color: var(--accent);
 }
 
 .address .type {
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    color: var(--flame);
+    color: var(--accent-dark);
 }
 
 .address .address-text {
@@ -383,36 +570,35 @@ body {
     align-items: center;
     gap: 10px;
     width: 100%;
-    background: var(--card);
-    border: 1px dashed var(--flame);
-    color: var(--flame-dark);
-    font-family: var(--font-body);
+    background: var(--accent-soft);
+    border: 1px dashed var(--accent);
+    color: var(--accent-dark);
     font-weight: 700;
     font-size: 13.5px;
     padding: 11px 13px;
-    border-radius: 10px;
-    cursor: pointer;
+    border-radius: var(--radius-sm);
     margin-top: 8px;
     transition: background 0.12s ease;
 }
 
 .live-location-btn:hover {
-    background: var(--card-hover);
+    background: #CFEBE1;
 }
 
 .live-location-btn i {
-    color: var(--flame);
+    color: var(--accent);
 }
 
 #map_container {
     display: none;
+    margin-top: 10px;
 }
 
 #map {
     border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
 }
-
-/* Fetching-location inline loader inside the panel-adjacent area */
 
 #loading_container {
     display: none;
@@ -420,8 +606,8 @@ body {
     gap: 12px;
     margin: 10px 0;
     padding: 12px 14px;
-    background: var(--card);
-    border-radius: 10px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
 }
 
 #loading_container.show {
@@ -430,11 +616,9 @@ body {
 
 #loading_container h1 {
     margin: 0;
-    font-family: var(--font-body);
     font-size: 13px;
     font-weight: 700;
     color: var(--ink);
-    text-transform: none;
 }
 
 #loading_fetch {
@@ -443,13 +627,78 @@ body {
     animation: spin 0.9s linear infinite;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+
+/* ============================================================
+   PICKUP TIME SHEET (address-options)
+   ============================================================ */
+
+#pickupSheet {
+    display: none;
+    flex-direction: column;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(360px, 92vw);
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-pop);
+    padding: 22px 20px 20px;
+    z-index: 81;
 }
 
-/* Address tag modal */
+#pickupSheet.show {
+    display: flex;
+}
+
+#pickupSheet h2 {
+    margin: 0 0 16px;
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+}
+
+#pickupSheet .pickup-time-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    margin-bottom: 8px;
+}
+
+#pickupSheet .pickup-time-row i {
+    color: var(--accent);
+}
+
+#pickupSheet .pickup-time-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    color: var(--ink);
+}
+
+#pickupSheet .pickup-error {
+    display: none;
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: var(--coral);
+    font-weight: 600;
+}
+
+#pickupSheet .pickup-error.show {
+    display: block;
+}
+
+
+/* ============================================================
+   ADDRESS TAG MODAL
+   ============================================================ */
 
 .modal {
     display: none;
@@ -458,7 +707,7 @@ body {
     z-index: 80;
     align-items: center;
     justify-content: center;
-    background: rgba(36, 28, 26, 0.55);
+    background: rgba(23, 36, 26, 0.55);
     padding: 20px;
 }
 
@@ -467,18 +716,19 @@ body {
 }
 
 .modal-content {
-    background: var(--white);
-    border-radius: var(--radius);
+    background: var(--surface);
+    border-radius: var(--radius-lg);
     padding: 26px 24px;
     width: min(360px, 100%);
-    box-shadow: var(--shadow-panel);
+    box-shadow: var(--shadow-pop);
     text-align: center;
 }
 
 .modal-content h3 {
     margin: 0 0 18px;
-    font-size: 17px;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 600;
 }
 
 .tag-options {
@@ -489,20 +739,18 @@ body {
 
 .tag-btn {
     flex: 1;
-    background: var(--card);
+    background: var(--surface-2);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     padding: 14px 6px;
-    font-family: var(--font-body);
     font-weight: 700;
     font-size: 13px;
-    cursor: pointer;
     transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
 
 .tag-btn:hover {
-    background: var(--card-hover);
-    border-color: var(--flame);
+    background: var(--accent-soft);
+    border-color: var(--accent);
     transform: translateY(-1px);
 }
 
@@ -511,165 +759,160 @@ body {
     background: none;
     border: none;
     color: var(--ink-soft);
-    font-family: var(--font-body);
     font-weight: 700;
     font-size: 13.5px;
     padding: 8px 0;
-    cursor: pointer;
 }
 
 .cancel-btn:hover {
-    color: var(--flame);
+    color: var(--coral);
 }
 
-/* Right nav (search / orders / cart) */
-
-.right-nav {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-shrink: 0;
-    width: 100%;
-    flex-direction:column !important;
-}
-.navigator{
-    position: relative; 
-    width:96vw;
-    display: flex;
-     justify-content: space-between;
-}
-.nav-btn{
-    position: relative;
-    flex: 1;
-    padding: 10px 0;
-    background:transparent;
-    color:var(--white);
-    border:none;
-        display: flex;
-    flex-direction: column;
-    justify-items: center;
-    align-items: center;
-}
-
-.active-indicator{
-    position: absolute;
-    top: 0;
-    width: 137px;              /* width of your SVG */
-    height: 61px;
-    background: url("/static/active-tab.svg") center/100% 100% no-repeat;
-    pointer-events: none;
-    transition: transform .35s cubic-bezier(.22,1,.36,1);
-}
-.nav-btn.active{
-    color:#f5a81c;
-}
-
-.search-container {
-    width: 100%;
-    margin-top:15px;
-    overflow: hidden;
-    transition: max-width 0.28s ease;
-    border-radius: 999px;
-    background: var(--white);
-}
-
-.search-container.active {
-    width: 100%;
-}
-
-.search-container input {
-    width: 200px;
-    border: none;
-    outline: none;
-    background: transparent;
-    font-family: var(--font-body);
-    font-size: 14px;
-    padding: 9px 14px;
-    color: var(--ink);
-}
-
-.search-container input::placeholder {
-    color: var(--ink-soft);
-}
-
-.right-nav ul {
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-}
-
-.right-nav ul li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--white);
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    padding: 9px 14px;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: background 0.15s ease, transform 0.15s ease;
-    white-space: nowrap;
-}
-
-.right-nav ul li:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateY(-1px);
-}
-
-.right-nav ul li i {
-    color: var(--mustard);
-    font-size: 14px;
-}
-
-#orderBtn,
-#cartBtn {
-    background: var(--flame);
-}
-
-#orderBtn:hover,
-#cartBtn:hover {
-    background: var(--flame-dark);
-}
-
-#orderBtn i,
-#cartBtn i {
-    color: var(--white);
-}
 
 /* ============================================================
-   PAGE CONTAINER
+   APP NAV — bottom tab bar on mobile, inline on desktop
+   ============================================================ */
+
+.app-navbar {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 560px;
+
+    display: flex;
+    justify-content: space-around;
+
+    background: var(--ink);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+    z-index: 55;
+}
+
+.navbar-indicator {
+    display: none;
+}
+
+.nav-item {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+
+    padding: 6px 4px;
+    border-radius: var(--radius-sm);
+
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 700;
+
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.nav-item i {
+    font-size: 16px;
+}
+
+.nav-item.active {
+    color: var(--white);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-item.active i {
+    color: var(--sun);
+}
+
+@media (min-width: 760px) {
+
+    body {
+        padding-bottom: 0;
+    }
+
+    .app-navbar {
+        position: static;
+        transform: none;
+        width: auto;
+        max-width: none;
+
+        background: transparent;
+        border-top: none;
+        padding: 0;
+
+        justify-content: flex-end;
+        gap: 4px;
+        margin-left: auto;
+    }
+
+    .nav-item {
+        flex: none;
+        flex-direction: row;
+        gap: 7px;
+        padding: 9px 14px;
+        font-size: 13px;
+    }
+
+    .brand-row {
+        gap: 20px;
+    }
+
+    .location-trigger {
+        order: 1;
+    }
+
+    .brand-row .app-navbar {
+        order: 2;
+    }
+
+    .avatar-btn {
+        order: 3;
+    }
+}
+
+
+/* ============================================================
+   PAGE CONTAINER (Home)
    ============================================================ */
 
 .container {
     max-width: 1120px;
     margin: 0 auto;
-    padding: 28px 20px 90px;
+    padding: 22px 20px 60px;
     position: relative;
 }
 
+.container img#loading {
+    display: block;
+    width: 44px;
+    height: 44px;
+    margin: 60px auto;
+    animation: spin 0.9s linear infinite;
+}
+
+
 /* ============================================================
-   FILTERS
+   FILTERS ROW
    ============================================================ */
 
 .filters {
+    display: flex;
     align-items: center;
-    margin-bottom: 22px;
-    gap: 16px;
+    justify-content: space-between;
     flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 20px;
 }
 
 .filters h2 {
     font-family: var(--font-display);
-    font-weight: 400;
-    text-transform: uppercase;
-    font-size: clamp(19px, 2.6vw, 25px);
-    letter-spacing: 0.005em;
+    font-weight: 600;
+    font-size: clamp(19px, 2.6vw, 26px);
+    line-height: 1.2;
     margin: 0;
     color: var(--ink);
     max-width: 640px;
@@ -678,26 +921,18 @@ body {
 #distancediv select {
     appearance: none;
     -webkit-appearance: none;
-    font-family: var(--font-body);
     font-weight: 700;
     font-size: 13px;
     color: var(--ink);
-    background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23241C1A'/%3E%3C/svg%3E") no-repeat right 13px center;
+    background: var(--surface);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%235C6A5D' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
     border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 9px 32px 9px 16px;
-    cursor: pointer;
+    padding: 9px 34px 9px 16px;
 }
 
-/* Big loading spinner while fetching restaurants */
-
-img#loading {
-    display: block;
-    width: 46px;
-    height: 46px;
-    margin: 60px auto;
-    animation: spin 0.9s linear infinite;
-}
 
 /* ============================================================
    RESTAURANT GRID
@@ -706,28 +941,34 @@ img#loading {
 .restaurant-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 22px;
+    gap: 20px;
 }
 
 .card {
-    background: var(--white);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    cursor: pointer;
     box-shadow: var(--shadow-card);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+    animation: rise 0.32s ease both;
+}
+
+@keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 4px 0 var(--line), 0 18px 30px -16px rgba(36, 28, 26, 0.5);
+    box-shadow: var(--shadow-pop);
 }
 
 .card-img {
     position: relative;
-    height: 150px;
+    aspect-ratio: 16 / 10;
     overflow: hidden;
+    background: var(--surface-2);
 }
 
 .card-img img {
@@ -741,34 +982,24 @@ img#loading {
     position: absolute;
     left: 10px;
     bottom: 10px;
-    background: var(--mustard);
-    color: var(--maroon);
+    background: var(--sun);
+    color: var(--sun-ink);
     font-family: var(--font-mono);
     font-weight: 700;
-    font-size: 11.5px;
-    letter-spacing: 0.02em;
-    padding: 5px 10px;
+    font-size: 11px;
+    padding: 4px 9px;
     border-radius: 6px;
 }
 
 .card-details {
     padding: 14px 16px 16px;
-    position: relative;
-}
-
-.card-details::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 16px;
-    right: 16px;
-    border-top: 1px dashed var(--line);
 }
 
 .card-details h3 {
-    margin: 8px 0 6px;
-    font-size: 16.5px;
-    font-weight: 700;
+    margin: 0 0 6px;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
     color: var(--ink);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -780,13 +1011,14 @@ img#loading {
     align-items: center;
     gap: 6px;
     margin: 0 0 6px;
-    font-size: 13px;
-    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
     color: var(--ink);
 }
 
 .card-details .rating i {
-    color: var(--green);
+    color: var(--accent);
     font-size: 12px;
 }
 
@@ -802,7 +1034,7 @@ img#loading {
 .card-details .area {
     margin: 0;
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ink-faint);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -812,10 +1044,11 @@ img#loading {
     content: '\f3c5';
     font-family: 'Font Awesome 6 Free';
     font-weight: 900;
-    color: var(--flame);
+    color: var(--accent);
     font-size: 10px;
     margin-right: 5px;
 }
+
 
 /* ============================================================
    EMPTY / ERROR STATES
@@ -825,33 +1058,40 @@ img#loading {
     display: none;
     max-width: 420px;
     margin: 40px auto;
+    text-align: center;
+    padding: 50px 20px;
 }
 
 #no-results-container .icon-circle {
-    filter: drop-shadow(0 6px 0 var(--line));
+    font-size: 46px;
+    margin-bottom: 16px;
 }
 
 #no-results-container h2 {
-    font-family: var(--font-display) !important;
-    font-weight: 400 !important;
-    text-transform: uppercase;
-    letter-spacing: 0.01em;
-    color: var(--ink) !important;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 21px;
+    color: var(--ink);
+    margin-bottom: 8px;
 }
 
 #no-results-container p {
-    font-size: 14px !important;
-    line-height: 1.6 !important;
-    color: var(--ink-soft) !important;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin-bottom: 20px;
 }
 
 #no-results-container button {
-    background: var(--flame) !important;
-    color: var(--white) !important;
-    font-family: var(--font-body) !important;
-    letter-spacing: 0.03em;
-    box-shadow: 0 3px 0 var(--flame-dark);
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    background: var(--accent);
+    color: var(--white);
+    border: none;
+    font-weight: 700;
+    font-size: 13.5px;
+    padding: 12px 22px;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 3px 0 var(--accent-dark);
+    transition: transform 0.12s ease;
 }
 
 #no-results-container button:hover {
@@ -859,8 +1099,8 @@ img#loading {
 }
 
 #no-results-container button:active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 var(--flame-dark);
+    transform: translateY(2px);
+    box-shadow: 0 0 0 var(--accent-dark);
 }
 
 .access_container {
@@ -878,257 +1118,102 @@ img#loading {
 }
 
 .access_container .icon {
-    font-size: 54px;
+    font-size: 50px;
     margin-bottom: 8px;
-    filter: drop-shadow(0 6px 0 var(--line));
 }
 
 .access_container h1 {
     font-family: var(--font-display);
-    font-weight: 400;
-    text-transform: uppercase;
-    font-size: 28px;
-    letter-spacing: 0.01em;
+    font-weight: 600;
+    font-size: 26px;
     margin: 4px 0 12px;
     max-width: 420px;
+    color: var(--ink);
 }
 
 .access_container p {
     max-width: 380px;
-    font-size: 14px !important;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin-bottom: 22px;
 }
 
 .access_container button {
-    background: var(--flame);
+    background: var(--accent);
     color: var(--white);
     border: none;
-    font-family: var(--font-body);
     font-weight: 700;
     font-size: 14px;
-    letter-spacing: 0.03em;
     padding: 13px 28px;
-    border-radius: 10px;
-    cursor: pointer;
-    box-shadow: 0 3px 0 var(--flame-dark);
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 3px 0 var(--accent-dark);
+    transition: transform 0.12s ease;
     margin-bottom: 16px;
 }
 
 .access_container button:hover {
     transform: translateY(-1px);
 }
-footer{
-        background: var(--bg);
-    border: 2px solid;
-    position: sticky;
-    bottom: 17px;
-    border-radius: 79px;
-    width: 80%;
-    justify-self: center;
-    cursor: pointer;
-}
-#profileLogo{
-    width: 35px;
-}
-#navigationContainer{
-        display: flex;
-    justify-content: space-between;
-    width: 100%;
-    padding: 14px;
-    margin: 0% 12%;
-}
+
 .access_container button:active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 var(--flame-dark);
+    transform: translateY(2px);
+    box-shadow: 0 0 0 var(--accent-dark);
 }
 
 .access_container .help-text {
     max-width: 340px;
     font-size: 12.5px;
-    color: var(--ink-soft);
+    color: var(--ink-faint);
     line-height: 1.6;
 }
-footer{
-    display: none;
-}
-/* Focus states */
 
-.location-trigger:focus-visible,
-.live-location-btn:focus-visible,
-.tag-btn:focus-visible,
-.cancel-btn:focus-visible,
-.right-nav ul li:focus-visible,
-.card:focus-visible,
-#distancediv select:focus-visible {
-    outline: 2px solid var(--flame);
-    outline-offset: 2px;
-}
-
-/* ============================================================
-   TYPE FILTER TABS — sliding pill, same visual language as the
-   Home/Orders/Cart nav indicator (.navbar-indicator)
-   ============================================================ */
-
-.type-tabs {
-    position: relative;
-    justify-content: space-between;
-    display: flex;
-    gap: 4px;
-    margin-top: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-    padding: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.type-tabs::-webkit-scrollbar {
-    display: none;
-}
-
-.type-tabs-indicator {
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    height: calc(100% - 8px);
-    width: 0;
-    background: var(--mustard);
-    border-radius: 999px;
-    z-index: 0;
-    transition: transform 0.3s cubic-bezier(.22, 1, .36, 1),
-                width 0.3s cubic-bezier(.22, 1, .36, 1);
-}
-
-.type-tab {
-    position: relative;
-    z-index: 1;
-    flex-shrink: 0;
-    border: none;
-    background: transparent;
-    color: var(--white);
-    font-family: var(--font-body);
-    font-weight: 700;
-    font-size: 12.5px;
-    letter-spacing: 0.02em;
-    padding: 8px 16px;
-    border-radius: 999px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: color 0.2s ease;
-}
-
-.type-tab.active {
-    color: var(--maroon);
-}
-
-@media (max-width: 420px) {
-    .type-tab {
-        font-size: 11.5px;
-        padding: 7px 12px;
-    }
-}
-
-/* The search bar and type filter only make sense while browsing
-   restaurants on Home. The header they live in is shared and stays
-   mounted on Orders/Cart/Profile too (per the "always live in the DOM"
-   note on the header), so without this they'd show everywhere.
-   home.js sets body[data-page] on every SPA navigation. */
-body:not([data-page="home"]) .searchBarContainer,
-body:not([data-page="home"]) .type-tabs {
-    display: none;
-}
 
 /* ============================================================
    RESPONSIVE
    ============================================================ */
 
 @media (max-width: 760px) {
-    .nav-container {
-        padding: 10px 14px;
-        gap: 10px;
-        padding-bottom: 0;
-    }
 
     .location-trigger {
-        max-width: 150px;
-    }
-
-    .right-nav ul li span {
-        display: none;
-    }
-
-    .right-nav ul li {
-        padding: 9px 11px;
+        max-width: 66%;
     }
 
     .container {
-        padding: 20px 14px 70px;
-    }
-
-    .filters {
-        flex-direction: column;
-        align-items: flex-start;
+        padding: 18px 14px 40px;
     }
 
     .restaurant-grid {
-        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         gap: 14px;
-    }
-
-    .card-img {
-        height: 120px;
     }
 
     .location-box {
         width: 92vw;
-    }
-}
-
-@media (max-width:240px) {
-    .restaurant-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        gap: 14px;
+        max-width: calc(92vw - 20px);
+        left: 10px;
     }
 }
 
 @media (max-width: 420px) {
 
-    .location-trigger {
-        max-width: 220px;
-        overflow: hidden;
-        white-space: nowrap;
-        transition: max-width 0.28s ease, padding 0.28s ease;
+    .restaurant-grid {
+        grid-template-columns: repeat(1, 1fr);
+        gap: 10px;
     }
 
-@media (max-width: 400px) {
-    footer {
-        display:flex;
+    .card-details {
+        padding: 10px 12px 12px;
     }
-}
-/* When search is active */
 
-
-.right-nav:has(.search-container.active) ul {
-    justify-content: space-between;
-}
-}
-
-* {
-    -webkit-tap-highlight-color: transparent;
-}
-
-@media (max-width:800px) {
-    .location-trigger {
-        max-width: 220px;
-        overflow: hidden;
-        white-space: nowrap;
-        transition: max-width 0.28s ease, padding 0.28s ease;
+    .card-details h3 {
+        font-size: 15px;
     }
 }
 
-* {
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
+@media (max-width: 300px) {
+
+    .restaurant-grid {
+        grid-template-columns: 1fr;
+    }
 }

@@ -15,7 +15,7 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 
-<body data-page="home">
+<body data-page="home" data-theme="all">
     <!-- data-page defaults to "home" to match the Home nav-item's initial
          "active" state below. home.js updates this on every SPA navigation
          so page-scoped chrome (search bar, type filter) can be hidden via
@@ -25,93 +25,104 @@
          SHARED HEADER — always live in the DOM, never swapped.
     ============================================================= -->
     <header class="navbar">
-        <div class="nav-container">
-            <div class="left-nav">
-                <div class="location-overlay" id="locationOverlay"></div>
-                <div class="pickup-overlay" id="pickupOverlay"></div>
-                <div class="address-options" id="pickupSheet">
-                    <h2>Pickup Time</h2>
-                    <div class="pickup-time-row">
-                        <i class="fa-regular fa-clock"></i>
-                        <input type="time" id="pickupTimeInput" class="pickup-time-input">
-                    </div>
-                    <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
-                    <button class="live-location-btn" id="confirmPickupBtn">
-                        <i class="fa-solid fa-check"></i>
-                        Confirm & Place Order
-                    </button>
-                </div>
-                <div style="display: flex;flex-direction: column;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <div class="location-trigger" id="locationTrigger">
-                            <i class="fa-solid fa-location-dot"></i>
-                            <span id="currentAddress">Select Location</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </div>
-                        <img src="../static/profile.png" alt="Swiggy Logo" class="logo" id="profileLogo">
-                    </div>
-                    <div class="searchBarContainer">
-                        <input type="text" placeholder="Enter Resturant Name..." id="searchInput">
-                    </div>
+        <div class="nav-shell">
 
-                    <!-- Type filter — sliding pill tabs, same visual language as the
-                         Home/Orders/Cart nav indicator below -->
-                    <div class="type-tabs" id="typeTabs">
-                        <div class="type-tabs-indicator" id="typeTabsIndicator"></div>
-                        <button class="type-tab active" data-type="all" type="button">All</button>
-                        <button class="type-tab" data-type="restaurant" type="button">Restaurant</button>
-                        <button class="type-tab" data-type="medical" type="button">Medical</button>
-                        <button class="type-tab" data-type="general_store" type="button">General Store</button>
-                    </div>
-                </div>
+            <div class="location-overlay" id="locationOverlay"></div>
+            <div class="pickup-overlay" id="pickupOverlay"></div>
 
-                <div class="location-box" id="locationBox">
-                    <div class="location-header">
-                        <i class="fa-solid fa-location-dot"></i>
-                        <span id="currentAddresss">Select delivery location</span>
-                    </div>
-
-                    <div class="location-search">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="addressInput" placeholder="Search for area, street, city...">
-                    </div>
-                    <div id="savedAddress">
-                        <h2 style="color: black; top: 10px; font-size: 22px; left: 5px; position: relative;">Saved
-                            Address</h2>
-                    </div>
-                    <button id="liveLocationBtn" class="live-location-btn">
-                        <i class="fa-solid fa-location-crosshairs"></i>
-                        Use Current Location
-                    </button>
-                    <button id="map_btn" class="live-location-btn" is_active="false">
-                        <i class="fa-solid fa-location-crosshairs"></i>
-                        Select on Map
-                    </button>
-                    <div id="map_container">
-                        <div id="map" style="height: 250px; border-radius: 15px; margin-top: 10px;"></div>
-                    </div>
-                    <div id="suggestions"></div>
+            <!-- Pickup time sheet (used from Cart's scheduled-order flow) -->
+            <div class="address-options" id="pickupSheet">
+                <h2>Pickup time</h2>
+                <div class="pickup-time-row">
+                    <i class="fa-regular fa-clock"></i>
+                    <input type="time" id="pickupTimeInput" class="pickup-time-input">
                 </div>
+                <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
+                <button class="live-location-btn" id="confirmPickupBtn">
+                    <i class="fa-solid fa-check"></i>
+                    Confirm &amp; place order
+                </button>
             </div>
 
-            <nav class="app-navbar" id="appNavbar">
-                <div class="navbar-indicator" id="navbarIndicator"></div>
+            <div class="brand-row">
 
-                <a href="#home" class="nav-item active" data-page="home">
-                    <i class="fa-solid fa-house"></i>
-                    <span>Home</span>
-                </a>
+                <div class="location-trigger" id="locationTrigger" role="button" tabindex="0">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span id="currentAddress">Select location</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </div>
 
-                <a href="#orders" class="nav-item" data-page="orders">
-                    <i class="fa-solid fa-bag-shopping"></i>
-                    <span>Orders</span>
-                </a>
+                <nav class="app-navbar" id="appNavbar">
+                    <div class="navbar-indicator" id="navbarIndicator"></div>
 
-                <a href="#cart" class="nav-item" data-page="cart">
-                    <i class="fa-solid fa-cart-shopping"></i>
-                    <span>Cart</span>
-                </a>
-            </nav>
+                    <a href="#home" class="nav-item active" data-page="home">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Home</span>
+                    </a>
+
+                    <a href="#orders" class="nav-item" data-page="orders">
+                        <i class="fa-solid fa-bag-shopping"></i>
+                        <span>Orders</span>
+                    </a>
+
+                    <a href="#cart" class="nav-item" data-page="cart">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                        <span>Cart</span>
+                    </a>
+                </nav>
+
+                <button class="avatar-btn" type="button" aria-label="Profile">
+                    <img src="../static/profile.png" alt="Profile" id="profileLogo">
+                </button>
+
+            </div>
+
+            <div class="searchBarContainer">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Search for restaurants" id="searchInput">
+            </div>
+
+            <!-- Type filter — sliding pill tabs -->
+            <div class="type-tabs" id="typeTabs">
+                <div class="type-tabs-indicator" id="typeTabsIndicator"></div>
+                <button class="type-tab active" data-type="all" type="button">All</button>
+                <button class="type-tab" data-type="restaurant" type="button">Restaurants</button>
+                <button class="type-tab" data-type="medical" type="button">Medical</button>
+                <button class="type-tab" data-type="general_store" type="button">General store</button>
+            </div>
+
+            <div class="location-box" id="locationBox">
+                <div class="location-header">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span id="currentAddresss">Select delivery location</span>
+                </div>
+
+                <div class="location-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="addressInput" placeholder="Search for area, street, city...">
+                </div>
+
+                <div id="savedAddress">
+                    <h2>Saved address</h2>
+                </div>
+
+                <button id="liveLocationBtn" class="live-location-btn">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                    Use current location
+                </button>
+
+                <button id="map_btn" class="live-location-btn" is_active="false">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    Select on map
+                </button>
+
+                <div id="map_container">
+                    <div id="map" style="height: 250px;"></div>
+                </div>
+
+                <div id="suggestions"></div>
+            </div>
+
         </div>
     </header>
 
@@ -131,7 +142,7 @@
 
             <div id="addressTagModal" class="modal">
                 <div class="modal-content">
-                    <h3>Save Address As</h3>
+                    <h3>Save address as</h3>
                     <div class="tag-options">
                         <button class="tag-btn" data-tag="Home">🏠 Home</button>
                         <button class="tag-btn" data-tag="Work">💼 Work</button>
@@ -141,7 +152,7 @@
                 </div>
             </div>
 
-            <section class="filters" style="display: flex;justify-content: space-between;">
+            <section class="filters">
                 <h2 id="Note">Restaurants with online food delivery in Hyderabad</h2>
                 <div id="distancediv">
                     <select name="distance" id="distance_options">
@@ -157,28 +168,25 @@
             <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
             <section class="restaurant-grid" id="resturants_container"></section>
 
-            <div id="no-results-container" style="text-align: center; padding: 50px 20px;">
-                <div class="icon-circle" style="font-size: 50px; margin-bottom: 20px;">📍</div>
-                <h2 style="color: #333; margin-bottom: 10px;">No Restaurants Found Near You</h2>
-                <p style="color: #666; margin-bottom: 25px;">
+            <div id="no-results-container">
+                <div class="icon-circle">📍</div>
+                <h2>No restaurants found near you</h2>
+                <p>
                     It looks like we don't have any partners within 5km of your location.
                     Try checking a different area.
                 </p>
-                <button onclick="location.reload()"
-                    style="background: #ff4757; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold;">
-                    Try Again / Refresh
-                </button>
+                <button onclick="location.reload()">Try again / refresh</button>
             </div>
         </main>
 
         <div class="access_container" id="deny">
             <div class="icon">📍</div>
-            <h1>Location Access Required</h1>
-            <p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
+            <h1>Location access required</h1>
+            <p>
                 We use your location to find nearby restaurants and provide
                 accurate distance-based results.
             </p>
-            <button id="requestlocation">Allow Location Access</button>
+            <button id="requestlocation">Allow location access</button>
             <div class="help-text">
                 If you previously denied access, enable location permissions
                 in your browser settings and refresh the page.

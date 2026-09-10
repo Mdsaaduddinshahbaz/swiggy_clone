@@ -501,6 +501,12 @@ async function initHomePage() {
     }
     window.__applyHomeFilters = applyHomeFilters;
 
+    // Each type tab owns a full color theme (home.css reads it off
+    // body[data-theme]). Set it once on load to match whichever tab is
+    // already active, then keep it in sync on every tab click below.
+    document.body.dataset.theme =
+        (typeTabs?.querySelector(".type-tab.active")?.dataset.type) || "all";
+
     addListenerOnce(searchInput, "input", applyHomeFilters);
 
     if (typeTabs) {
@@ -511,6 +517,7 @@ async function initHomePage() {
             btn.classList.add("active");
             moveTypeIndicator(btn);
             applyHomeFilters();
+            document.body.dataset.theme = btn.dataset.type || "all";
         });
 
         // Position the pill correctly once layout has settled, and keep it
