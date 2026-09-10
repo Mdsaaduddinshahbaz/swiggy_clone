@@ -150,7 +150,7 @@ def fetch_profiles(user_id):
         return {"success": True, "profile": user}
     else:
         return {"success": False, "message": "User not found"}
-def update_profile(user_id, name, phone):
+def update_profiles(user_id, name, phone):
     result = users.find_one_and_update(
         {"_id": ObjectId(user_id)},
         {"$set": {"username": name, "phone": phone}},
