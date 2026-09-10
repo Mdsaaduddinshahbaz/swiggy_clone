@@ -18,7 +18,7 @@
 <body data-page="home" data-theme="all">
     <!-- data-page defaults to "home" to match the Home nav-item's initial
          "active" state below. home.js updates this on every SPA navigation
-         so page-scoped chrome (search bar, type filter) can be hidden via
+         so page-scoped chrome (search bar, category strip) can be hidden via
          CSS on Orders/Cart/Profile instead of just staying visible forever. -->
 
     <!-- ============================================================
@@ -47,29 +47,24 @@
             <div class="brand-row">
 
                 <div class="location-trigger" id="locationTrigger" role="button" tabindex="0">
-                    <i class="fa-solid fa-location-dot"></i>
-                    <span id="currentAddress">Select location</span>
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <div class="loc-row">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span id="currentAddress">Select location</span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    <span class="delivery-pill" id="deliveryEtaPill">
+                        <i class="fa-solid fa-bolt"></i>
+                        18 mins delivery
+                    </span>
                 </div>
 
-                <nav class="app-navbar" id="appNavbar">
-                    <div class="navbar-indicator" id="navbarIndicator"></div>
-
-                    <a href="#home" class="nav-item active" data-page="home">
-                        <i class="fa-solid fa-house"></i>
-                        <span>Home</span>
-                    </a>
-
-                    <a href="#orders" class="nav-item" data-page="orders">
-                        <i class="fa-solid fa-bag-shopping"></i>
-                        <span>Orders</span>
-                    </a>
-
-                    <a href="#cart" class="nav-item" data-page="cart">
-                        <i class="fa-solid fa-cart-shopping"></i>
-                        <span>Cart</span>
-                    </a>
-                </nav>
+                <div class="kirana-cash-badge" id="kiranaCashBadge">
+                    <span class="coin"><i class="fa-solid fa-indian-rupee-sign"></i></span>
+                    <span class="kc-text">
+                        <span class="kc-amount" id="kiranaCashAmount">150</span>
+                        <span class="kc-label">KiranaCash</span>
+                    </span>
+                </div>
 
                 <button class="avatar-btn" type="button" aria-label="Profile">
                     <img src="../static/profile.png" alt="Profile" id="profileLogo">
@@ -77,31 +72,92 @@
 
             </div>
 
+            <!-- Bottom tab nav (Home / Orders / Cart) — unchanged behavior,
+                 just visually tucked under the header via home.css rules. -->
+            <nav class="app-navbar" id="appNavbar">
+                <div class="navbar-indicator" id="navbarIndicator"></div>
+
+                <a href="#home" class="nav-item active" data-page="home">
+                    <i class="fa-solid fa-house"></i>
+                    <span>Home</span>
+                </a>
+
+                <a href="#orders" class="nav-item" data-page="orders">
+                    <i class="fa-solid fa-bag-shopping"></i>
+                    <span>Orders</span>
+                </a>
+
+                <a href="#cart" class="nav-item" data-page="cart">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>Cart</span>
+                </a>
+            </nav>
+
             <div class="searchBarContainer">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" placeholder="Search for restaurants" id="searchInput">
+                <input type="text" placeholder="Search for Aashirvaad Atta, Dal, Milk, or brands" id="searchInput">
+                <button class="search-icon-btn" id="voiceSearchBtn" type="button" aria-label="Voice search" title="Voice search">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+                <button class="search-icon-btn" id="uploadListBtn" type="button" aria-label="Upload handwritten list" title="Upload Handwritten List">
+                    <i class="fa-solid fa-camera"></i>
+                </button>
             </div>
 
-            <!-- Type filter — sliding pill tabs -->
-            <div class="type-tabs" id="typeTabs">
-                <div class="type-tabs-indicator" id="typeTabsIndicator"></div>
-                <button class="type-tab active" data-type="all" type="button">
+            <!-- Decorative category strip — matches the reference screenshot's
+                 6 icon circles. Not wired to filtering (6 items don't map
+                 1:1 onto the 4 real backend types below), purely visual. -->
+            <div class="category-strip-wrap">
+                <p class="category-strip-title">Category Quick-Filter Strip</p>
+                <div class="category-strip" id="quickFilterStrip">
+                    <button class="category-item" type="button">
+                        <span class="cat-icon"><i class="fa-solid fa-bolt"></i></span>
+                        <span>Essentials</span>
+                    </button>
+                    <button class="category-item" type="button">
+                        <span class="cat-icon"><i class="fa-solid fa-wheat-awn"></i></span>
+                        <span>Staples</span>
+                    </button>
+                    <button class="category-item" type="button">
+                        <span class="cat-icon"><i class="fa-solid fa-pump-soap"></i></span>
+                        <span>Household</span>
+                    </button>
+                    <button class="category-item" type="button">
+                        <span class="cat-icon"><i class="fa-solid fa-pump-medical"></i></span>
+                        <span>Personal Care</span>
+                    </button>
+                    <button class="category-item" type="button">
+                        <span class="cat-icon"><i class="fa-solid fa-box"></i></span>
+                        <span>Monthly Pack</span>
+                    </button>
+                    <button class="category-item" type="button">
+                        <span class="cat-icon"><i class="fa-solid fa-gift"></i></span>
+                        <span>Gifts</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Real store-type filter — pill tabs. This is the one home.js's
+                 __applyHomeFilters reads (matches .store-card[data-type]). -->
+            <div class="pill-tabs" id="typeTabs">
+                <button class="pill-tab active" data-type="all" type="button">
                     <i class="fa-solid fa-layer-group"></i>
                     <span>All</span>
                 </button>
-                <button class="type-tab" data-type="restaurant" type="button">
+                <button class="pill-tab" data-type="restaurant" type="button">
                     <i class="fa-solid fa-utensils"></i>
                     <span>Restaurants</span>
                 </button>
-                <button class="type-tab" data-type="medical" type="button">
+                <button class="pill-tab" data-type="medical" type="button">
                     <i class="fa-solid fa-kit-medical"></i>
                     <span>Medical</span>
                 </button>
-                <button class="type-tab" data-type="general_store" type="button">
+                <button class="pill-tab" data-type="general_store" type="button">
                     <i class="fa-solid fa-store"></i>
-                    <span>General store</span>
+                    <span>General Store</span>
                 </button>
             </div>
+
 
             <div class="location-box" id="locationBox">
                 <div class="location-header">
@@ -140,10 +196,7 @@
 
     <!-- ============================================================
          PAGE TEMPLATES — inert until spa_router.js clones one of
-         these into #spa-content. Only ONE page's markup is ever
-         live in the document at a time, which is what home.js /
-         cart.js / orders.js / profile.js already assume (see their
-         `if (!el) return;` guards).
+         these into #spa-content.
     ============================================================= -->
     <template id="tpl-home">
         <main class="container">
@@ -177,8 +230,23 @@
                 </div>
             </section>
 
+            <div class="promo-banner">
+                <i class="fa-solid fa-circle-check"></i>
+                Directly from Trusted Kirana Partners — Local Prices, Zero Markups
+            </div>
+
             <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
-            <section class="restaurant-grid" id="resturants_container"></section>
+            <section class="restaurant-grid" id="resturants_container">
+                <!-- Skeleton placeholders: pure static markup, no JS needed.
+                     renderRestaurants() replaces this whole container's
+                     innerHTML the instant real data is ready. -->
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+            </section>
+
+            <p id="no-search-matches">No restaurants match your search. Try a different name.</p>
 
             <div id="no-results-container">
                 <div class="icon-circle">📍</div>
@@ -189,6 +257,10 @@
                 </p>
                 <button onclick="location.reload()">Try again / refresh</button>
             </div>
+
+            <button id="scrollTopBtn" class="scroll-top-btn" type="button" aria-label="Back to top">
+                <i class="fa-solid fa-arrow-up"></i>
+            </button>
         </main>
 
         <div class="access_container" id="deny">
@@ -263,10 +335,6 @@
                     </div>
 
                     <div id="addressOptions" class="address-options">
-                        <!-- Renamed from "liveLocationBtn": the header above has its own
-                             button with that id and stays live in the DOM the whole time,
-                             so this one needs to be distinct or getElementById("liveLocationBtn")
-                             will silently grab the header's button instead of this one. -->
                         <button id="cart-liveLocationBtn" class="live-location-btn">
                             <i class="fa-solid fa-location-crosshairs"></i>
                             Use Current Location
@@ -380,6 +448,8 @@
          Router clones exactly one template's content in here.
     ============================================================= -->
     <div id="spa-content"></div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script src="../static/spa_router.js"></script>
     <script src="../static/home.js"></script>

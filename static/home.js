@@ -2,9 +2,44 @@ let map;
 let marker;
 let userLatt = null;
 let userLong = null;
+let scrollTopHandler = null; // re-bound each initHomePage() run — see wiring below
+let toastTimer = null;
 
 function getRestaurantCacheKey(userId) {
     return `cachedRestaurants_${userId}`;
+}
+
+function currentUserId() {
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    return window.APP_USER_ID || pathParts[pathParts.length - 1];
+}
+
+// ---- Favorites (client-side only, persisted per user in localStorage) ----
+function getFavoriteIds(userId) {
+    try {
+        const raw = localStorage.getItem(`favoriteRestaurants_${userId}`);
+        return new Set(raw ? JSON.parse(raw) : []);
+    } catch (e) {
+        return new Set();
+    }
+}
+
+function toggleFavoriteId(userId, id) {
+    const favorites = getFavoriteIds(userId);
+    const isNowFavorite = !favorites.has(id);
+    if (isNowFavorite) favorites.add(id); else favorites.delete(id);
+    localStorage.setItem(`favoriteRestaurants_${userId}`, JSON.stringify([...favorites]));
+    return isNowFavorite;
+}
+
+// ---- Toast: small, short-lived confirmation message ----
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
 // Basic HTML-escaping so restaurant/address/suggestion data from the API
@@ -30,6 +65,35 @@ function addListenerOnce(el, event, handler) {
     el.addEventListener(event, handler);
 }
 
+// Cache of already-fetched preview items, keyed by res_id. renderRestaurants()
+// re-runs on every cache-hit → fresh-fetch cycle and on every distance-filter
+// change, which would otherwise wipe already-loaded product rows back to a
+// skeleton and re-fetch them from scratch. Reusing the cache means a card
+// only ever shows the skeleton once, the first time it's seen.
+const previewItemsCache = new Map();
+
+function productThumbsMarkup(items) {
+    if (!items || items.length === 0) {
+        return `<div class="product-thumb empty-thumb"><p>No items listed yet</p></div>`;
+    }
+    return items.map(item => `
+        <div class="product-thumb" data-item-id="${escapeHtml(item.id)}">
+            <img src="${escapeHtml(item.file_url)}" alt="${escapeHtml(item.name)}">
+            <p class="p-name">${escapeHtml(item.name)}</p>
+            <div class="p-row">
+                <span class="p-price">₹${escapeHtml(item.price)}</span>
+                <span class="p-add">Add</span>
+            </div>
+        </div>
+    `).join("");
+}
+
+// Store cards start with skeleton item-thumbs (unless we already have that
+// restaurant's items cached from an earlier render) and get their real
+// products filled in by loadPreviewItems() right after, via a single
+// batched /preview_items call (see database.py's get_preview_items). Rating,
+// "open now", and delivery-time stay as presentational placeholders since
+// /list_resturants doesn't return them — same as before.
 function renderRestaurants(results, containers) {
     const { display_resturants, no_results_container } = containers;
 
@@ -40,19 +104,99 @@ function renderRestaurants(results, containers) {
     }
 
     no_results_container.style.display = "none";
-    const html = Object.entries(results).map(([id, detail]) => `
-        <div class="card" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}">
-            <div class="card-img">
-                <img src=${escapeHtml(detail.file_url)} alt="Food">
+
+    const userId = currentUserId();
+    const favorites = getFavoriteIds(userId);
+
+    const skeletonThumbs = `
+        <div class="product-thumb skeleton-thumb"><div class="skeleton-img"></div></div>
+        <div class="product-thumb skeleton-thumb"><div class="skeleton-img"></div></div>
+        <div class="product-thumb skeleton-thumb"><div class="skeleton-img"></div></div>`;
+
+    const html = Object.entries(results).map(([id, detail], index) => {
+        const isFavorite = favorites.has(id);
+        const cached = previewItemsCache.get(id);
+        const productsMarkup = cached ? productThumbsMarkup(cached) : skeletonThumbs;
+        return `
+        <div class="store-card" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}" style="--i:${index}">
+            <div class="store-head">
+                <div>
+                    <h3 class="store-name resturant_name">${escapeHtml(detail.res_name)}</h3>
+                    <div class="store-badges">
+                        <span class="badge-verified"><i class="fa-solid fa-circle-check"></i> Verified Partner</span>
+                        <span class="badge-open">Open Now</span>
+                    </div>
+                </div>
+                <button
+                    class="store-fav${isFavorite ? " active" : ""}"
+                    type="button"
+                    data-fav-id="${escapeHtml(id)}"
+                    aria-label="Save to favorites"
+                >
+                    <i class="fa-solid fa-heart"></i>
+                </button>
             </div>
-            <div class="card-details">
-                <h3 class="resturant_name" >${escapeHtml(detail.res_name)}</h3>
-                <p class="rating"><i class="fa-solid fa-circle-star"></i> 4.2 • 25-30 mins</p>
-                <p class="cuisine">Burgers, American</p>
-                <p class="area">${escapeHtml(detail.address)}</p>
+
+            <div class="store-meta">
+                <span class="rating"><i class="fa-solid fa-star"></i> 4.2</span>
+                <span class="dot">•</span>
+                <span>25-30 mins</span>
+                <span class="dot">•</span>
+                <span>0.8 km away</span>
             </div>
-        </div>`).join("");
+
+            <div class="store-products" data-res-id="${escapeHtml(id)}">${productsMarkup}</div>
+
+            <div class="store-tags">
+                <span class="tag-chip area">${escapeHtml(detail.address)}</span>
+                <span class="tag-chip">Free Delivery</span>
+                <span class="tag-chip">Local Prices</span>
+            </div>
+        </div>`;
+    }).join("");
     display_resturants.innerHTML = html;
+
+    // Only fetch for restaurants we don't already have cached items for —
+    // this is what stops a re-render from re-triggering the skeleton state.
+    const idsNeedingFetch = Object.keys(results).filter(id => !previewItemsCache.has(id));
+    loadPreviewItems(idsNeedingFetch);
+}
+
+// Batched fetch of a few real items per restaurant, for the store-card
+// product strip. One request for the whole visible list instead of one
+// per card. Pairs with POST /preview_items on the server (see
+// get_preview_items in database.py).
+async function loadPreviewItems(resIds) {
+    if (!resIds || resIds.length === 0) return;
+    try {
+        const res = await fetch("/preview_items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ res_ids: resIds })
+        });
+        if (!res.ok) throw new Error(`preview_items failed: ${res.status}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || "preview_items returned success:false");
+
+        // Backend omits the key entirely for a restaurant with zero in-stock
+        // items — treat every id we asked for as resolved, defaulting missing
+        // ones to an empty list, so nothing is left shimmering forever.
+        resIds.forEach(resId => {
+            const items = (data.items && data.items[resId]) || [];
+            previewItemsCache.set(resId, items);
+            const container = document.querySelector(`.store-products[data-res-id="${CSS.escape(resId)}"]`);
+            if (container) container.innerHTML = productThumbsMarkup(items);
+        });
+    } catch (e) {
+        console.error("loadPreviewItems failed", e);
+        // Don't leave every card shimmering forever if the request/route is broken —
+        // show a clear "couldn't load" state instead so it's obvious something's wrong.
+        // Deliberately NOT cached, so the next re-render retries the fetch.
+        resIds.forEach(resId => {
+            const container = document.querySelector(`.store-products[data-res-id="${CSS.escape(resId)}"]`);
+            if (container) container.innerHTML = `<div class="product-thumb empty-thumb"><p>Couldn't load items</p></div>`;
+        });
+    }
 }
 
 function getPosition() {
@@ -172,6 +316,15 @@ async function initHomePage() {
     const loading_container = document.getElementById("loading_container");
     const savedAddress = document.getElementById("savedAddress");
     const userId = window.APP_USER_ID || pathParts[pathParts.length - 1];
+
+    // Small, purely cosmetic touch: greet by time of day instead of a
+    // static heading. Safe to set unconditionally — nothing else in this
+    // file reads Note's text, only its display/visibility.
+    if (Note) {
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+        Note.textContent = `${greeting}! Restaurants with online delivery near you`;
+    }
     const maps_btn = document.getElementById("map_btn");
     const cancelbtn = document.getElementById("closeModal");
 
@@ -320,7 +473,16 @@ async function initHomePage() {
         }
 
         addListenerOnce(display_resturants, "click", function (e) {
-            const card = e.target.closest(".card");
+            const favBtn = e.target.closest(".store-fav");
+            if (favBtn) {
+                e.stopPropagation();
+                const isNowFavorite = toggleFavoriteId(userId, favBtn.dataset.favId);
+                favBtn.classList.toggle("active", isNowFavorite);
+                showToast(isNowFavorite ? "Added to favorites" : "Removed from favorites");
+                return;
+            }
+
+            const card = e.target.closest(".store-card");
             if (card) {
                 const name = card.querySelector(".resturant_name").textContent;
                 const addresss = card.querySelector(".area").textContent;
@@ -357,6 +519,7 @@ async function initHomePage() {
         const overlay = document.getElementById("locationOverlay");
         if (box) box.classList.remove("show");
         if (overlay) overlay.classList.remove("show");
+        showToast("Delivery location updated");
     });
 
     addListenerOnce(request_location, "click", async () => {
@@ -456,6 +619,7 @@ async function initHomePage() {
             const address_long = document.getElementById("currentAddress").dataset.long;
             const cordinates = { latt: address_latt, long: address_long };
             document.getElementById("addressTagModal").classList.remove("show");
+            let saved = false;
             try {
                 const res = await fetch("/save_address", {
                     method: "POST",
@@ -463,67 +627,66 @@ async function initHomePage() {
                     body: JSON.stringify({ address: address, address_type: addressType, userId: userId, cordinates: cordinates })
                 });
                 if (!res.ok) throw new Error(`save_address failed: ${res.status}`);
+                saved = true;
             } catch (err) {
                 console.error("save_address failed", err);
             }
             currentAddress.textContent = addressType + " - " + address;
+            showToast(saved ? "Address saved" : "Address set for this order (save failed)");
         });
     });
 
-    // ---- Search box + type-filter tabs, combined ----
-    // Both act on the already-rendered .card elements: text search matches
-    // the restaurant name, the tab filter matches data-type. Exposed on
-    // window so change()/distance-filter re-renders can re-apply the
-    // currently active filters without needing to re-bind listeners.
+    // ---- Search box + category quick-filter strip, combined ----
+    // Both act on the already-rendered .store-card elements: text search
+    // matches the restaurant name, the pill-tab filter matches data-type.
+    // Exposed on window so change()/distance-filter re-renders can re-apply
+    // the currently active filters without needing to re-bind listeners.
     const searchInput = document.getElementById("searchInput");
     const typeTabs = document.getElementById("typeTabs");
-    const typeTabsIndicator = document.getElementById("typeTabsIndicator");
-
-    function moveTypeIndicator(btn) {
-        if (!typeTabsIndicator || !btn) return;
-        typeTabsIndicator.style.width = btn.offsetWidth + "px";
-        typeTabsIndicator.style.transform = `translateX(${btn.offsetLeft - 4}px)`;
-    }
 
     function applyHomeFilters() {
         const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : "";
-        const activeTab = typeTabs ? typeTabs.querySelector(".type-tab.active") : null;
+        const activeTab = typeTabs ? typeTabs.querySelector(".pill-tab.active") : null;
         const activeType = activeTab ? activeTab.dataset.type : "all";
 
-        document.querySelectorAll(".card").forEach(card => {
+        const allCards = document.querySelectorAll(".store-card");
+        let visibleCount = 0;
+
+        allCards.forEach(card => {
             const nameEl = card.querySelector(".resturant_name");
             const restaurantName = nameEl ? nameEl.textContent.toLowerCase() : "";
             const cardType = card.dataset.type || "";
             const matchesSearch = restaurantName.includes(searchTerm);
             const matchesType = activeType === "all" || cardType === activeType;
-            card.style.display = (matchesSearch && matchesType) ? "block" : "none";
+            const isMatch = matchesSearch && matchesType;
+            card.style.display = isMatch ? "block" : "none";
+            if (isMatch) visibleCount += 1;
         });
+
+        const noSearchMatches = document.getElementById("no-search-matches");
+        if (noSearchMatches) {
+            noSearchMatches.classList.toggle("show", allCards.length > 0 && visibleCount === 0);
+        }
     }
     window.__applyHomeFilters = applyHomeFilters;
 
-    // Each type tab owns a full color theme (home.css reads it off
+    // Each pill tab owns a full color theme (home.css reads it off
     // body[data-theme]). Set it once on load to match whichever tab is
     // already active, then keep it in sync on every tab click below.
     document.body.dataset.theme =
-        (typeTabs?.querySelector(".type-tab.active")?.dataset.type) || "all";
+        (typeTabs?.querySelector(".pill-tab.active")?.dataset.type) || "all";
 
     addListenerOnce(searchInput, "input", applyHomeFilters);
 
     if (typeTabs) {
         addListenerOnce(typeTabs, "click", (e) => {
-            const btn = e.target.closest(".type-tab");
+            const btn = e.target.closest(".pill-tab");
             if (!btn) return;
-            typeTabs.querySelector(".type-tab.active")?.classList.remove("active");
+            typeTabs.querySelector(".pill-tab.active")?.classList.remove("active");
             btn.classList.add("active");
-            moveTypeIndicator(btn);
             applyHomeFilters();
             document.body.dataset.theme = btn.dataset.type || "all";
         });
-
-        // Position the pill correctly once layout has settled, and keep it
-        // aligned to the active tab if the window is resized.
-        requestAnimationFrame(() => moveTypeIndicator(typeTabs.querySelector(".type-tab.active")));
-        window.addEventListener("resize", () => moveTypeIndicator(typeTabs.querySelector(".type-tab.active")));
     }
 
     addListenerOnce(livelocationBtn, "click", async () => {
@@ -534,6 +697,7 @@ async function initHomePage() {
             const userLocation = { latt: livelctn.coords.latitude, long: livelctn.coords.longitude };
             localStorage.setItem("userLocation", JSON.stringify(userLocation));
             await change(livelctn.coords.latitude, livelctn.coords.longitude);
+            showToast("Using your current location");
         } catch (err) {
             console.error("live location failed", err);
             alert("Location access denied");
@@ -554,6 +718,7 @@ async function initHomePage() {
             currentAddress.textContent = address;
             await change(lat, lng);
             document.getElementById("addressTagModal").classList.add("show");
+            showToast("Location updated");
         } catch (err) {
             console.error("map click reverse geocode failed", err);
         }
@@ -581,12 +746,37 @@ async function initHomePage() {
             map_container.style.position = "absolute";
         }
     });
+
+    // ---- Scroll-to-top button ----
+    // The button lives inside the Home template, so it's a fresh DOM node
+    // every time the SPA router remounts Home. addListenerOnce handles the
+    // click fine (it keys off the node itself), but the window-level
+    // scroll listener needs to be swapped to point at the current node
+    // each run, or it'd keep toggling a detached element after navigating
+    // away and back.
+    const scrollTopBtn = document.getElementById("scrollTopBtn");
+    if (scrollTopBtn) {
+        if (scrollTopHandler) window.removeEventListener("scroll", scrollTopHandler);
+        scrollTopHandler = () => scrollTopBtn.classList.toggle("show", window.scrollY > 400);
+        window.addEventListener("scroll", scrollTopHandler);
+        addListenerOnce(scrollTopBtn, "click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+    }
+
+    // ---- Voice search / upload-handwritten-list buttons ----
+    // No backend wired up yet for either — stubbed with a toast so the
+    // buttons aren't dead ends, swap these for real handlers when ready.
+    addListenerOnce(document.getElementById("voiceSearchBtn"), "click", () => {
+        showToast("Voice search coming soon");
+    });
+    addListenerOnce(document.getElementById("uploadListBtn"), "click", () => {
+        showToast("Upload handwritten list coming soon");
+    });
 }
 
-// Keep the shared header's page-scoped chrome (search bar, type filter
-// tabs) in sync with whichever page is actually showing. The header never
-// gets swapped out by the router, so without this it would stay visible
-// on Orders/Cart/Profile too. Runs for every navigation, not just Home.
+// Keep the shared header's page-scoped chrome (search bar, category strip)
+// in sync with whichever page is actually showing. The header never gets
+// swapped out by the router, so without this it would stay visible on
+// Orders/Cart/Profile too. Runs for every navigation, not just Home.
 document.addEventListener("spa:pageload", (e) => {
     document.body.dataset.page = e.detail.page;
 });

@@ -1113,7 +1113,31 @@ def _order_amount(order: dict, item_index: dict) -> float:
         qty = line.get("qty", 0) if isinstance(line, dict) else 0
         total += int(price) * int(qty)
     return total
+def get_preview_items(res_ids, limit=4):
+    """Batched preview items for the home-page store cards — a few in-stock
+    items per restaurant in one query instead of one call per card."""
+    if not res_ids:
+        return {}
 
+    pipeline = [
+        {"$match": {"resturant_id": {"$in": res_ids}, "available": True}},
+        {"$sort": {"sold": -1}},  # popular items first
+        {"$group": {
+            "_id": "$resturant_id",
+            "items": {"$push": {
+                "id": {"$toString": "$_id"},
+                "name": "$item_name",
+                "price": "$price",
+                "file_url": "$file_url"
+            }}
+        }},
+        {"$project": {"items": {"$slice": ["$items", limit]}}}
+    ]
+
+    preview = {}
+    for doc in resturants_items.aggregate(pipeline):
+        preview[doc["_id"]] = doc["items"]
+    return preview
 
 def get_seller_analytics(seller_id: str) -> dict:
     """

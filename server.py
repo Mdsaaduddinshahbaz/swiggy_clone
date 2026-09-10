@@ -1,4 +1,4 @@
-from database import fetch_profiles, save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+from database import fetch_profiles, get_preview_items, save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
@@ -483,6 +483,14 @@ def list_resturantss():
     except Exception as e:
         print(e)
         return({"success":False})
+@app.route("/preview_items", methods=["POST"])
+def preview_items():
+    data = request.json or {}
+    res_ids = data.get("res_ids", [])
+    if not res_ids:
+        return jsonify({"success": False, "message": "res_ids required"}), 400
+    items = get_preview_items(res_ids)
+    return jsonify({"success": True, "items": items})
 @app.post("/list_items")
 @login_required
 def list_item():
