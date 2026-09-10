@@ -150,6 +150,16 @@ def fetch_profiles(user_id):
         return {"success": True, "profile": user}
     else:
         return {"success": False, "message": "User not found"}
+def update_profile(user_id, name, phone):
+    result = users.find_one_and_update(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"username": name, "phone": phone}},
+        return_document=ReturnDocument.AFTER
+    )
+    if result:
+        return {"success": True}
+    else:
+        return {"success": False, "message": "User not found"}
 def list_resturants(long,latt,dist:int=5):
     restaurants = restaurants_name.find({
         "location": {

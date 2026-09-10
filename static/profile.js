@@ -92,7 +92,7 @@ async function initProfilePage() {
         const phone = phoneInput.value.trim();
         if (!name) { alert("Name can't be empty"); return; }
         try {
-            const res = await fetch("/update_profile", {
+            const res = await fetch("/user/update_profile", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: userId, name, phone })

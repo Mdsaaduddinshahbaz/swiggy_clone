@@ -782,6 +782,21 @@ def fetch_profile():
     except Exception as e:
         print(e)
         return jsonify({"success": False, "message": "Internal server error"}), 500
+@app.route("/user/update_profile", methods=["POST"])
+@login_required
+def update_profile():
+    try:
+        user_id = g.user_id
+        data = request.get_json(force=True) or {}
+        name = data.get("name")
+        phone = data.get("phone")
+        result = update_profile(user_id, name, phone)
+        if not result:
+            return jsonify({"success": False, "message": "Failed to update profile"}), 500
+        return jsonify({"success": True, "message": "Profile updated successfully"})
+    except Exception as e:
+        print(e)
+        return jsonify({"success": False, "message": "Internal server error"}), 500
 @app.route("/seller/orders",methods=["POST","GET"])
 @login_required
 def getsellerOrders():
