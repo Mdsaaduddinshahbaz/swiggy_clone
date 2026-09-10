@@ -1,4 +1,4 @@
-from database import fetch_profiles, save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+from database import fetch_profiles, save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
@@ -790,7 +790,7 @@ def update_profile():
         data = request.get_json(force=True) or {}
         name = data.get("name")
         phone = data.get("phone")
-        result = update_profile(user_id, name, phone)
+        result = update_profiles(user_id, name, phone)
         if not result:
             return jsonify({"success": False, "message": "Failed to update profile"}), 500
         return jsonify({"success": True, "message": "Profile updated successfully"})
