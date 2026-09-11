@@ -117,6 +117,25 @@ function renderRestaurants(results, containers) {
         const isFavorite = favorites.has(id);
         const cached = previewItemsCache.get(id);
         const productsMarkup = cached ? productThumbsMarkup(cached) : skeletonThumbs;
+        let distance_km = parseFloat(detail.distance_km);
+        let minutes_per_km = 2.5; // default value
+        if (distance_km < 3) {
+            minutes_per_km = 3.0
+        }
+        else if (distance_km < 7) {
+            minutes_per_km = 2.5
+        }
+        else{
+            minutes_per_km = 2.0
+        }
+
+       let eta = distance_km * minutes_per_km
+       let lower = Math.floor(eta / 5) * 5;
+        let upper = lower + 5;
+
+        let displayEta = `${lower}-${upper}`;
+
+        console.log("ETA", eta)
         return `
         <div class="store-card" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}" style="--i:${index}">
             <div class="store-head">
@@ -140,9 +159,9 @@ function renderRestaurants(results, containers) {
             <div class="store-meta">
                 <span class="rating"><i class="fa-solid fa-star"></i> 4.2</span>
                 <span class="dot">•</span>
-                <span>25-30 mins</span>
+                <span>${escapeHtml(displayEta)} mins</span>
                 <span class="dot">•</span>
-                <span>0.8 km away</span>
+                <span>${escapeHtml(detail.distance_km)} km away</span>
             </div>
 
             <div class="store-products" data-res-id="${escapeHtml(id)}">${productsMarkup}</div>

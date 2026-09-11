@@ -161,24 +161,38 @@ def update_profiles(user_id, name, phone):
     else:
         return {"success": False, "message": "User not found"}
 def list_resturants(long,latt,dist:int=5):
-    restaurants = restaurants_name.find({
-        "location": {
-            "$near": {
-                "$geometry": {
-                    "type": "Point",
-                    "coordinates": [long,latt]
-                },
-                "$maxDistance": dist*1000
-            }
+    # restaurants = restaurants_name.find({
+    #     "location": {
+    #         "$near": {
+    #             "$geometry": {
+    #                 "type": "Point",
+    #                 "coordinates": [long,latt]
+    #             },
+    #             "$maxDistance": dist*1000
+    #         }
+    #     }
+    # })
+    restaurants = restaurants_name.aggregate([
+    {
+        "$geoNear": {
+            "near": {
+                "type": "Point",
+                "coordinates": [long, latt]
+            },
+            "key": "location",
+            "distanceField": "distanceMeters",
+            "maxDistance": dist * 1000,
+            "spherical": True
         }
-    })
+    }
+])
     res_names={}
     # for r in restaurants:
     #     print(r["name"])
     #     res_names[r["name"]]={"res_id":str(r["_id"]),"address":r["address"],"file_url":r["file_url"]}
     for r in restaurants:
         print(r["name"])
-        res_names[str(r["_id"])]={"res_name":r["name"],"address":r["address"],"file_url":r["file_url"],"type":r.get("type","restaurant")}
+        res_names[str(r["_id"])]={"res_name":r["name"],"address":r["address"],"file_url":r["file_url"],"type":r.get("type","restaurant"),"distance_km": f"{r['distanceMeters'] / 1000:.1f}"}
         # res_names.append(r["name"])
     return res_names
 def add_new_customer(username,password):
