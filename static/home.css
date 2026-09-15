@@ -131,8 +131,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 body:not([data-page="home"]) .searchBarContainer,
 body:not([data-page="home"]) .category-strip-wrap,
+body[data-page="cart"] .searchBarContainer {
+    display: none;
+}
 body:not([data-page="home"]) .pill-tabs { display: none; }
-
 /* ============================================================ REAL STORE-TYPE FILTER (pill tabs) */
 .pill-tabs { display: flex; gap: 6px; background: var(--surface); border-radius: 999px; padding: 5px; overflow-x: auto; scrollbar-width: none; }
 .pill-tabs::-webkit-scrollbar { display: none; }

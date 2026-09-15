@@ -50,8 +50,12 @@ function renderProfileAddresses(addresses, listEl, emptyEl) {
 }
 
 async function initProfilePage() {
+    console.log("in init profile");
+    
     const profileCard = document.querySelector(".profile-card");
     if (!profileCard) return; // profile isn't the live page right now
+
+    console.log("after init profile")
 
     const userId = getProfileUserId();
 
@@ -119,6 +123,8 @@ async function initProfilePage() {
     // do a hard reload — falls back to a plain redirect if it's ever
     // missing (e.g. profile.js loaded standalone without spa_router.js).
     addListenerOnceProfile(ordersBtn, "click", () => {
+        console.log("ordersBtn Clicked");
+        
         if (typeof renderPage === "function") renderPage("orders");
         else window.location.href = `/orders/${userId}`;
     });
@@ -166,7 +172,7 @@ async function initProfilePage() {
         if (loading) loading.classList.remove("show");
     }
 }
-
+initProfilePage()
 document.addEventListener("spa:pageload", (e) => {
     if (e.detail.page === "profile") initProfilePage();
 });

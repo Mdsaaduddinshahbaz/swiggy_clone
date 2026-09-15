@@ -509,7 +509,7 @@ async function initHomePage() {
                 window.location.href = `/menu/${encodeURIComponent(name)}/${encodeURIComponent(addresss)}/${encodeURIComponent(res_id)}/${encodeURIComponent(userId)}`;
             }
         });
-        addListenerOnce(cartBtn, "click", () => { window.location.href = `/cart/${userId}`; });
+        addListenerOnce(cartBtn, "click", () => { window.location.href = `/user/${userId}/#cart`; });
         addListenerOnce(orderBtn, "click", () => { window.location.href = `/orders/${userId}`; });
 
         // Type tabs may have loaded with a non-"all" active tab from a previous
@@ -802,6 +802,7 @@ document.addEventListener("spa:pageload", (e) => {
 
 // Run on this page's first real load...
 initHomePage();
+
 // ...and re-run every time the SPA router swaps Home back into view
 document.addEventListener("spa:pageload", (e) => {
     if (e.detail.page === "home") initHomePage();
