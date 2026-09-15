@@ -42,8 +42,8 @@ function showToast(message) {
     toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
-// Basic HTML-escaping so restaurant/address/suggestion data from the API
-// can never break out of the markup it's injected into (XSS guard).
+// Basic HTML-escaping so restaurant/address/suggestion/menu data from the
+// API can never break out of the markup it's injected into (XSS guard).
 function escapeHtml(str) {
     if (str === null || str === undefined) return "";
     return String(str)
@@ -52,6 +52,21 @@ function escapeHtml(str) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+// Normalizes Mongo-style ids ({ $oid: "..." }), nested { _id } / { id }
+// wrappers, and plain strings/numbers down to a single string. Used by the
+// menu page to compare category/subcategory ids consistently.
+function normalizeId(value) {
+    if (value === null || value === undefined) return null;
+
+    if (typeof value === "object") {
+        if (value.$oid !== undefined) return String(value.$oid);
+        if (value._id !== undefined) return normalizeId(value._id);
+        if (value.id !== undefined) return normalizeId(value.id);
+    }
+
+    return String(value).trim();
 }
 
 // addListenerOnce(): prevents the same handler from being bound multiple
@@ -63,6 +78,31 @@ function addListenerOnce(el, event, handler) {
     if (el.dataset[key]) return;
     el.dataset[key] = "true";
     el.addEventListener(event, handler);
+}
+
+// spa_router.js only recognizes exact page names ("home", "orders", "menu",
+// "cart", "profile") — it doesn't parse extra hash segments, and it never
+// listens for hashchange (only .nav-item clicks and popstate). So menu
+// params can't ride along in the URL hash; they're stashed in
+// sessionStorage instead, and navigation goes through the router's own
+// renderPage() (a plain top-level function in spa_router.js, so it's
+// reachable as window.renderPage) rather than by touching location.hash.
+function goToPage(page) {
+    if (typeof window.renderPage === "function") {
+        window.renderPage(page);
+    } else {
+        // Fallback if spa_router.js hasn't loaded for some reason.
+        window.location.hash = page;
+    }
+}
+
+function navigateToMenu(resName, address, resId, userId) {
+    try {
+        sessionStorage.setItem("menuParams", JSON.stringify({ resName, address, resId, userId }));
+    } catch (e) {
+        console.warn("Could not persist menu params", e);
+    }
+    goToPage("menu");
 }
 
 // Cache of already-fetched preview items, keyed by res_id. renderRestaurants()
@@ -506,7 +546,9 @@ async function initHomePage() {
                 const name = card.querySelector(".resturant_name").textContent;
                 const addresss = card.querySelector(".area").textContent;
                 const res_id = card.getAttribute("id");
-                window.location.href = `/menu/${encodeURIComponent(name)}/${encodeURIComponent(addresss)}/${encodeURIComponent(res_id)}/${encodeURIComponent(userId)}`;
+                // Was a full page navigation to /menu/... — now routes inside
+                // the SPA so the header/map/session state never gets torn down.
+                navigateToMenu(name, addresss, res_id, userId);
             }
         });
         addListenerOnce(cartBtn, "click", () => { window.location.href = `/user/${userId}/#cart`; });
@@ -792,18 +834,817 @@ async function initHomePage() {
     });
 }
 
+
+/* ============================================================
+   MENU PAGE (merged from menu.js)
+
+   Was its own full page at /menu/:res_name/:address/:res_id/:userId.
+   Now an SPA page: routed via #menu/<res_name>/<address>/<res_id>/<userId>,
+   rendered into tpl-menu, params read from the hash instead of the path.
+   ============================================================ */
+
+const pendingMenuUpdates = new Map();
+const inFlightMenuControllers = new Map();
+
+function scheduleMenuCartUpdate(itemId, resId, userId, delta, onSuccess, onFailure) {
+
+    let entry = pendingMenuUpdates.get(itemId);
+
+    if (entry) {
+        entry.accumulatedDelta += delta;
+        clearTimeout(entry.timer);
+    } else {
+        entry = { accumulatedDelta: delta, timer: null };
+        pendingMenuUpdates.set(itemId, entry);
+    }
+
+    entry.timer = setTimeout(async () => {
+
+        const netDelta = entry.accumulatedDelta;
+        pendingMenuUpdates.delete(itemId);
+
+        if (netDelta === 0) return;
+
+        if (inFlightMenuControllers.has(itemId)) {
+            inFlightMenuControllers.get(itemId).abort();
+        }
+
+        const controller = new AbortController();
+        inFlightMenuControllers.set(itemId, controller);
+
+        try {
+            const response = await fetch("/update_cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    res_id: resId,
+                    item_id: itemId,
+                    qty: netDelta
+                }),
+                signal: controller.signal
+            });
+
+            if (!response.ok) throw new Error(`update_cart failed: ${response.status}`);
+            const data = await response.json();
+
+            if (data.success) {
+                onSuccess(data);
+            } else {
+                onFailure(data.message || "Failed updating cart");
+            }
+
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                console.error("Menu cart update failed:", error);
+                onFailure("Network error");
+            }
+        } finally {
+            if (inFlightMenuControllers.get(itemId) === controller) {
+                inFlightMenuControllers.delete(itemId);
+            }
+        }
+
+    }, 400);
+}
+
+async function initMenuPage() {
+
+    const menuContainer = document.getElementById("menu_container");
+    if (!menuContainer) return; // not on the menu page
+
+    let menuParams = null;
+    try {
+        menuParams = JSON.parse(sessionStorage.getItem("menuParams"));
+    } catch (e) {
+        menuParams = null;
+    }
+
+    if (!menuParams || !menuParams.resId) {
+        // No restaurant context to show (e.g. a direct reload landed on the
+        // menu template with nothing in sessionStorage) — bounce home.
+        goToPage("home");
+        return;
+    }
+
+    const decodedRestaurant = menuParams.resName || "";
+    const decodedAddress = menuParams.address || "";
+    const resId = menuParams.resId;
+    const userId = menuParams.userId || currentUserId();
+
+    const breadcrumbHome = document.querySelector(".breadcrumb-home");
+    if (breadcrumbHome) {
+        breadcrumbHome.addEventListener("click", (e) => {
+            e.preventDefault();
+            goToPage("home");
+        });
+    }
+
+    const loading = document.getElementById("loading");
+    const heading = document.querySelector(".res-info h1");
+    const location_ = document.querySelector(".res-location");
+    const menuAreaCrumb = document.getElementById("menuAreaCrumb");
+    const menuNameCrumb = document.getElementById("menuNameCrumb");
+
+    const footer = document.getElementById("menuFooter");
+    const totalAmount = document.getElementById("amount");
+    const goCartBtn = document.getElementById("GoCartBtn");
+
+    const resultMeta = document.getElementById("resultMeta");
+
+    const searchInput = document.getElementById("menuSearchInput");
+    const searchClearBtn = document.getElementById("menuSearchClearBtn");
+    const searchBackBtn = document.getElementById("menuSearchBackBtn");
+
+    const categoryTabs = document.getElementById("categoryTabs");
+
+    const sortSelect = document.getElementById("sortSelect");
+    const stockToggle = document.getElementById("stockToggle");
+    const subDivider = document.getElementById("subDivider");
+    const subcategoryTabs = document.getElementById("subcategoryTabs");
+
+    const replaceContainer = document.getElementById("ReplaceContainer");
+    const overlay = document.getElementById("overlayContainer");
+    const message = document.getElementById("message");
+    const yesBtn = document.getElementById("YES");
+    const noBtn = document.getElementById("NO");
+
+    document.title = `${decodedRestaurant} | Swiggy Clone`;
+    heading.textContent = decodedRestaurant;
+    location_.textContent = decodedAddress;
+    menuAreaCrumb.textContent = decodedAddress;
+    menuNameCrumb.textContent = decodedRestaurant;
+
+    // Reset any leftover UI state from a previous visit to a different menu
+    if (searchInput) searchInput.value = "";
+    if (searchClearBtn) searchClearBtn.classList.remove("show");
+    if (stockToggle) stockToggle.classList.remove("active");
+    if (sortSelect) sortSelect.value = "default";
+    if (footer) footer.classList.remove("show");
+
+    let cartData;
+
+    try {
+        const response = await fetch("/get_cart_items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userid: userId })
+        });
+
+        if (response.status === 401) {
+            alert("Unauthorized user. Please log in");
+            window.location.href = "/login/user";
+            return;
+        }
+
+        if (!response.ok) throw new Error("Failed to load cart");
+
+        cartData = await response.json();
+
+        if (cartData?.results && cartData.results.total > 0) {
+            footer.classList.add("show");
+            totalAmount.textContent = cartData.results.total;
+        }
+
+    } catch (error) {
+        console.error("Cart loading error:", error);
+        alert("Error loading cart");
+        return;
+    }
+
+    let menuData;
+
+    try {
+        const response = await fetch("/list_items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ res_id: resId, type: "user" })
+        });
+
+        if (response.status === 401) {
+            alert("Unauthorized user. Please log in");
+            window.location.href = "/login/user";
+            return;
+        }
+
+        if (!response.ok) throw new Error("Failed to load menu");
+
+        menuData = await response.json();
+
+    } catch (error) {
+        console.error("Menu loading error:", error);
+        alert("Error loading menu");
+        return;
+    }
+
+    const categories = Array.isArray(menuData?.categories?.categories)
+        ? menuData.categories.categories
+        : [];
+
+    const subcategoryMap = new Map();
+
+    categories.forEach(category => {
+
+        const categoryId = normalizeId(category._id);
+        const subcategories = Array.isArray(category.subcategories) ? category.subcategories : [];
+
+        subcategories.forEach(subcategory => {
+
+            const subId = normalizeId(subcategory._id);
+            if (!subId) return;
+
+            subcategoryMap.set(subId, {
+                categoryId,
+                subcategoryId: subId,
+                subcategoryName: String(subcategory.name || "").trim().toLowerCase()
+            });
+        });
+    });
+
+    const menuItems = [];
+
+    Object.entries(menuData.res || {}).forEach(([itemName, item]) => {
+
+        if (!item) return;
+
+        const itemId = normalizeId(item.id ?? item._id);
+        if (!itemId) return;
+
+        const subId = normalizeId(item.sub_id);
+        const categoryInfo = subcategoryMap.get(subId);
+
+        const cleanResId = normalizeId(resId);
+        const restaurantCart = cartData?.results?.cart?.[cleanResId]?.items || {};
+        const cartItem = restaurantCart[itemId];
+        const qty = Number(cartItem?.qty || 0);
+
+        menuItems.push({
+            id: itemId,
+            name: itemName,
+            price: Number(item.price) || 0,
+            file_url: item.file_url,
+            item_qty: Number(item.item_qty ?? 0),
+            qty,
+
+            catId: categoryInfo?.categoryId || "uncategorized",
+            subcatId: categoryInfo?.subcategoryId || subId || "uncategorized"
+        });
+    });
+
+    if (loading) loading.style.display = "none";
+
+    let activeCategoryId = "all";
+    let activeSubcategoryId = "all";
+    let sortMode = "default";
+    let stockOnly = false;
+
+    const wishlist = new Set();
+
+    function findCategory(categoryId) {
+        const id = normalizeId(categoryId);
+        return categories.find(category => normalizeId(category._id) === id);
+    }
+
+    function findSubcategory(category, subcategoryId) {
+        if (!category) return null;
+        const id = normalizeId(subcategoryId);
+        return category.subcategories?.find(sub => normalizeId(sub._id) === id) || null;
+    }
+
+    function thumbnailFor(categoryId) {
+        const match = menuItems.find(item => item.catId === categoryId && item.file_url);
+        return match ? match.file_url : null;
+    }
+
+    function renderCategoryRail() {
+
+        categoryTabs.innerHTML = "";
+
+        const allChip = document.createElement("button");
+        allChip.type = "button";
+        allChip.className = "category-chip active";
+        allChip.dataset.catId = "all";
+        allChip.innerHTML = `
+            <span class="chip-avatar"><i class="fa-solid fa-bowl-food"></i></span>
+            <span>All</span>
+        `;
+        categoryTabs.appendChild(allChip);
+
+        categories.forEach(category => {
+
+            const categoryId = normalizeId(category._id);
+            if (!categoryId) return;
+
+            const name = category.name || "";
+            const thumb = thumbnailFor(categoryId);
+
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "category-chip";
+            chip.dataset.catId = categoryId;
+
+            const avatarInner = thumb
+                ? `<img src="${escapeHtml(thumb)}" alt="">`
+                : escapeHtml((name[0] || "?").toUpperCase());
+
+            chip.innerHTML = `
+                <span class="chip-avatar">${avatarInner}</span>
+                <span>${escapeHtml(name)}</span>
+            `;
+
+            categoryTabs.appendChild(chip);
+        });
+    }
+
+    function renderSubcategoryChips(category) {
+
+        subcategoryTabs.innerHTML = "";
+        activeSubcategoryId = "all";
+
+        const hasSubs = category
+            && Array.isArray(category.subcategories)
+            && category.subcategories.length > 0;
+
+        if (!hasSubs) {
+            subcategoryTabs.classList.remove("show");
+            subDivider.style.display = "none";
+            return;
+        }
+
+        subDivider.style.display = "block";
+        subcategoryTabs.classList.add("show");
+
+        const allButton = document.createElement("button");
+        allButton.type = "button";
+        allButton.className = "subcategory-tab active";
+        allButton.dataset.subcatId = "all";
+        allButton.textContent = "All";
+        subcategoryTabs.appendChild(allButton);
+
+        category.subcategories.forEach(subcategory => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "subcategory-tab";
+            button.dataset.subcatId = normalizeId(subcategory._id);
+            button.textContent = subcategory.name;
+            subcategoryTabs.appendChild(button);
+        });
+    }
+
+    function renderMenu() {
+
+        const searchTerm = searchInput.value.trim().toLowerCase();
+
+        const selectedCategory = activeCategoryId === "all" ? null : findCategory(activeCategoryId);
+        const selectedSubcategory = activeSubcategoryId === "all"
+            ? null
+            : findSubcategory(selectedCategory, activeSubcategoryId);
+
+        let filteredItems = menuItems.filter(item => {
+
+            const matchesSearch = item.name.toLowerCase().includes(searchTerm);
+
+            const matchesCategory = !selectedCategory
+                || item.catId === normalizeId(selectedCategory._id);
+
+            const matchesSubcategory = !selectedSubcategory
+                || item.subcatId === normalizeId(selectedSubcategory._id);
+
+            const matchesStock = !stockOnly || item.item_qty > 0;
+
+            return matchesSearch && matchesCategory && matchesSubcategory && matchesStock;
+        });
+
+        filteredItems = filteredItems.slice();
+
+        if (sortMode === "price-asc") {
+            filteredItems.sort((a, b) => a.price - b.price);
+        } else if (sortMode === "price-desc") {
+            filteredItems.sort((a, b) => b.price - a.price);
+        } else if (sortMode === "name-asc") {
+            filteredItems.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        resultMeta.textContent = `${filteredItems.length} item${filteredItems.length === 1 ? "" : "s"}`;
+
+        if (filteredItems.length === 0) {
+
+            menuContainer.innerHTML = `
+                <div class="empty-menu">
+                    <h3>No items found</h3>
+                    <p>Try a different search term or filter.</p>
+                </div>
+            `;
+
+            return;
+        }
+
+        menuContainer.innerHTML = filteredItems.map((item, index) => {
+
+            const outOfStock = item.item_qty <= 0;
+            const lowStock = !outOfStock && item.item_qty <= 3;
+
+            let controls;
+
+            if (outOfStock) {
+                controls = `
+                    <button class="add-btn" type="button" disabled>
+                        SOLD OUT
+                    </button>
+                `;
+            } else if (item.qty === 0) {
+                controls = `
+                    <button class="add-btn" data-item-id="${escapeHtml(item.id)}" type="button">
+                        ADD
+                    </button>
+                `;
+            } else {
+                controls = `
+                    <div class="quantity-control">
+                        <button class="qty-btn reduce" type="button">-</button>
+                        <span class="item_qty">${escapeHtml(item.qty)}</span>
+                        <button class="qty-btn increase" type="button">+</button>
+                    </div>
+                `;
+            }
+
+            const stockFlag = outOfStock
+                ? `<span class="stock-flag">SOLD OUT</span>`
+                : lowStock
+                    ? `<span class="stock-flag">${escapeHtml(item.item_qty)} left</span>`
+                    : "";
+
+            const isWishlisted = wishlist.has(item.id);
+
+            return `
+                <div
+                    class="menu-item"
+                    id="${escapeHtml(item.id)}"
+                    data-item-id="${escapeHtml(item.id)}"
+                    data-cat-id="${escapeHtml(item.catId)}"
+                    data-subcat-id="${escapeHtml(item.subcatId)}"
+                    available="${escapeHtml(item.item_qty)}"
+                    style="animation-delay:${index * 0.02}s"
+                >
+
+                    <div class="item-media">
+
+                        ${stockFlag}
+
+                        <img src="${escapeHtml(item.file_url)}" alt="${escapeHtml(item.name)}">
+
+                        <button
+                            class="wishlist-btn${isWishlisted ? " active" : ""}"
+                            data-wishlist-id="${escapeHtml(item.id)}"
+                            type="button"
+                            aria-label="Save to wishlist"
+                        >
+                            <i class="fa-solid fa-heart"></i>
+                        </button>
+
+                        <div class="item-controls">
+                            ${controls}
+                        </div>
+
+                    </div>
+
+                    <div class="item-body">
+                        <p class="price">${escapeHtml(item.price)}</p>
+                        <h3>${escapeHtml(item.name)}</h3>
+                        <p class="customisable">Customisable</p>
+                    </div>
+
+                </div>
+            `;
+
+        }).join("");
+    }
+
+    renderCategoryRail();
+    renderMenu();
+
+    categoryTabs.addEventListener("click", event => {
+
+        const chip = event.target.closest(".category-chip");
+        if (!chip) return;
+
+        categoryTabs.querySelectorAll(".category-chip").forEach(el => el.classList.remove("active"));
+        chip.classList.add("active");
+
+        activeCategoryId = chip.dataset.catId;
+
+        if (activeCategoryId === "all") {
+            renderSubcategoryChips(null);
+        } else {
+            renderSubcategoryChips(findCategory(activeCategoryId));
+        }
+
+        renderMenu();
+    });
+
+    subcategoryTabs.addEventListener("click", event => {
+
+        const button = event.target.closest(".subcategory-tab");
+        if (!button) return;
+
+        subcategoryTabs.querySelectorAll(".subcategory-tab").forEach(el => el.classList.remove("active"));
+        button.classList.add("active");
+
+        activeSubcategoryId = button.dataset.subcatId;
+
+        renderMenu();
+    });
+
+    sortSelect.addEventListener("change", () => {
+        sortMode = sortSelect.value;
+        renderMenu();
+    });
+
+    stockToggle.addEventListener("click", () => {
+        stockOnly = !stockOnly;
+        stockToggle.classList.toggle("active", stockOnly);
+        renderMenu();
+    });
+
+    searchInput.addEventListener("input", () => {
+        searchClearBtn.classList.toggle("show", searchInput.value.length > 0);
+        renderMenu();
+    });
+
+    searchClearBtn.addEventListener("click", () => {
+        searchInput.value = "";
+        searchClearBtn.classList.remove("show");
+        searchInput.focus();
+        renderMenu();
+    });
+
+    searchBackBtn.addEventListener("click", () => {
+        goToPage("home");
+    });
+
+    menuContainer.addEventListener("click", event => {
+
+        const wishlistBtn = event.target.closest(".wishlist-btn");
+        if (!wishlistBtn) return;
+
+        const id = wishlistBtn.dataset.wishlistId;
+
+        if (wishlist.has(id)) {
+            wishlist.delete(id);
+            wishlistBtn.classList.remove("active");
+        } else {
+            wishlist.add(id);
+            wishlistBtn.classList.add("active");
+        }
+    });
+
+    let pendingCartItem = null;
+
+    menuContainer.addEventListener("click", async event => {
+
+        const addButton = event.target.closest(".add-btn");
+        if (!addButton || addButton.disabled) return;
+
+        const item = addButton.closest(".menu-item");
+        if (!item) return;
+
+        const itemId = item.dataset.itemId;
+        const itemName = item.querySelector("h3").textContent;
+        const price = item.querySelector(".price").textContent;
+
+        const available = parseInt(item.getAttribute("available"));
+
+        if (!Number.isNaN(available) && available <= 0) {
+            alert("This item is currently out of stock");
+            return;
+        }
+
+        try {
+
+            const response = await fetch("/add_to_cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    resid: resId,
+                    userid: userId,
+                    item: itemName,
+                    ress_name: decodedRestaurant,
+                    qty: 1,
+                    item_id: itemId,
+                    price: parseInt(price),
+                    replace: false
+                })
+            });
+
+            if (response.status === 401) {
+                alert("Unauthorized user. Please log in");
+                window.location.href = "/login/user";
+                return;
+            }
+
+            if (!response.ok) throw new Error("add_to_cart failed");
+
+            const data = await response.json();
+
+            if (data.success) {
+
+                addButton.outerHTML = `
+                    <div class="quantity-control">
+                        <button class="qty-btn reduce" type="button">-</button>
+                        <span class="item_qty">1</span>
+                        <button class="qty-btn increase" type="button">+</button>
+                    </div>
+                `;
+
+                footer.classList.add("show");
+                totalAmount.textContent = data.Total ?? data.total ?? 0;
+
+            } else {
+
+                pendingCartItem = {
+                    resid: resId,
+                    userid: userId,
+                    item: itemName,
+                    ress_name: decodedRestaurant,
+                    qty: 1,
+                    item_id: itemId,
+                    price: parseInt(price)
+                };
+
+                message.textContent = data.message || "Do you want to replace your existing cart?";
+
+                replaceContainer.classList.add("show");
+                overlay.classList.add("show");
+            }
+
+        } catch (error) {
+            console.error("Add cart error:", error);
+            alert("Something went wrong adding this item.");
+        }
+    });
+
+    yesBtn.addEventListener("click", async () => {
+
+        if (!pendingCartItem) return;
+
+        try {
+
+            const response = await fetch("/add_to_cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...pendingCartItem, replace: true })
+            });
+
+            if (response.status === 401) {
+                alert("Unauthorized user. Please log in");
+                window.location.href = "/login/user";
+                return;
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+
+                footer.classList.add("show");
+                totalAmount.textContent = data.Total ?? data.total ?? 0;
+
+                replaceContainer.classList.remove("show");
+                overlay.classList.remove("show");
+
+                const item = document.getElementById(pendingCartItem.item_id);
+
+                if (item) {
+
+                    const addButton = item.querySelector(".add-btn");
+
+                    if (addButton) {
+
+                        addButton.outerHTML = `
+                            <div class="quantity-control">
+                                <button class="qty-btn reduce" type="button">-</button>
+                                <span class="item_qty">1</span>
+                                <button class="qty-btn increase" type="button">+</button>
+                            </div>
+                        `;
+                    }
+                }
+
+            } else {
+                alert(data.message || "Failed to replace cart");
+            }
+
+        } catch (error) {
+            console.error("Replace cart error:", error);
+            alert("Something went wrong.");
+        } finally {
+            pendingCartItem = null;
+        }
+    });
+
+    noBtn.addEventListener("click", () => {
+        replaceContainer.classList.remove("show");
+        overlay.classList.remove("show");
+        pendingCartItem = null;
+    });
+
+    menuContainer.addEventListener("click", event => {
+
+        const item = event.target.closest(".menu-item");
+        if (!item) return;
+
+        const itemId = item.dataset.itemId;
+        const availableRaw = item.getAttribute("available");
+
+        const available = availableRaw !== null && availableRaw !== ""
+            ? parseInt(availableRaw)
+            : Infinity;
+
+        if (event.target.classList.contains("increase")) {
+
+            const qtyEl = item.querySelector(".item_qty");
+            const previousQty = Number(qtyEl.textContent);
+
+            if (previousQty + 1 > available) {
+                alert(`Only ${available} in stock`);
+                return;
+            }
+
+            qtyEl.textContent = previousQty + 1;
+
+            scheduleMenuCartUpdate(itemId, resId, userId, 1,
+                (data) => {
+                    const total = data.total ?? data.Total ?? 0;
+                    if (total > 0) {
+                        footer.classList.add("show");
+                        totalAmount.textContent = total;
+                    }
+                },
+                (errorMessage) => {
+                    qtyEl.textContent = previousQty;
+                    alert(errorMessage);
+                }
+            );
+
+        } else if (event.target.classList.contains("reduce")) {
+
+            const qtyEl = item.querySelector(".item_qty");
+            const previousQty = Number(qtyEl.textContent);
+            const newQty = Math.max(0, previousQty - 1);
+
+            qtyEl.textContent = newQty;
+
+            scheduleMenuCartUpdate(itemId, resId, userId, -1,
+                (data) => {
+
+                    const total = data.total ?? data.Total ?? 0;
+
+                    if (total > 0) {
+                        footer.classList.add("show");
+                        totalAmount.textContent = total;
+                    } else {
+                        footer.classList.remove("show");
+                    }
+
+                    if (data.removed) {
+
+                        const control = item.querySelector(".quantity-control");
+
+                        if (control) {
+                            control.outerHTML = `
+                                <button class="add-btn" data-item-id="${escapeHtml(itemId)}" type="button">
+                                    ADD
+                                </button>
+                            `;
+                        }
+                    }
+                },
+                (errorMessage) => {
+                    qtyEl.textContent = previousQty;
+                    alert(errorMessage);
+                }
+            );
+        }
+    });
+
+    goCartBtn.addEventListener("click", () => {
+        goToPage("cart");
+    });
+}
+
 // Keep the shared header's page-scoped chrome (search bar, category strip)
 // in sync with whichever page is actually showing. The header never gets
 // swapped out by the router, so without this it would stay visible on
-// Orders/Cart/Profile too. Runs for every navigation, not just Home.
+// Orders/Cart/Profile/Menu too. Runs for every navigation, not just Home.
 document.addEventListener("spa:pageload", (e) => {
     document.body.dataset.page = e.detail.page;
 });
 
 // Run on this page's first real load...
 initHomePage();
+initMenuPage();
 
-// ...and re-run every time the SPA router swaps Home back into view
+// ...and re-run every time the SPA router swaps Home / Menu back into view
 document.addEventListener("spa:pageload", (e) => {
     if (e.detail.page === "home") initHomePage();
+    if (e.detail.page === "menu") initMenuPage();
 });

@@ -8,8 +8,9 @@
     <link rel="stylesheet" href="../static/user_navbar.css">
     <link rel="stylesheet" href="../static/cart.css">
     <link rel="stylesheet" href="../static/orders.css">
-    <link rel="stylesheet" href="../static/home.css">
     <link rel="stylesheet" href="../static/profile.css">
+    <link rel="stylesheet" href="../static/menu.css">
+    <link rel="stylesheet" href="../static/home.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -19,7 +20,7 @@
     <!-- data-page defaults to "home" to match the Home nav-item's initial
          "active" state below. home.js updates this on every SPA navigation
          so page-scoped chrome (search bar, category strip) can be hidden via
-         CSS on Orders/Cart/Profile instead of just staying visible forever. -->
+         CSS on Orders/Cart/Profile/Menu instead of just staying visible forever. -->
 
     <!-- ============================================================
          SHARED HEADER — always live in the DOM, never swapped.
@@ -237,9 +238,6 @@
 
             <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
             <section class="restaurant-grid" id="resturants_container">
-                <!-- Skeleton placeholders: pure static markup, no JS needed.
-                     renderRestaurants() replaces this whole container's
-                     innerHTML the instant real data is ready. -->
                 <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
                 <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
                 <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
@@ -419,6 +417,108 @@
                 <button id="placeorder" class="pay-btn">Place Order</button>
             </div>
         </main>
+    </template>
+
+    <!-- ============================================================
+         MENU TEMPLATE — was its own full page (menu.html). Now cloned
+         into #spa-content like everything else, routed via
+         #menu/<res_name>/<address>/<res_id>/<userId>. The shared header
+         above already provides Home/Orders/Cart nav, so this only needs
+         the restaurant strip, search/filter/menu grid, the replace-cart
+         confirmation modal, and the floating "view cart" bar.
+    ============================================================= -->
+    <template id="tpl-menu">
+        <main class="menu-container">
+
+            <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
+
+            <section class="res-strip">
+
+                <nav class="breadcrumbs">
+                    <a href="#home" class="breadcrumb-home">Home</a> / <span id="menuAreaCrumb"></span> / <span id="menuNameCrumb"></span>
+                </nav>
+
+                <div class="res-header">
+                    <div class="res-info">
+                        <h1></h1>
+                        <p class="res-location"></p>
+                    </div>
+                </div>
+
+                <div class="res-delivery-info">
+                    <span>
+                        <i class="fa-solid fa-clock"></i>
+                        25-30 MINS
+                    </span>
+                    <span>
+                        <i class="fa-solid fa-indian-rupee-sign"></i>
+                        ₹350 for two
+                    </span>
+                </div>
+
+            </section>
+
+            <div class="search-bar">
+                <div class="search-shell">
+                    <button class="search-back" id="menuSearchBackBtn" type="button" aria-label="Go back">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="menuSearchInput" placeholder="Search for items" autocomplete="off">
+                    <button class="search-clear" id="menuSearchClearBtn" type="button" aria-label="Clear search">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <nav class="category-rail" id="categoryTabs" role="tablist" aria-label="Food categories"></nav>
+
+            <div class="filter-row" id="filterRow">
+                <select class="filter-select" id="sortSelect" aria-label="Sort items">
+                    <option value="default">Sort: Recommended</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="name-asc">Name: A to Z</option>
+                </select>
+
+                <button class="filter-toggle" id="stockToggle" type="button">
+                    <i class="fa-solid fa-circle-check"></i>
+                    In stock only
+                </button>
+
+                <div class="filter-divider" id="subDivider" style="display:none;"></div>
+
+                <div class="subcategory-tabs" id="subcategoryTabs" role="tablist" aria-label="Food subcategories"></div>
+            </div>
+
+            <p class="result-meta" id="resultMeta"></p>
+
+            <section class="menu-section" id="menu_container"></section>
+
+            <div class="overlay" id="overlayContainer"></div>
+
+            <section id="ReplaceContainer" aria-hidden="true">
+                <span id="message">Error:</span>
+                <div id="controlBtn">
+                    <button id="NO" type="button">NO</button>
+                    <button id="YES" type="button">YES</button>
+                </div>
+            </section>
+
+        </main>
+
+        <footer id="menuFooter">
+            <div id="goToCartContainer">
+                <div id="TotalPrice">
+                    <span>Total</span>
+                    <span id="amount">0</span>
+                </div>
+                <span id="GoCartBtn">
+                    View cart
+                    <i class="fa-solid fa-chevron-right"></i>
+                </span>
+            </div>
+        </footer>
     </template>
 
     <template id="tpl-profile">

@@ -867,6 +867,7 @@ footer::after {
 }
 
 footer.show {
+    bottom: -2px;
     visibility: visible;
     width: min(92vw, 420px) !important;
 }

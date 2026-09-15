@@ -7,7 +7,7 @@
 // home.js about the old map DOM node being "discarded by the
 // router's content swap".
 
-const SPA_PAGES = ["home", "orders", "cart", "profile"];
+const SPA_PAGES = ["home", "orders", "menu","cart", "profile"];
 const spaContent = document.getElementById("spa-content");
 const navLinks = document.querySelectorAll(".nav-item");
 const navIndicator = document.getElementById("navbarIndicator");
