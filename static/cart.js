@@ -240,7 +240,7 @@ async function initCartPage() {
                     </span>
 
                     <span class="item-name">
-                        ${escapeHtml(detail.name)}
+                        ${escapeHtml(detail.name)} x ${escapeHtml(detail.qty)}
                     </span>
 
                     <div class="quantity-control">
@@ -258,6 +258,7 @@ async function initCartPage() {
             return `
                 <div class="cart-restaurant" data-res-id="${res_id}">
                     <div class="cart-restaurant-name">${escapeHtml(res.name || "Store")}</div>
+                    <hr>
                     ${itemsHtml}
                 </div>
             `;
