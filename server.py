@@ -471,6 +471,7 @@ def remove_item():
         return({"success":False})
 
 @app.post("/list_resturants")
+@login_required
 def list_resturantss():
     try:
         data=request.get_json()
@@ -567,7 +568,11 @@ def carts():
     except Exception as e:
         print(e)
         return({"success":False})
-
+@app.post("/user/logout")
+def logout_user():
+    response=jsonify({"success":True})
+    response.delete_cookie("user_token")
+    return response
 @app.get("/menu/<name>/<address>/<res_id>/<user_id>")
 def list_items(name,address,res_id,user_id):
     try:

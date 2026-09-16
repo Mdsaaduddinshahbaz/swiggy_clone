@@ -134,10 +134,15 @@ async function initProfilePage() {
         else window.location.href = `/user/${userId}`;
     });
 
-    addListenerOnceProfile(logoutBtn, "click", () => {
+    addListenerOnceProfile(logoutBtn, "click", async() => {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = "/login/user";
+        // window.location.href = "/login/user";
+        const res=await fetch("/user/logout",{
+            method:"POST"
+        })
+        console.log(res)
+        window.location.replace("/login/user");
     });
 
     try {
