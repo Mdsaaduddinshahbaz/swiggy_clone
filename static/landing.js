@@ -1,23 +1,112 @@
+/* ============================================================
+   PICKIT LANDING PAGE
+============================================================ */
+
+
+/*
+ * USER FLOW
+ *
+ * Existing user:
+ *     /user/<userId>
+ *
+ * New user:
+ *     /login/user
+ *
+ *
+ * SELLER FLOW
+ *
+ * Seller:
+ *     /login/seller
+ *
+ */
+
+
 function selectRole(role) {
-      if (role === 'user') {
-        console.log("role")
-        const userid=localStorage.getItem("userId")
-        if (userid){
-          window.location.href=`/user/${userid}`
+
+    /* ========================================================
+       CUSTOMER
+    ========================================================= */
+
+    if (role === "user") {
+
+        const userId =
+            localStorage.getItem("userId");
+
+
+        /*
+         * Existing customer
+         */
+
+        if (userId) {
+
+            window.location.href =
+                `/user/${userId}`;
+
         }
-        else{
-        window.location.href = "/login/user";  
-        } // change route
-      } else {
-        const res_id=localStorage.getItem("res_id")
-        window.location.href=`/login/seller`
-        // if (res_id){
-        //   window.location.href=`/seller//${res_id}`
-        // }
-        // else{
-        //   window.location.href = "/login/seller";  
-        // } // change route
-        // window.location.href = "/seller"; // change route
-      }
+
+
+        /*
+         * New customer
+         */
+
+        else {
+
+            window.location.href =
+                "/login/user";
+
+        }
+
+        return;
     }
-    
+
+
+
+    /* ========================================================
+       SELLER
+    ========================================================= */
+
+    if (role === "seller") {
+
+        /*
+         * Keep seller login separate from the
+         * customer experience.
+         */
+
+        window.location.href =
+            "/login/seller";
+
+        return;
+    }
+
+}
+
+
+
+/* ============================================================
+   SMALL PAGE ENHANCEMENT
+============================================================ */
+
+
+/*
+ * If the user already has a session, change the navbar
+ * button from "Sign in" to "Open Pickit".
+ */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const userId =
+        localStorage.getItem("userId");
+
+
+    const signInButton =
+        document.querySelector(".signin-button");
+
+
+    if (userId && signInButton) {
+
+        signInButton.textContent =
+            "Open Pickit";
+
+    }
+
+});

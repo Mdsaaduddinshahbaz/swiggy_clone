@@ -1,35 +1,511 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Choose Role</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <meta
+        name="description"
+        content="Pickit — order what you need and pick it up when it's ready."
+    >
+
+    <title>Pickit — Order. Pick up. Go.</title>
+
     <link rel="stylesheet" href="../static/landing.css">
 </head>
 
+
 <body>
 
-  <div class="container">
-    <h1>Who are you?</h1>
+    <!-- =====================================================
+         BACKGROUND
+    ====================================================== -->
 
-    <div class="cards">
+    <div class="background-shape shape-one"></div>
+    <div class="background-shape shape-two"></div>
 
-      <div class="card" onclick="selectRole('user')">
-        <div class="icon">👤</div>
-        <div class="title">User</div>
-        <div class="desc">Browse & buy products</div>
-      </div>
 
-      <div class="card" onclick="selectRole('seller')">
-        <div class="icon">🏪</div>
-        <div class="title">Seller</div>
-        <div class="desc">Sell & manage products</div>
-      </div>
+    <!-- =====================================================
+         NAVIGATION
+    ====================================================== -->
 
-    </div>
-  </div>
+    <header class="navbar">
 
-  <script src="../static/landing.js"></script>
+        <a href="/" class="logo">
+
+            <div class="logo-mark">
+                P
+            </div>
+
+            <span>pickit</span>
+
+        </a>
+
+
+        <div class="nav-actions">
+
+            <button
+                class="partner-link"
+                onclick="selectRole('seller')"
+            >
+                Partner with Pickit
+            </button>
+
+            <button
+                class="signin-button"
+                onclick="selectRole('user')"
+            >
+                Sign in
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =====================================================
+         HERO
+    ====================================================== -->
+
+    <main>
+
+        <section class="hero">
+
+
+            <!-- =================================================
+                 LEFT
+            ================================================== -->
+
+            <div class="hero-content">
+
+
+                <div class="eyebrow">
+
+                    <span class="eyebrow-dot"></span>
+
+                    Simple pickup. Zero waiting.
+
+                </div>
+
+
+
+                <h1>
+
+                    Order online.
+                    <span>Pick it up.</span>
+
+                </h1>
+
+
+
+                <p class="hero-description">
+
+                    Browse what you need, place your order,
+                    and collect it when it's ready.
+                    Pickit makes shopping simple.
+
+                </p>
+
+
+
+                <!-- CTA -->
+
+                <button
+                    class="primary-cta"
+                    onclick="selectRole('user')"
+                >
+
+                    <span>Start shopping</span>
+
+                    <span class="cta-arrow">→</span>
+
+                </button>
+
+
+
+                <!-- SMALL TRUST -->
+
+                <div class="micro-copy">
+
+                    <span class="check">✓</span>
+
+                    Browse freely
+
+                    <span class="separator">•</span>
+
+                    Order ahead
+
+                    <span class="separator">•</span>
+
+                    Pick up when ready
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 RIGHT VISUAL
+            ================================================== -->
+
+            <div class="hero-visual">
+
+
+                <!-- Decorative rings -->
+
+                <div class="ring ring-one"></div>
+
+                <div class="ring ring-two"></div>
+
+
+
+                <!-- Main pickup bag -->
+
+                <div class="pickup-card">
+
+
+                    <div class="card-top">
+
+                        <span class="card-label">
+                            PICKIT ORDER
+                        </span>
+
+                        <span class="order-number">
+                            #PK48291
+                        </span>
+
+                    </div>
+
+
+
+                    <div class="bag-area">
+
+                        <div class="bag-shadow"></div>
+
+                        <div class="shopping-bag">
+
+                            <div class="bag-handle"></div>
+
+                            <div class="bag-logo">
+                                P
+                            </div>
+
+                        </div>
+
+
+                        <!-- Product floating objects -->
+
+                        <div class="product product-one">
+                            <div class="product-cap"></div>
+                            <div class="product-body"></div>
+                        </div>
+
+
+                        <div class="product product-two">
+                            <div class="product-label"></div>
+                        </div>
+
+
+                        <div class="product product-three">
+                            <div class="product-top"></div>
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Order status -->
+
+                    <div class="status-area">
+
+                        <div class="status-header">
+
+                            <span>
+                                Order status
+                            </span>
+
+                            <strong>
+                                Ready
+                            </strong>
+
+                        </div>
+
+
+                        <div class="progress">
+
+                            <div class="progress-line"></div>
+
+                            <div class="progress-step active">
+                                <span>✓</span>
+                                <small>Ordered</small>
+                            </div>
+
+                            <div class="progress-step active">
+                                <span>✓</span>
+                                <small>Preparing</small>
+                            </div>
+
+                            <div class="progress-step current">
+                                <span>●</span>
+                                <small>Ready</small>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Pickup strip -->
+
+                    <div class="pickup-strip">
+
+                        <div class="pickup-icon">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                            >
+
+                                <path
+                                    d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                />
+
+                                <circle
+                                    cx="12"
+                                    cy="10"
+                                    r="2.4"
+                                    stroke="currentColor"
+                                    stroke-width="1.7"
+                                />
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                PICKUP POINT
+                            </span>
+
+                            <strong>
+                                Pickit Warehouse
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Floating READY badge -->
+
+                <div class="ready-badge">
+
+                    <div class="ready-check">
+                        ✓
+                    </div>
+
+                    <div>
+
+                        <span>
+                            YOUR ORDER
+                        </span>
+
+                        <strong>
+                            IS READY
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Floating PICKUP badge -->
+
+                <div class="pickup-badge">
+
+                    <div class="pickup-badge-icon">
+                        ↗
+                    </div>
+
+                    <div>
+
+                        <span>
+                            WHEN YOU'RE READY
+                        </span>
+
+                        <strong>
+                            Just pick it up.
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
+             PROCESS
+        ====================================================== -->
+
+        <section class="process">
+
+
+            <div class="process-title">
+
+                <span>
+                    HOW IT WORKS
+                </span>
+
+                <strong>
+                    Three simple steps.
+                </strong>
+
+            </div>
+
+
+
+            <div class="steps">
+
+
+                <div class="step">
+
+                    <div class="step-number">
+                        01
+                    </div>
+
+                    <div class="step-content">
+
+                        <h3>
+                            Browse
+                        </h3>
+
+                        <p>
+                            Find everything you need
+                            in one place.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="step-line"></div>
+
+
+
+                <div class="step">
+
+                    <div class="step-number">
+                        02
+                    </div>
+
+                    <div class="step-content">
+
+                        <h3>
+                            Order
+                        </h3>
+
+                        <p>
+                            Add your items and
+                            place your order.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="step-line"></div>
+
+
+
+                <div class="step">
+
+                    <div class="step-number">
+                        03
+                    </div>
+
+                    <div class="step-content">
+
+                        <h3>
+                            Pick it up
+                        </h3>
+
+                        <p>
+                            Come by when it's ready
+                            and collect your order.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+
+    <footer>
+
+        <div class="footer-left">
+
+            © 2026 Pickit
+
+        </div>
+
+
+        <div class="footer-brand">
+
+            pickit
+
+        </div>
+
+
+        <button
+            class="footer-partner"
+            onclick="selectRole('seller')"
+        >
+
+            Seller / Admin →
+            
+        </button>
+
+    </footer>
+
+
+    <script src="../static/landing.js"></script>
 
 </body>
+
 </html>
