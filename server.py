@@ -1,2144 +1,706 @@
-from database import fetch_profiles, get_preview_items, save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
-from flask import Flask,request,render_template,redirect,url_for,jsonify,g
-from flask_socketio import SocketIO, emit,join_room
-from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
-from flask_cors import CORS
-from flask_mail import Mail
-from dotenv import load_dotenv
-from itsdangerous import URLSafeTimedSerializer
-from verify import upload_image   
-# from verifpy1 import upload_image
-from functools import wraps
-import jwt
-from datetime import datetime,timedelta
-import requests
+"""
+Flask app: pages, JSON API and Socket.IO.
+
+Production:  gunicorn -w 1 --threads 100 server:app
+Local:       python server.py            (set FLASK_DEBUG=1 for auto-reload)
+Packages:    pip install gunicorn simple-websocket
+
+Route function names are Flask endpoint names. Templates may use them in url_for(),
+so they are kept exactly as before.
+"""
+import logging
 import os
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+
+import jwt
+import requests
+from dotenv import load_dotenv
+from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, url_for
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room
+from itsdangerous import URLSafeTimedSerializer
+from werkzeug.exceptions import HTTPException
 
 load_dotenv(override=True)
-mail_sever_name=os.getenv("Mail_server")
-mail_port=int(os.getenv("Mail_port"))
-mail_use_tls = os.getenv("Mail_use_tls", "False").lower() == "true"
-mail_use_ssl = os.getenv("Mail_use_ssl", "True").lower() == "true"
-mail_username=os.getenv("Mail")
-mail_password=os.getenv("Mail_password")
-secret_key=os.getenv("Mail_secret_key")
-brevo_api=os.getenv("brevo_api_email")
-app=Flask(__name__)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
+                    format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("server")
+
+from database import (  # noqa: E402  (logging must be set up first)
+    AlreadySetUp, add_resturant_items, add_resturants, add_subcategory, check_existing_owner,
+    check_existing_user, create_new_user, fetch_address, fetch_profiles, get_item_for_cart,
+    get_orders, get_preview_items, get_seller_analytics, get_seller_orders, list_resturant_items,
+    list_resturants, remove_resturant_item, resturant_stats, return_res_analytics, save_address,
+    save_category, set_verified, store_orders, update_order_status_seller, update_order_status_user,
+    update_profiles, update_resturant_item, verify_order,
+)
+from redis_db import REDIS_URL, acquire_lock, add_cart, get_cart, release_lock, update_cart_qty  # noqa: E402
+from validators import (  # noqa: E402
+    validate_add_to_cart, validate_address, validate_category, validate_credentials, validate_item_form,
+    validate_restaurant_form, validate_signup, validate_subcategory, validate_update_item,
+)
+from verify import upload_image  # noqa: E402
+
+SECRET_KEY = os.environ["Mail_secret_key"]
+BREVO_API_KEY = os.getenv("brevo_api_email")
+MAIL_SENDER = os.getenv("MAIL_SENDER", "dummy.mail.saad@gmail.com")
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "0") == "1"      # set to 1 once the site is on HTTPS
+
+app = Flask(__name__)
+app.config["SECRET_KEY"] = SECRET_KEY
 CORS(app)
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
-def rate_limit_key():
-    if hasattr(g, "user_id"):
-        return f"user:{g.user_id}"
-    if hasattr(g, "res_id"):
-        return f"res:{g.res_id}"
-    return get_remote_address()
-
-# limiter = Limiter(
-#     app=app,
-#     key_func=rate_limit_key,
-#     storage_uri=f"redis://{os.getenv('Redis_uri')}:{os.getenv('Redis_port')}",
-#     default_limits=["200 per minute"]
-# )
-redis_user = os.getenv("Redis_USERNAME", "")
-redis_pass = os.getenv("Redis_PASSWORD", "")
-redis_host = os.getenv("Redis_uri")
-redis_port = os.getenv("Redis_port")
-
-if redis_user or redis_pass:
-    storage_uri = f"redis://{redis_user}:{redis_pass}@{redis_host}:{redis_port}"
-else:
-    storage_uri = f"redis://{redis_host}:{redis_port}"
-print(storage_uri)
-# limiter = Limiter(app=app, key_func=rate_limit_key, storage_uri=storage_uri, default_limits=["200 per minute"])
-app.config["MAIL_SERVER"] = mail_sever_name
-app.config["MAIL_PORT"] = mail_port
-app.config["MAIL_USE_TLS"] = mail_use_tls
-app.config["MAIL_USE_SSL"]=mail_use_ssl
-app.config["MAIL_USERNAME"] = mail_username
-app.config["MAIL_PASSWORD"] = mail_password
-app.config["SECRET_KEY"]=secret_key
-
-print("SERVER:", mail_sever_name, flush=True)
-print("PORT:", mail_port, flush=True)
-print("TLS:", mail_use_tls, flush=True)
-print("SSL:", mail_use_ssl, flush=True)
-print("USER:", mail_username, flush=True)
-print("PASS EXISTS:", bool(mail_password), flush=True)
-
-brevo_api=os.getenv("brevo_api_email")
-socketio = SocketIO(app, cors_allowed_origins="*")
-# mail=Mail(app)
+# "threading" is the right mode for pymongo/redis, which block while they wait for the network.
+# The Redis message queue is only needed if more than one process sends Socket.IO events.
+socketio = SocketIO(app, cors_allowed_origins="*",
+                    message_queue=None if os.getenv("SOCKETIO_MESSAGE_QUEUE") == "off" else REDIS_URL,
+                    async_mode=os.getenv("SOCKETIO_ASYNC_MODE", "threading"))
+serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 
-from itsdangerous import URLSafeTimedSerializer
+# ======================================================================= helpers
 
-serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
-def login_required(f):
-    @wraps(f)
+def _body():
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def _json_error(message, status, clear_cookies=()):
+    resp = jsonify({"success": False, "message": message})
+    resp.status_code = status
+    for name in clear_cookies:
+        resp.delete_cookie(name)
+    return resp
+
+
+def _set_auth_cookie(resp, name, claims, ttl):
+    token = jwt.encode({**claims, "exp": datetime.now(timezone.utc) + ttl}, SECRET_KEY, algorithm="HS256")
+    resp.set_cookie(name, token, httponly=True, secure=COOKIE_SECURE, samesite="Lax",
+                    max_age=int(ttl.total_seconds()))
+
+
+def _decode(token):
+    return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+
+
+# Pages that send a logged-out visitor to a login page instead of returning a JSON error.
+LOGIN_PAGES = {"home": "user", "sellerTemplate": "seller"}
+
+
+def login_required(fn=None, *, role=None):
+    """Checks the user_token / seller_token cookie and fills g.
+    role=None accepts both; role="user" or role="seller" accepts only that one."""
+    if fn is None:
+        return lambda f: login_required(f, role=role)
+
+    @wraps(fn)
     def wrapper(*args, **kwargs):
-        # token = request.cookies.get("token")
-        token = (
-            request.cookies.get("user_token") or
-            request.cookies.get("seller_token")
-        )
+        names = ("seller_token", "user_token") if role == "seller" else ("user_token", "seller_token")
+        token = next((request.cookies[n] for n in names if request.cookies.get(n)), None)
         if not token:
-            print(request.endpoint)
-            if(request.endpoint=="home"):
-                return redirect(url_for("login", role="seller"))
-            elif(request.endpoint=="sellerTemplate"):
-                return redirect(url_for("login", role="seller"))
-            else:
-            # return redirect(url_for('renderLanding'))
-                return jsonify({"success": False,"message":"Token is missing or unauthorized access"}), 401
-
+            if request.endpoint in LOGIN_PAGES:
+                return redirect(url_for("login", role=LOGIN_PAGES[request.endpoint]))
+            return _json_error("Token is missing or unauthorized access", 401)
         try:
-            payload = jwt.decode(
-                token,
-                app.config["SECRET_KEY"],
-                algorithms=["HS256"]
-            )
-            print(payload)
-            g.type = payload["type"]
-            if(g.type == "user"):
-                g.user_id = payload["user_id"]
-            elif(g.type == "seller"):
-                g.res_id=payload["res_id"]
-                g.username=payload["username"]
-
+            payload = _decode(token)
         except jwt.InvalidTokenError:
-            # response=jsonify({"success": False}), 401
-            # return jsonify({"success": False}), 401
-            # response=jsonify({"success":True,"res_id":id}),401
-            response=jsonify({"success":True,"msg":"invalid Token"}),401
-            response.delete_cookie("user_token")
-            response.delete_cookie("seller_token")
-            return response
+            return _json_error("Invalid token", 401, ("user_token", "seller_token"))
 
-        return f(*args, **kwargs)
-
-    return wrapper
-def auth_seller_res(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        # token = request.cookies.get("token")
-        token = (
-            request.cookies.get("seller_res_token")
-        )
-        if not token:
-            return jsonify({"success": False}), 401
-
-        try:
-            payload = jwt.decode(
-                token,
-                app.config["SECRET_KEY"],
-                algorithms=["HS256"]
-            )
-            print(payload)
-            g.type = payload["type"]
-            g.owner_id = payload["owner_id"]
-            g.username = payload["username"]
-
-        except jwt.InvalidTokenError:
-            # response=jsonify({"success": False}), 401
-            # return jsonify({"success": False}), 401
-            # response=jsonify({"success":True,"res_id":id}),401
-            response=jsonify({"success":True,"msg":"invalid Token"}),401
-            response.delete_cookie("seller_res_token")
-            return response
-
-        return f(*args, **kwargs)
-
-    return wrapper
-def generate_verification_token(email,role):
-    return serializer.dumps({
-            "email": email,
-            "role": role
-        }, salt="email-verification")
-
-def send_verification_email(user_email,role):
-    print("in send varification")
-    print("generating token")
-    token = generate_verification_token(user_email,role)
-    print("verify url")
-    verify_url = url_for(
-        "verify_email",
-        token=token,
-        _external=True
-    )
-    print("msg")
-    # msg = Message(
-    #     subject="Verify Your Email",
-    #     sender=app.config["MAIL_USERNAME"],
-    #     recipients=[user_email]
-    # )
-
-    response = requests.post(
-        "https://api.brevo.com/v3/smtp/email",
-        headers={
-            "accept": "application/json",
-            "api-key": brevo_api,
-            "content-type": "application/json"
-        },
-        json={
-            "sender": {"email": "dummy.mail.saad@gmail.com"},
-            "to": [{"email": user_email}],
-            "subject": "Verify Email",
-            "htmlContent": f"""
-            <p>Click below to verify:</p>
-            <a href="{verify_url}">{verify_url}</a>
-            """
-        }
-    )
-    print(response.status_code,flush=True)
-    print(response.text,flush=True)
-    if(response.status_code==201):
-        print("done sending email")
-        return 1
-    else:
-        return 0
-
-
-# print("Email sent")
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return jsonify({
-        "success": False,
-        "message": "Too many requests, please slow down"
-    }), 429
-@app.route("/", methods=["GET", "POST"])
-def land():
-    return redirect(url_for('renderLanding'))
-import os
-from flask import send_from_directory
-
-@app.route("/.well-known/assetlinks.json", methods=["GET"])
-def serve_asset_links_file():
-    # Assumes your assetlinks.json file is inside your 'static' folder
-    static_file_dir = os.path.join(app.root_path, 'static')
-    return send_from_directory(static_file_dir, 'assetlinks.json', mimetype='application/json')
-@app.route("/user/<userid>", methods=["GET", "POST"])
-@login_required
-##@limiter.limit("10 per minute")
-def home(userid):
-    try:
-        return render_template('home.html',page="home")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.route("/logout/seller", methods=["GET"])
-def logout_seller():
-    response = jsonify({"success": True, "message": "Logged out successfully"})
-    response.delete_cookie("seller_token")
-    return response
-# @app.post("/add_res_items")
-# def add_itemss():
-#     try:
-#         data=request.get_json()
-#         res_id=data["res_id"]
-#         itm_name=data["itm_name"]
-#         itm_qty=data["itm_qty"]
-#         price=data["price"]
-#         sub_id=data["sub_id"]
-#         desc=data["description"]
-#         unit=data["unit"]
-#         lowat=data["lowAt"]
-#         available=data["available"]
-
-#         # print(res_id,itm)
-#         res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
-#         return ({"success":True,"id":res})
-#     except Exception as e:
-        # print(e)
-#         return({"success":False})
-@app.post("/add_res_items")
-@login_required
-#@limiter.limit("10 per minute")
-def add_itemss():
-    try:
-        # itm_name = request.form.get("itm_name")
-        # # res_id = request.form.get("res_id")
-        # res_id=g.res_id
-        # itm_qty = request.form.get("itm_qty")
-        # price = int(request.form.get("price"))
-        # sub_id = request.form.get("sub_id")
-        # desc = request.form.get("desc")
-        # unit = request.form.get("unit")
-        # lowat = request.form.get("lowat")
-        # available=request.form.get("available")
-        # photo = request.files.get("photo")
-        if g.type != "seller":
-            return jsonify({
-                "success": False,
-                "message": "Unauthorized"
-            }), 403
-        data,error=validate_item_form()
-        if error:
-            return error
-        if data["photo"]:
-            res_id=g.res_id
-            file_id = upload_image(data["photo"])
-            print(file_id)
-            res = add_resturant_items(
-                res_id,
-                data["itm_name"],
-                data["itm_qty"],
-                data["price"],
-                data["sub_id"],
-                data["desc"],
-                data["unit"],
-                data["lowat"],
-                data["available"],
-                file_id=file_id
-            )
-            print("res after adding item with photo:", res)
-        # if (photo):
-        #     file_id=upload_image(photo)
-        #     print(file_id)
-        #     res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available,file_id)
-            # return ({"success":True,"id":res["id"],"img_url":res["url"]})
+        g.type = payload.get("type")
+        if g.type == "user" and payload.get("user_id"):
+            g.user_id = payload["user_id"]
+        elif g.type == "seller" and payload.get("res_id"):
+            g.res_id = payload["res_id"]
+            g.username = payload.get("username")
         else:
-            res_id=g.res_id
-            res=add_resturant_items(
-                res_id,
-                data["itm_name"],
-                data["itm_qty"],
-                data["price"],
-                data["sub_id"],
-                data["desc"],
-                data["unit"],
-                data["lowat"],
-                data["available"]
-            )
-        return ({"success":True,"id":res["id"],"img_url":res["url"]})
-        # print(res_id,itm)
-        # res=add_resturant_items(res_id,itm_name,itm_qty,price,sub_id,desc,unit,lowat,available)
-        # return ({"success":True,"id":res})
-    except Exception as e:
-        print("add itemss")
-        print(e) 
-        return({"success":False})
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
-def allowed_file(filename):
-    return (
-        "." in filename and
-        filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-    )
-@app.post("/add_resturant")
-@auth_seller_res
-#@limiter.limit("5 per minute")
-def add_resturant():
-    try:
+            return _json_error("Invalid token", 401, ("user_token", "seller_token"))
+
+        if role and g.type != role:
+            return _json_error("Unauthorized", 403)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+def owner_setup_required(fn):
+    """For owners who signed up but haven't created their restaurant yet (seller_res_token cookie)."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
         token = request.cookies.get("seller_res_token")
         if not token:
-            return jsonify({"success": False, "message": "Token is required"}), 400
-        payload = jwt.decode(
-                token,
-                app.config["SECRET_KEY"],
-                algorithms=["HS256"]
-            )
-        print(payload)
-        owner_id = payload["owner_id"]
-        name = request.form.get("name")
-        shop_type = request.form.get("type")
-        address = request.form.get("address")
-        phone = request.form.get("phone")
-        lat = request.form.get("lat")
-        lng = request.form.get("lng")
-        
-        # owner_id = request.form.get("owner_id")
-        photo = request.files.get("photo")
-        # Required field validation
-        if not owner_id:
-            return jsonify({"success": False, "message": "Owner ID is required"}), 400
-
-        if not name:
-            return jsonify({"success": False, "message": "Restaurant name is required"}), 400
-        
-        if not shop_type:
-            return jsonify({"success": False, "message": "Restaurant type is required"}), 400
-        
-        if not address:
-            return jsonify({"success": False, "message": "Address is required"}), 400
-
-        if not phone:
-            return jsonify({"success": False, "message": "Phone number is required"}), 400
-
-        if not lat or not lng:
-            return jsonify({"success": False, "message": "Latitude and Longitude are required"}), 400
+            return jsonify({"success": False}), 401
         try:
-            latt = round(float(lat),4)
-            long = round(float(lng),4)
-            if not (-90 <= latt <= 90):
-                return jsonify({"success": False, "message": "Invalid latitude"}), 400
+            payload = _decode(token)
+            g.owner_id = payload["owner_id"]
+            g.username = payload.get("username")
+        except (jwt.InvalidTokenError, KeyError):
+            return _json_error("Invalid token", 401, ("seller_res_token",))
+        return fn(*args, **kwargs)
+    return wrapper
 
-            if not (-180 <= long <= 180):
-                return jsonify({"success": False, "message": "Invalid longitude"}), 400
-        except ValueError:
-            return jsonify({"success": False, "message": "Latitude and Longitude must be numbers"}), 400
 
-        # Phone validation
-        if not phone.isdigit() or len(phone) != 10:
-            return jsonify({"success": False, "message": "Invalid phone number"}), 400
-        if (photo):
-            if photo.filename == "":
-                return jsonify({"success": False, "message": "Invalid photo"}), 400
+def socket_auth(role):
+    """Socket.IO version of login_required. Reads the cookie sent when the socket connected."""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            token = request.cookies.get("user_token" if role == "user" else "seller_token")
+            try:
+                payload = _decode(token) if token else {}
+            except jwt.InvalidTokenError:
+                payload = {}
+            if payload.get("type") != role:
+                return {"success": False, "message": "Unauthorized"}
+            g.user_id = payload.get("user_id")
+            g.res_id = payload.get("res_id")
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
-            if not allowed_file(photo.filename):
-                return jsonify({
-                    "success": False,
-                    "message": "Only png, jpg, jpeg and webp files are allowed"
-                }), 400
-            file_id=upload_image(photo)
-            print(file_id)
-            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt,file_id)
-            # return ({"success":True,"res_id":id})
-            response=jsonify({"success":True,"res_id":id})
-            response.delete_cookie("seller_res_token")
-            # return response
-            res_id=id
-            res_name=name
-            token = jwt.encode(
-                {
-                    "type":"seller",
-                    "res_id": str(res_id),
-                    "res_name":res_name,
-                    "username":g.username,
-                    "exp": datetime.utcnow() + timedelta(days=7)
-                },
-                app.config["SECRET_KEY"],
-                algorithm="HS256"
-            )
-            # response=jsonify({"success":True,"res_id":res_id,"res_name":res_name,"is_setup":is_setup})
-            # response.delete_cookie("user_token")
-            response.set_cookie(
-                "seller_token",
-                token,
-                httponly=True,
-                secure=False,      # True in production with HTTPS
-                samesite="Lax",
-                max_age=7 * 24 * 60 * 60
-            )
-            return response
-        else:
-            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt)
-            response=jsonify({"success":True,"res_id":id})
-            response.delete_cookie("seller_res_token")
-            # return response
-            res_id=id
-            res_name=name
-            token = jwt.encode(
-                {
-                    "type":"seller",
-                    "res_id": str(res_id),
-                    "res_name":res_name,
-                    "username":g.username,
-                    "exp": datetime.utcnow() + timedelta(days=7)
-                },
-                app.config["SECRET_KEY"],
-                algorithm="HS256"
-            )
-            # response=jsonify({"success":True,"res_id":res_id,"res_name":res_name,"is_setup":is_setup})
-            # response.delete_cookie("user_token")
-            response.set_cookie(
-                "seller_token",
-                token,
-                httponly=True,
-                secure=False,      # True in production with HTTPS
-                samesite="Lax",
-                max_age=7 * 24 * 60 * 60
-            )
-            return response
-    except Exception as e:
-        print(e)
-        return jsonify({
-    "success": False,
-    "message": "Internal server error"
-}), 500
-@app.post("/remove_items")
-@login_required
-#@limiter.limit("30 per minute")
-def remove_item():
-    try:
-        res_id=g.res_id
-        data=request.get_json()
-        item_id=data["item_id"]
-        remove_itemss(item_id,res_id)
-        return({"success":True})
-    except Exception as e:
-        print(e)
-        return({"success":False})
 
-@app.post("/list_resturants")
-@login_required
-def list_resturantss():
+def send_verification_email(email, role):
+    token = serializer.dumps({"email": email, "role": role}, salt="email-verification")
+    verify_url = url_for("verify_email", token=token, _external=True)
     try:
-        data=request.get_json()
-        latt=data["latt"]
-        long=data["long"]
-        dist=data["dist"]
-        dist=int(dist)
-        res=list_resturants(long,latt,dist)
-        return ({"success":True,"results":res})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.route("/preview_items", methods=["POST"])
-def preview_items():
-    data = request.json or {}
-    res_ids = data.get("res_ids", [])
-    if not res_ids:
-        return jsonify({"success": False, "message": "res_ids required"}), 400
-    items = get_preview_items(res_ids)
-    return jsonify({"success": True, "items": items})
-@app.post("/list_items")
+        resp = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"accept": "application/json", "api-key": BREVO_API_KEY, "content-type": "application/json"},
+            json={
+                "sender": {"email": MAIL_SENDER},
+                "to": [{"email": email}],
+                "subject": "Verify Email",
+                "htmlContent": f'<p>Click below to verify:</p><a href="{verify_url}">{verify_url}</a>',
+            },
+            timeout=10,
+        )
+    except requests.RequestException:
+        log.exception("verification email to %s failed", email)
+        return False
+    if resp.status_code != 201:
+        log.error("Brevo answered %s: %s", resp.status_code, resp.text[:300])
+        return False
+    return True
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(e):
+    print(e)
+    if isinstance(e, HTTPException):
+        return e
+    log.exception("unhandled error on %s %s", request.method, request.path)
+    return jsonify({"success": False, "message": "Internal server error"}), 500
+
+
+# ========================================================================= pages
+
+@app.route("/", methods=["GET", "POST"])
+def land():
+    return redirect(url_for("renderLanding"))
+
+
+@app.get("/landing")
+def renderLanding():
+    return render_template("landing.html")
+
+
+@app.get("/.well-known/assetlinks.json")
+def serve_asset_links_file():
+    return send_from_directory(os.path.join(app.root_path, "static"), "assetlinks.json",
+                               mimetype="application/json")
+
+
+@app.route("/login/<role>")
+def login(role):
+    return render_template("auth.html")
+
+
+@app.route("/signup/<role>")
+def signup(role):
+    return render_template("signup.html")
+
+
+@app.route("/user/<userid>", methods=["GET", "POST"])
 @login_required
-def list_item():
-    data=request.get_json()
-    types=g.type
-    if(types=="seller"):
-        res_id=g.res_id
-    else:
-        res_id=data["res_id"]
-    res=list_resturant_items(res_id,types)
-    if(types=="seller"):
-        return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
-    else:
-        return ({"success":True,"res":res["item_name"],"categories":res["categories"]})
-    # try:
-    # except Exception as e:
-    #     print(e)
-    #     return({"success":False})
-@app.post("/update_item_details")
-@login_required
-#@limiter.limit("20 per minute")
-def update_items():
-    try:
-        res_id=g.res_id
-        data, error = validate_update_item()
-        if error:
-            print("validation error:", error)
-            return error
-        if(data["photo"]):
-            file_id = upload_image(data["photo"])
-            print(file_id)
-            res = update_resturant_item(
-                data["item_id"],
-                data["name"],
-                data["price"],
-                data["unit"],
-                data["lowAt"],
-                data["desc"],
-                data["subId"],
-                data["stock"],
-                data["available"],
-                res_id,
-                file_id=file_id
-            )
-        else:
-            res = update_resturant_item(
-                data["item_id"],
-                data["name"],
-                data["price"],
-                data["unit"],
-                data["lowAt"],
-                data["desc"],
-                data["subId"],
-                data["stock"],
-                data["available"],
-                res_id
-            ) 
-        if(res["success"]):
-            return ({"success":True})
-        else:
-            return ({"success":False,"message":res["message"]})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/add_item_carts")
-def carts():
-    try:
-        data=request.get_json()
-        itm_name=data["itm_name"]
-        itm_id=data["itm_id"]
-        res_id=data["res_id"]
-        add_customer_items(itm_name,res_id,itm_id)
-        return({"success":True})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/user/logout")
-def logout_user():
-    response=jsonify({"success":True})
-    response.delete_cookie("user_token")
-    return response
+def home(userid):
+    return render_template("home.html", page="home")
+
+
 @app.get("/menu/<name>/<address>/<res_id>/<user_id>")
-def list_items(name,address,res_id,user_id):
-    try:
-        # data=request.get_json()
-        # res_id=data["res_id"]
-        # res=list_resturant_items(res_id)
-        # return ({"success":True,"res":res})
-        return render_template("menu.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.get("/menu/sel/<id>")
-def s_me(id):
-    print("running s_me")
-    try:
-        return render_template("menu_seller.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
+def list_items(name, address, res_id, user_id):
+    return render_template("menu.html")
+
+
 @app.get("/cart/<userid>")
 def cartss(userid):
-    try:
-        return render_template("cart.html",page="cart")
-    except Exception as e:
-        return({"success":False})
-@app.post("/get_cart_items")
-@login_required
-def list_cart_items():
-    try:
-        print("in get cart",g.__dict__)
-        data=request.get_json()
-        # userid=data["userid"]
-        userid=g.user_id
-        res=get_cart(userid)
-        return ({"success":True,"results":res})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-# @app.post("/add_to_cart")
-# @login_required
-# def addToCart():
-#     try:
-#         print("in addTOCart")
-#         print("userid in add to cart",g.__dict__)
-#         data, error = validate_add_to_cart()
-#         if error:
-#             return error
-#         userid = g.user_id
-#         # response = get_resturantItem_price(data["resid"], data["item_id"])
-#         # if(response["success"]):
-#         #     price=response["price"]
-#         #     available_qty=response["available_qty"]
-#         price=data["price"]
-#         available_qty=10
-#         # print(response)
-#         try:
-#             replace =data["replace"]
-#             print("in replace",replace)
-#         except Exception as e:
-#             print(e)
-#             replace=False
-#         res = add_cart(
-#             data["resid"],
-#             userid,
-#             data["item"],
-#             data["ress_name"],
-#             data["item_id"],
-#             data["qty"],
-#             # data["price"]
-#             price,
-#             available_qty,
-#             replace
-#         )
-
-#         if(res["success"]):
-#             return({"success":True,"Total":res["total"]})
-#         return jsonify({"success": False,"message": res.get("message", "Unable to add item to cart")}), 400
-#     except Exception as e:
-#         print(e)
-#         return({"success":False ,"error":str(e)})
+    return render_template("cart.html", page="cart")
 
 
-@app.post("/update_cart")
-@login_required
-#@limiter.limit("120 per minute")
-def updateCart():
-    try:
-        data = request.get_json(force=True) or {}
-        item_id = data.get("item_id")
-        qty = data.get("qty")
-
-        if item_id is None or qty is None:
-            return jsonify({"success": False, "message": "item_id and qty are required"}), 400
-
-        try:
-            qty = int(qty)
-        except (TypeError, ValueError):
-            return jsonify({"success": False, "message": "qty must be an integer"}), 400
-
-        result = update_cart_qty(g.user_id, item_id, qty)
-
-        if result["success"]:
-            return jsonify({
-                "success": True,
-                "total": result["total"],
-                "removed": result.get("removed", False)
-            })
-        return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
-
-    except Exception as e:
-        print("update_cart error:", e)
-        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
-
-
-@app.post("/add_to_cart")
-#@limiter.limit("30 per minute")
-@login_required
-def addToCart():
-    try:
-        data, error = validate_add_to_cart()
-        if error:
-            return error
-
-        userid = g.user_id
-
-        # TODO: re-enable server-side price/stock lookup instead of trusting the client.
-        # response = get_resturantItem_price(data["resid"], data["item_id"])
-        # price, available_qty = response["price"], response["available_qty"]
-        price = data["price"]
-        available_qty = 10000
-
-        replace = data.get("replace", False)
-
-        res = add_cart(
-            data["resid"],
-            userid,
-            data["item"],
-            data["ress_name"],
-            data["item_id"],
-            data["qty"],
-            price,
-            available_qty,
-            replace
-        )
-        print("add_cart result:", res)
-        if res["success"]:
-            return jsonify({"success": True, "Total": res["total"]})
-        return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
-
-    except Exception as e:
-        print("add_to_cart error:", e)
-        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
-@app.get("/seller/menu/<name>/<seller_id>")
-def seller_page(name,seller_id):
-    try:
-        return render_template("menu_seller.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/store_orders")
-#@limiter.limit("5 per minute")
-@login_required
-def store_order():
-    user_id = g.user_id
-    lock_key = f"lock:checkout:{user_id}"
-    token = acquire_lock(lock_key, ttl_seconds=15)
-
-    if not token:
-        return jsonify({
-            "success": False,
-            "message": "Your order is already being processed"
-        }), 409
-    try:
-        # data=request.get_json()
-        user_id=g.user_id
-        data=request.get_json(force=True) or {}
-        pickup_time=data.get("pickup_time")
-        print(pickup_time)
-        resids=store_orders(user_id,pickup_time)
-        print("resids in server",resids)
-        if(resids==404):
-            return({"success":False})
-        if resids is False:
-            return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
-        for resid in resids:
-            socketio.emit("new_order", {"msg": "refresh"}, room=resid)
-        return ({"success":True})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-    finally:
-        release_lock(lock_key, token)
 @app.get("/orders/<userid>")
 def renderOrders(userid):
-    try:
-        return render_template("orders.html",page="orders")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/get_orders/<userid>")
-@login_required
-def getOrders(userid):
-    try:
-        userid=g.user_id
-        orders=get_orders(userid)
-        print("oorders in server",orders)
-        return({"success":True,"orders":orders})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.route("/user/fetch_profile", methods=["POST"])
-@login_required
-def fetch_profile():
-    try:
-        user_id = g.user_id
-        profile = fetch_profiles(user_id)
-        if profile is None:
-            return jsonify({"success": False, "message": "Profile not found"}), 404
-        return jsonify({"success": True, "profile": profile["profile"]})
-    except Exception as e:
-        print(e)
-        return jsonify({"success": False, "message": "Internal server error"}), 500
-@app.route("/user/update_profile", methods=["POST"])
-@login_required
-def update_profile():
-    try:
-        user_id = g.user_id
-        data = request.get_json(force=True) or {}
-        name = data.get("name")
-        phone = data.get("phone")
-        result = update_profiles(user_id, name, phone)
-        if not result:
-            return jsonify({"success": False, "message": "Failed to update profile"}), 500
-        return jsonify({"success": True, "message": "Profile updated successfully"})
-    except Exception as e:
-        print(e)
-        return jsonify({"success": False, "message": "Internal server error"}), 500
-@app.route("/seller/orders",methods=["POST","GET"])
-@login_required
-def getsellerOrders():
-    try:
-        data=request.get_json()
-        # res_id=data["res_id"]
-        if g.type != "seller":
-            return jsonify({
-                "success": False,
-                "message": "Unauthorized"
-            }), 403
-        res_id=g.res_id
-        print(res_id)
-        orders=get_seller_ordes(res_id)
-        print("orders in server",orders)
-        return({"success":True,"orders":orders})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-# @app.post("/seller_orders")
-# def store_seller_orde():
-#     try:
-#         data=request.get_json()
-#         res_id=data["res_id"]
-#         items=data["items"]
-#         user_id=data["user_id"]
-#         store_seller_orders(res_id,items,user_id)
-#         return({"success":True})
-#     except Exception as e:
-        print(e)
-#         return({"success":False})
+    return render_template("orders.html", page="orders")
+
+
+@app.get("/menu/sel/<id>")
+def s_me(id):
+    return render_template("menu_seller.html")
+
+
+@app.get("/seller/menu/<name>/<seller_id>")
+def seller_page(name, seller_id):
+    return render_template("menu_seller.html")
+
+
 @app.get("/seller/orders/<res_name>/<res_id>")
-def renderSellerOrders(res_name,res_id):
-    try:
-        return render_template("seller_orders.html",page="orders")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@socketio.on('join_seller_room')
-@login_required
-def handle_join(data):
-    try:
-        # seller_id = data['seller_id']
-        seller_id=g.res_id
-        join_room(seller_id)
-    except Exception as e:
-        print(e)
-        return({"success":False})
-def notify_new_order(seller_id, order):
-    try:
-        socketio.emit('new_order', order, room=seller_id)
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@socketio.on('join_user_room')
-@login_required
-def handle_user_join(data):
-    try:
-        # user_id = data['user_id']
-        user_id=g.user_id
-        join_room(user_id)
-        print(f"User joined: {user_id}")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@socketio.on("order_completed")
-@login_required
-def handle_order_completed(data):
-    try:
-        print("Order completed:", data)
+def renderSellerOrders(res_name, res_id):
+    return render_template("seller_orders.html", page="orders")
 
-        token_no = data.get("token_no")
-        # user_id=data.get("userid")
-        order_id = data.get("order_id")
-        # res_id=data.get("res_id")
-        res_id=g.res_id
-        user_id=verify_order(res_id,order_id)
-        if(user_id==None):
-            return {"success": False, "message": "Unauthorized order"}
-        status=data.get("status")
 
-        # send update to USER
-        socketio.emit(
-            "order_status_updated",
-            {
-                "order_id": order_id,
-                "token_no":token_no,
-                "res_id":res_id,
-                "status": status
-            },
-            room=user_id
-        )
-        return({"success":True})
-    except Exception as e:
-        print(e)
-        return({"success":False,"message":str(e)})
-import re
+@app.get("/seller/analytics/<res_id>")
+def render_analytics_template(res_id):
+    return render_template("analytics.html")
 
-EMAIL_REGEX = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
-@app.post("/validate_user")
-#@limiter.limit("10 per minute")
-def validate():
-    try:
-        data=request.get_json()
-        if not data:
-            return jsonify({
-                "success": False,
-                "message": "Request body is required"
-            }), 400
 
-        credentials, error = validate_credentials(request.get_json())
+@app.get("/seller/resturantSetup/<seller_id>")
+@owner_setup_required
+def renderSetup(seller_id):
+    return render_template("resturant_setup.html")
 
-        if error:
-            return error
 
-        res = check_existing_user(
-            credentials["email"],
-            credentials["password"]
-        )
-        print("res",res)
-        if(res["success"]==False): return jsonify({
-                "success": False,
-                "message": "Invalid email or password"
-            }), 401
-        elif(res["success"]==True):
-            if(res["is_verified"]): 
-                userid=str(res["userid"])
-                username=res["username"]
-                print(userid)
-                token = jwt.encode(
-                    {   
-                        "type":"user",
-                        "user_id": str(userid),
-                        "username":username,
-                        "exp": datetime.utcnow() + timedelta(days=7)
-                    },
-                    app.config["SECRET_KEY"],
-                    algorithm="HS256"
-                )
-                response=jsonify({"success":True,"user_id":userid,"username":username})
-                response.delete_cookie("seller_token")
-                response.set_cookie(
-                    "user_token",
-                    token,
-                    httponly=True,
-                    secure=False,      # True in production with HTTPS
-                    samesite="Lax",
-                    max_age=7 * 24 * 60 * 60
-                )
-                return response
-            else:
-                res_email=send_verification_email(data["email"],"user")
-                if (res_email == 1):
-                    return jsonify({
-                        "success": False,
-                        "message": "Email not verified"
-                    }), 403
+@app.get("/seller/<name>/<seller_id>")
+@login_required(role="seller")
+def sellerTemplate(name, seller_id):
+    return render_template("seller_dashboard.html", page="dashboard", username=g.username)
 
-                return jsonify({
-                    "success": False,
-                    "message": "Failed to send verification email"
-                }), 500
-                # if(res_email == 1): return({"success":False,"msg":"Not_verified"})
-                # else: return ({"success":False,"msg":"Internal Server occured Please Try Again"})
-        else: return({"success":False,"message":"Not_found"})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/validate_owner")
-#@limiter.limit("10 per minute")
-def validate_owner():
-    try:
-        data=request.get_json()
-        if not data:
-            return ({"success":False})
-        # print("data in login",data)
-        # email,password=validate_credentials(data)
-        credentials, error = validate_credentials(data)
 
-        if error:
-            return error
+# ================================================================ auth & account
 
-        email = credentials["email"]
-        password = credentials["password"]
-        res=check_existing_owner(email,password)
-        print("res",res)
-        if(res["success"]==False): return({"success":False})
-        elif(res["success"]==True):
-            if(res["is_verified"]): 
-                if(res["is_setup"]==False):
-                    token = jwt.encode(
-                        {   
-                            "type":"seller",
-                            "username":res["username"],
-                            "owner_id": str(res["id"]),
-                            "exp": datetime.utcnow() + timedelta(hours=1)
-                        },
-                        app.config["SECRET_KEY"],
-                        algorithm="HS256"
-                        )
-                    response=jsonify({"success":True,"user_id":res["id"],"is_setup":False})
-                    response.set_cookie(
-                        "seller_res_token",
-                        token,
-                        httponly=True,
-                        secure=False,      # True in production with HTTPS
-                        samesite="Lax",
-                        max_age=7 * 24 * 60 * 60
-                    )
-                    return response
-                    # return({"success":True,"res_id":res["res_id"],"is_setup":False})
-                res_id=str(res["res_id"])
-                res_name=res["resturant_name"]
-                is_setup=res["is_setup"]
-                username=res["username"]
-                token = jwt.encode(
-                    {
-                        "type":"seller",
-                        "res_id": str(res_id),
-                        "res_name":res_name,
-                        "username":username,
-                        "exp": datetime.utcnow() + timedelta(days=7)
-                    },
-                    app.config["SECRET_KEY"],
-                    algorithm="HS256"
-                )
-                response=jsonify({"success":True,"res_id":res_id,"res_name":res_name,"is_setup":is_setup})
-                response.delete_cookie("user_token")
-                response.set_cookie(
-                    "seller_token",
-                    token,
-                    httponly=True,
-                    secure=False,      # True in production with HTTPS
-                    samesite="Lax",
-                    max_age=7 * 24 * 60 * 60
-                )
-                return response
-                # return ({"success":True,"user_id":userid,"username":username,"is_setup":is_setup})
-            else:
-                res_email=send_verification_email(data["email"],"owner")
-                if(res_email==1): return({"success":False,"msg":"not_verified"})
-                else: return({"success":False,"msg":"Internal Server occured Please Try again"})
-        else: return({"success":False,"msg":"Not_found"})
-    except Exception as e:
-        print("in exception validate owner")
-        print(e)
-        return {"success": False}
 @app.post("/signup_user")
-#@limiter.limit("5 per minute")
 def signup_user():
-    try:
-        # print(signup)
-        data=request.get_json()
-        # print("data in signup",data)
-        # email=data["email"]
-        # username=data["username"]
-        # password=data["password"]
-        # role=data["role"]
-        # data=request.get_json()
-        
-        if not data:
-            return jsonify({
-                "success": False,
-                "message": "Request body is required"
-            }), 400
+    data, error = validate_signup()
+    if error:
+        return error
+    res = create_new_user(data["email"], data["username"], data["password"], data["role"])
+    if not res["success"]:
+        return {"success": False, "msg": "user already exists!"}
+    if not send_verification_email(data["email"], data["role"]):
+        return {"success": False, "msg": "Internal Server Occured Please Try Again"}
+    if data["role"] == "seller":
+        resp = jsonify({"success": True, "user_id": res["id"]})
+        _set_auth_cookie(resp, "seller_res_token",
+                         {"type": "seller", "owner_id": res["id"], "username": data["username"]},
+                         timedelta(hours=1))
+        return resp
+    return {"success": True, "user_id": res["id"]}
 
-        signup_data, error = validate_signup(data)
 
-        if error:
-            return error
-        # print(email)
-        # print("mail sent",role)
-        res = create_new_user(
-            signup_data["email"],
-            signup_data["username"],
-            signup_data["password"],
-            signup_data["role"]
-        )
+@app.post("/validate_user")
+def validate():
+    creds, error = validate_credentials()
+    if error:
+        return error
+    res = check_existing_user(creds["email"], creds["password"])
+    if res["status"] == "not_found":
+        return {"success": False, "message": "Not_found"}
+    if res["status"] == "wrong_password":
+        return {"success": False, "message": "Invalid email or password"}, 401
+    if not res["is_verified"]:
+        if send_verification_email(creds["email"], "user"):
+            return {"success": False, "message": "Email not verified"}, 403
+        return {"success": False, "message": "Failed to send verification email"}, 500
 
-        email=signup_data["email"]
-        role=signup_data["role"]
-        # if(verify)
-        print(res)
-        if(res["success"]):
-            res_email=send_verification_email(email,role)
-            if (res_email==1):
-                if(role=="seller"):
-                    token = jwt.encode(
-                    {   
-                        "type":"seller",
-                        "owner_id": str(res["id"]),
-                        "username":signup_data["username"],
-                        "exp": datetime.utcnow() + timedelta(hours=1)
-                    },
-                    app.config["SECRET_KEY"],
-                    algorithm="HS256"
-                    )
-                    response=jsonify({"success":True,"user_id":res["id"]})
-                    response.set_cookie(
-                        "seller_res_token",
-                        token,
-                        httponly=True,
-                        secure=False,      # True in production with HTTPS
-                        samesite="Lax",
-                        max_age=7 * 24 * 60 * 60
-                    )
-                    return response
-                else:
-                    return ({"success":True,"user_id":res["id"]})
-            else: return({"success":False,"msg":"Internal Server Occured Please Try Again"})
-        else:
-            return ({"success":False,"msg":"user already exists!"})
-    except Exception as e:
-        print("in exception signup user")
-        print(e)
-        return({"success":False,"msg":"Internal Error occured Please Try Again"})
+    resp = jsonify({"success": True, "user_id": res["user_id"], "username": res["username"]})
+    resp.delete_cookie("seller_token")
+    _set_auth_cookie(resp, "user_token",
+                     {"type": "user", "user_id": res["user_id"], "username": res["username"]},
+                     timedelta(days=7))
+    return resp
+
+
+@app.post("/validate_owner")
+def validate_owner():
+    creds, error = validate_credentials()
+    if error:
+        return error
+    res = check_existing_owner(creds["email"], creds["password"])
+    if res["status"] == "not_found":
+        return {"success": False, "msg": "Not_found"}
+    if res["status"] == "wrong_password":
+        return {"success": False}
+    if not res["is_verified"]:
+        if send_verification_email(creds["email"], "owner"):
+            return {"success": False, "msg": "not_verified"}
+        return {"success": False, "msg": "Internal Server occured Please Try again"}
+
+    if not res["is_setup"]:
+        resp = jsonify({"success": True, "user_id": res["owner_id"], "is_setup": False})
+        _set_auth_cookie(resp, "seller_res_token",
+                         {"type": "seller", "owner_id": res["owner_id"], "username": res["username"]},
+                         timedelta(hours=1))
+        return resp
+
+    resp = jsonify({"success": True, "res_id": res["res_id"], "res_name": res["res_name"], "is_setup": True})
+    resp.delete_cookie("user_token")
+    _set_auth_cookie(resp, "seller_token",
+                     {"type": "seller", "res_id": res["res_id"], "res_name": res["res_name"],
+                      "username": res["username"]},
+                     timedelta(days=7))
+    return resp
+
 
 @app.route("/verify/<token>")
 def verify_email(token):
     try:
-        data = serializer.loads(
-        token,
-        salt="email-verification",
-        max_age=3600
-    )
-        email = data["email"]
-        role = data["role"]
+        data = serializer.loads(token, salt="email-verification", max_age=3600)
+        email, role = data["email"], data["role"]
     except Exception:
         return "Invalid or expired link."
-
-    userid=set_verified(email,role)
-
+    set_verified(email, role)
+    target = "/login/user" if role == "user" else "/login/seller"
     return f"""
         <h1>Email verified successfully ✅</h1>
         <p>Redirecting to login page in 3 seconds...</p>
-
-        <script>
-        const role = "{role}";
-
-        setTimeout(() => {{
-            if(role === "user")
-                window.location.href = "/login/user";
-            else
-                window.location.href = "/login/seller";
-        }}, 3000);
-        </script>
+        <script>setTimeout(() => {{ window.location.href = "{target}"; }}, 3000);</script>
         """
 
-@app.post("/save_subcategory")
-@login_required
-#@limiter.limit("30 per minute")
-def save_subcats():
-    # data=request.get_json()
-    # # res_id=data["res_id"]
-    # res_id=g.res_id
-    # cat_id=data["category_id"]
-    # subcat_name=data["name"]
-    data, error = validate_subcategory()
 
+@app.get("/logout/seller")
+def logout_seller():
+    resp = jsonify({"success": True, "message": "Logged out successfully"})
+    resp.delete_cookie("seller_token")
+    return resp
+
+
+@app.post("/user/logout")
+def logout_user():
+    resp = jsonify({"success": True})
+    resp.delete_cookie("user_token")
+    return resp
+
+
+@app.post("/user/fetch_profile")
+@login_required(role="user")
+def fetch_profile():
+    profile = fetch_profiles(g.user_id)
+    if profile is None:
+        return {"success": False, "message": "Profile not found"}, 404
+    return {"success": True, "profile": profile}
+
+
+@app.post("/user/update_profile")
+@login_required(role="user")
+def update_profile():
+    data = _body()
+    if not update_profiles(g.user_id, data.get("name"), data.get("phone")):
+        return {"success": False, "message": "Failed to update profile"}, 500
+    return {"success": True, "message": "Profile updated successfully"}
+
+
+@app.post("/save_address")
+@login_required(role="user")
+def save_address_type():
+    data, error = validate_address()
     if error:
         return error
-    res = add_subcategory(
-            g.res_id,
-            data["category_id"],
-            data["name"]
-        )
-    if(res["success"]):
-        return {"success": True,"subcategory": res["subcategory"]}
-    else:
-        return {"success":False}
-@app.get("/seller/resturantSetup/<seller_id>")
-@auth_seller_res
-def renderSetup(seller_id):
-    try:
-        return render_template("resturant_setup.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.route("/login/<role>")
-def login(role):
-    try:
-        return render_template("auth.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.route("/signup/<role>")
-def signup(role):
-    try:
-        return render_template("signup.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-# @app.get("/seller/<name>/<seller_id>")
-# def sellerTemplate(name,seller_id):
-#     try:
-#         return render_template("seller.html")
-#     except Exception as e:
-#         print(e)
-#         return({"success":False})
-@app.get("/seller/<name>/<seller_id>")
-@login_required
-def sellerTemplate(name,seller_id):
-    try:
-        username=g.username
-        print(username)
-        return render_template("seller_dashboard.html",page="dashboard",username=username)
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.get("/landing")
-def renderLanding():
-    try:
-        return render_template("landing.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/update_order")
-@login_required
-#@limiter.limit("30 per minute")
-def update_status():
-    try:
-        res_id=g.res_id
-        data=request.get_json()
-        order_id=data["order_id"]
-        status=data["status"]
-        userid=data["user_id"]
-        res=update_order_status_seller(order_id,status,userid,res_id)
-        if(res["success"]):
-            return ({"success":True})
-        else:
-            return({"success":False,"message":res["message"]})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/update_order_user")
-@login_required
-#@limiter.limit("30 per minute")
-def update_status_user():
-    try:
-        userid=g.user_id
-        data=request.get_json()
-        order_id=data["order_id"]
-        status=data["status"]
-        # userid=data["user_id"]
-        result=update_order_status_user(order_id,status,userid)
-        if result["success"]:
-            return jsonify(result)
+    return {"success": save_address(data["address"], data["address_type"], g.user_id, data["cordinates"])}
 
-        return jsonify(result), 403
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/stats")
-@login_required
-def returnstats():
-    try:
-        res_id=g.res_id
-        data=request.get_json()
-        # res_id=data["res_id"]
-        res=resturant_stats(res_id)
-        return({"success":True,"stats":res})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.get("/seller/analytics/<res_id>")
-def render_analytics_template(res_id):
-    try:
-        print("seller_anlytics")
-        return render_template("analytics.html")
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/seller/analytics")
-@login_required
-def return_seller_stats():
-    try:
-        data=request.get_json()
-        # res_id=data["res_id"]
-        res_id=g.res_id
-        stats=return_res_analytics(res_id)
-        return({"success":True,"stats":stats})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-    
-@app.post("/seller/stats")
-@login_required
-def return_seller_statistics():
-    try:
-        res_id=g.res_id
-        stats=get_seller_analytics(res_id)
-        return({"success":True,"stats":stats})
-    except Exception as e:
-        print(e)
-        return({"success":False})
-# @app.post("/update_cart")
-# @login_required
-# def update_cart():
-#     try:
-#         # data=request.get_json()
-#         # # userid=data["user_id"]
-#         # userid=g.user_id
-#         # item_id=data["item_id"]
-#         # qty=data["qty"]
-#         data, error = validate_update_cart()
 
-#         if error:
-#             return error
-
-#         userid = g.user_id
-#         res = update_cart_qty(userid,data["item_id"],data["qty"])
-#         print(res)
-#         if not res["success"]:
-#             return jsonify({"success": False,"message": res.get("message", "Unable to update cart")}), 400
-#         return ({"success":True,"total":res["total"]})
-#     except Exception as e:
-#         print(e)
-#         return({"success":False})
-# @app.post("/update_cart")
-# @login_required
-# def updateCart():
-#     data = request.get_json()
-#     result = update_cart_qty(g.user_id, data["item_id"], int(data["qty"]))
-#     if result["success"]:
-#         return jsonify({"success": True, "total": result["total"]})
-#     return jsonify({"success": False, "message": result.get("message", "Unable to update item")}), 400
-@socketio.on("user_cancelled_order")
-def handle_user_cancel(data):
-    try:
-        # data['res_ids'] is now a LIST: ["res1", "res2"]
-        res_list = data.get("res_ids", [])
-        
-        for res_id in res_list:
-            emit("seller_order_cancelled", data, room=res_id)
-    except Exception as e:
-        print(e)
-        return({"success":False})
-@app.post("/save_address")
-@login_required
-#@limiter.limit("10 per minute")
-def save_address_type():
-    try:    
-        # data=request.get_json()
-        # address=data["address"]
-        # types=data["address_type"]
-        # # uid=data["userId"]
-        # uid=g.user_id
-        # cordinates=data["cordinates"]
-        # result=save_address(address,types,uid,cordinates)
-        data, error = validate_address()
-
-        if error:
-            return error
-
-        result = save_address(
-            data["address"],
-            data["address_type"],
-            g.user_id,
-            data["cordinates"]
-            )
-        if(result["success"]):
-            return ({"success":True})
-        else:
-            return ({"success":False})
-    except Exception as e:
-        print(e)
-        return jsonify({"success": False,"message": "Internal server error"}), 500
 @app.post("/fetch_address")
 @login_required
 def fetch_addresss():
-    try:
-        data=request.get_json()
-        # uid=data["user_id"]
-        uid=g.user_id
-        address=fetch_address(uid)
-        if(address["success"]):
-            if(address["status"]==200):
-                return({"success":True,"address":address["address"]}),200
-            return({"success":False,"msg":"No Address Found","status":404})
-        else:
-            return({"success":False,"status":500})
-    except AttributeError:
-        # return({"success":False,"msg":"Login Please"})
-        response=jsonify({"success":False,"msg":"Login Please"})
-        # token = (
-        #     request.cookies.get("seller_token")
-        # )
-        
-        response.delete_cookie("seller_token")
-        return response
-    except:
-        return({"success":False})
-    
-@app.post("/save_categories")
-@login_required
-#@limiter.limit("20 per minute")
-def sve_cate():
-    # data=request.get_json()
-    # # res_id=data["res_id"]
-    # res_id=g.res_id
-    # cat_name=data["cat_name"]
-    # sub_cats=data["subcats"]
-    # res=save_category(res_id,cat_name,sub_cats)
-    data, error = validate_category()
+    if g.type != "user":        # same as before: a seller session gets logged out here
+        resp = jsonify({"success": False, "msg": "Login Please"})
+        resp.delete_cookie("seller_token")
+        return resp
+    addresses = fetch_address(g.user_id)
+    if addresses is None:
+        return {"success": False, "status": 500}
+    if not addresses:
+        return {"success": False, "msg": "No Address Found", "status": 404}
+    return {"success": True, "address": addresses}
 
+
+# ============================================================ restaurant & menu
+
+@app.post("/add_resturant")
+@owner_setup_required
+def add_resturant():
+    data, error = validate_restaurant_form()
     if error:
         return error
+    file_id = upload_image(data["photo"]) if data["photo"] else None
+    try:
+        res_id = add_resturants(data["name"], data["type"], data["address"], data["phone"],
+                                g.owner_id, data["lng"], data["lat"], file_id)
+    except AlreadySetUp:
+        return {"success": False, "message": "This account already has a restaurant"}, 409
 
-    res = save_category(
-        g.res_id,
-        data["cat_name"],
-        data["subcats"]
-    )
-    if(res["success"]):
-        print(res)
-        return({"success":True,"category":res["category_data"]})
+    resp = jsonify({"success": True, "res_id": res_id})
+    resp.delete_cookie("seller_res_token")
+    _set_auth_cookie(resp, "seller_token",
+                     {"type": "seller", "res_id": res_id, "res_name": data["name"], "username": g.username},
+                     timedelta(days=7))
+    return resp
+
+
+@app.post("/list_resturants")
+@login_required
+def list_resturantss():
+    data = _body()
+    try:
+        lat, lng = float(data["latt"]), float(data["long"])
+        dist = min(max(int(data.get("dist", 5)), 1), 100)
+    except (KeyError, TypeError, ValueError):
+        return {"success": False, "message": "latt, long and dist must be numbers"}, 400
+    return {"success": True, "results": list_resturants(lng, lat, dist)}
+
+
+@app.post("/preview_items")
+def preview_items():
+    res_ids = _body().get("res_ids")
+    if not res_ids or not isinstance(res_ids, list):
+        return {"success": False, "message": "res_ids required"}, 400
+    return {"success": True, "items": get_preview_items(res_ids)}
+
+
+@app.post("/list_items")
+@login_required
+def list_item():
+    if g.type == "seller":
+        res_id = g.res_id
     else:
-        print(res)
-        return({"success":False,"error":res["error"]})
-    
-
-############################# VALIDATION FNS ######################
-
-from flask import jsonify
-
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-
-def allowed_file(filename):
-    return "." in filename and \
-        filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+        res_id = str(_body().get("res_id") or "")
+        if not res_id:
+            return {"success": False, "message": "res_id is required"}, 400
+    res = list_resturant_items(res_id, for_seller=g.type == "seller")
+    return {"success": True, "res": res["item_name"], "categories": res["categories"]}
 
 
-def validate_item_form():
-    itm_name = request.form.get("itm_name", "").strip()
-    itm_qty = request.form.get("itm_qty", "").strip()
-    price = request.form.get("price")
-    sub_id = request.form.get("sub_id", "").strip()
-    desc = request.form.get("desc", "").strip()
-    unit = request.form.get("unit", "").strip()
-    lowat = request.form.get("lowat", "").strip()
-    available = request.form.get("available", "").strip()
-    photo = request.files.get("photo")
+@app.post("/add_res_items")
+@login_required(role="seller")
+def add_itemss():
+    data, error = validate_item_form()
+    if error:
+        return error
+    file_id = upload_image(data["photo"]) if data["photo"] else None
+    res = add_resturant_items(g.res_id, data["itm_name"], data["itm_qty"], data["price"], data["sub_id"],
+                              data["desc"], data["unit"], data["lowat"], data["available"], file_id=file_id)
+    return {"success": True, "id": res["id"], "img_url": res["url"]}
 
-    # Required fields
-    if not itm_name:
-        return None, (jsonify({"success": False, "message": "Item name is required"}), 400)
 
-    if not itm_qty:
-        return None, (jsonify({"success": False, "message": "Item quantity is required"}), 400)
+@app.post("/update_item_details")
+@login_required(role="seller")
+def update_items():
+    data, error = validate_update_item()
+    if error:
+        return error
+    file_id = upload_image(data["photo"]) if data["photo"] else None
+    res = update_resturant_item(data["item_id"], g.res_id, data["name"], data["price"], data["unit"],
+                                data["lowAt"], data["desc"], data["subId"], data["stock"], data["available"],
+                                file_id=file_id)
+    if res["success"]:
+        return {"success": True}
+    return {"success": False, "message": res["message"]}
 
-    if not price:
-        return None, (jsonify({"success": False, "message": "Price is required"}), 400)
 
-    if not sub_id:
-        return None, (jsonify({"success": False, "message": "Category is required"}), 400)
+@app.post("/remove_items")
+@login_required(role="seller")
+def remove_item():
+    item_id = _body().get("item_id")
+    if not item_id:
+        return {"success": False, "message": "item_id is required"}, 400
+    return remove_resturant_item(str(item_id), g.res_id)
 
-    if not unit:
-        return None, (jsonify({"success": False, "message": "Unit is required"}), 400)
 
-    if available == "":
-        return None, (jsonify({"success": False, "message": "Availability is required"}), 400)
+@app.post("/save_categories")
+@login_required(role="seller")
+def sve_cate():
+    data, error = validate_category()
+    if error:
+        return error
+    return {"success": True, "category": save_category(g.res_id, data["cat_name"], data["subcats"])}
 
-    # Price
+
+@app.post("/save_subcategory")
+@login_required(role="seller")
+def save_subcats():
+    data, error = validate_subcategory()
+    if error:
+        return error
+    res = add_subcategory(g.res_id, data["category_id"], data["name"])
+    if res["success"]:
+        return {"success": True, "subcategory": res["subcategory"]}
+    return {"success": False}
+
+
+# ========================================================================== cart
+
+@app.post("/add_item_carts")
+def carts():
+    # Old endpoint: carts live in Redis now (/add_to_cart). Kept so old frontend calls don't 404.
+    return {"success": True}
+
+
+@app.post("/get_cart_items")
+@login_required(role="user")
+def list_cart_items():
+    return {"success": True, "results": get_cart(g.user_id)}
+
+
+@app.post("/add_to_cart")
+@login_required(role="user")
+def addToCart():
+    data, error = validate_add_to_cart()
+    if error:
+        return error
+    # Price and stock come from the database, never from the browser.
+    item = get_item_for_cart(data["resid"], data["item_id"])
+    if item is None:
+        return {"success": False, "message": "Item not found"}, 404
+    if not item["available"] or item["item_qty"] <= 0:
+        return {"success": False, "message": f"{item['name']} is not available right now"}, 400
+
+    res = add_cart(data["resid"], g.user_id, item["name"], data["ress_name"], data["item_id"],
+                   data["qty"], item["price"], item["item_qty"], data["replace"])
+    if res["success"]:
+        return {"success": True, "Total": res["total"]}
+    return {"success": False, "message": res.get("message", "Unable to add item to cart")}, 400
+
+
+@app.post("/update_cart")
+@login_required(role="user")
+def updateCart():
+    data = _body()
+    item_id, qty = data.get("item_id"), data.get("qty")
+    if item_id is None or qty is None:
+        return {"success": False, "message": "item_id and qty are required"}, 400
     try:
-        price = int(price)
-        if price < 0:
-            return None, (jsonify({"success": False, "message": "Price must be positive"}), 400)
-    except ValueError:
-        return None, (jsonify({"success": False, "message": "Invalid price"}), 400)
-
-    # Quantity
-    try:
-        itm_qty = float(itm_qty)
-        if itm_qty <= 0:
-            return None, (jsonify({"success": False, "message": "Quantity must be greater than 0"}), 400)
-    except ValueError:
-        return None, (jsonify({"success": False, "message": "Invalid quantity"}), 400)
-
-    # Low stock alert (optional)
-    if lowat:
-        try:
-            lowat = float(lowat)
-            if lowat < 0:
-                return None, (jsonify({"success": False, "message": "Invalid low stock value"}), 400)
-        except ValueError:
-            return None, (jsonify({"success": False, "message": "Invalid low stock value"}), 400)
-    else:
-        lowat = None
-
-    # Available
-    if available.lower() not in ("true", "false", "0", "1"):
-        return None, (jsonify({"success": False, "message": "Invalid availability"}), 400)
-
-    available = available.lower() in ("true", "1")
-
-    # Image
-    if photo:
-        if photo.filename == "":
-            return None, (jsonify({"success": False, "message": "Invalid image"}), 400)
-
-        if not allowed_file(photo.filename):
-            return None, (
-                jsonify({
-                    "success": False,
-                    "message": "Only PNG, JPG, JPEG and WEBP images are allowed"
-                }),
-                400
-            )
-
-    return {
-        "itm_name": itm_name,
-        "itm_qty": itm_qty,
-        "price": price,
-        "sub_id": sub_id,
-        "desc": desc,
-        "unit": unit,
-        "lowat": lowat,
-        "available": available,
-        "photo": photo
-    }, None
-#################22222222222222#################
-from flask import jsonify, request
-
-def validate_update_item():
-    # Get form data
-    # print("data in validate_update_item",data.items())
-    item_id = request.form.get("item_id", "").strip()
-    name = request.form.get("name", "").strip()
-    price_raw = request.form.get("price", "").strip()
-    unit = request.form.get("unit", "").strip()
-    low_at_raw = request.form.get("lowAt", "").strip()
-    desc = request.form.get("desc", "").strip()
-    sub_id = request.form.get("subId", "").strip()
-    stock_raw = request.form.get("stock", "").strip()
-    available_raw = request.form.get("available", "").strip()
-    photo = request.files.get("photo")
-
-    # Required fields
-    required = {
-        "item_id": item_id,
-        "name": name,
-        "price": price_raw,
-        "unit": unit,
-        "lowAt": low_at_raw,
-        "desc": desc,
-        "subId": sub_id,
-        "stock": stock_raw,
-        "available": available_raw
-    }
-
-    for field, value in required.items():
-        if not value:
-            return None, (jsonify({
-                "success": False,
-                "message": f"{field} is required"
-            }), 400)
-
-    # Name
-    if not name:
-        return None, (jsonify({
-            "success": False,
-            "message": "Item name cannot be empty"
-        }), 400)
-
-    # Price
-    try:
-        price = int(price_raw)
-        if price < 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid price"
-        }), 400)
-
-    # Stock
-    try:
-        stock = float(stock_raw)
-        if stock < 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid stock quantity"
-        }), 400)
-
-    # Low stock alert
-    try:
-        low_at = float(low_at_raw)
-        if low_at < 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid low stock value"
-        }), 400)
-
-    # Available
-    if available_raw.lower() not in ("true", "false"):
-        return None, (jsonify({
-            "success": False,
-            "message": "available must be true or false"
-        }), 400)
-
-    available = available_raw.lower() == "true"
-
-    # Build validated data
-    validated = {
-        "item_id": item_id,
-        "name": name,
-        "price": price,
-        "unit": unit,
-        "lowAt": low_at,
-        "desc": desc,
-        "subId": sub_id,
-        "stock": stock,
-        "available": available,
-        "photo": photo
-    }
-
-    return validated, None
-####################33333333333333333333333######################
-from flask import request, jsonify
-
-def validate_add_to_cart():
-    data = request.get_json(silent=True)
-    print(data)
-    print("validate_add to cart",data)
-    if not data:
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid JSON payload"
-        }), 400)
-    
-
-    required = [
-        "resid",
-        "item",
-        "qty",
-        "item_id",
-        "ress_name",
-        "price"
-    ]
-
-    for field in required:
-        if field not in data:
-            return None, (jsonify({
-                "success": False,
-                "message": f"{field} is required"
-            }), 400)
-
-    # Item name
-    item = str(data["item"]).strip()
-    if not item:
-        return None, (jsonify({
-            "success": False,
-            "message": "Item name cannot be empty"
-        }), 400)
-
-    replace= data["replace"]
-    if(type(replace)!=bool):
-        return None, (jsonify({
-            "success": False,
-            "message": "Replace value must be a Boolean"
-        }), 400)
-    # Restaurant name
-    res_name = str(data["ress_name"]).strip()
-    if not res_name:
-        return None, (jsonify({
-            "success": False,
-            "message": "Restaurant name cannot be empty"
-        }), 400)
-
-    # Quantity
-    try:
-        qty = int(data["qty"])
-        if qty <= 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Quantity must be greater than 0"
-        }), 400)
-
-    # Price
-    try:
-        price = float(data["price"])
-        if price < 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid price"
-        }), 400)
-
-    # IDs
-    try:
-        resid = (data["resid"])
-        item_id = (data["item_id"])
-    except Exception as e:
-        print(e)
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid restaurant or item id"
-        }), 400)
-
-    return {
-        "resid": resid,
-        "item": item,
-        "qty": qty,
-        "item_id": item_id,
-        "ress_name": res_name,
-        "price": price,
-        "replace":replace
-    }, None
-def validate_update_cart():
-    data = request.get_json(silent=True)
-    print("valid update cart",data)
-    if not data:
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid JSON"
-        }), 400)
-
-    if "item_id" not in data:
-        return None, (jsonify({
-            "success": False,
-            "message": "item_id is required"
-        }), 400)
-
-    if "qty" not in data:
-        return None, (jsonify({
-            "success": False,
-            "message": "qty is required"
-        }), 400)
-
-    try:
-        item_id = (data["item_id"])
-        qty = int(data["qty"])
+        qty = int(qty)
     except (TypeError, ValueError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid item_id or qty"
-        }), 400)
+        return {"success": False, "message": "qty must be an integer"}, 400
 
-    # if qty < 0:
-    #     return None, (jsonify({
-    #         "success": False,
-    #         "message": "Quantity cannot be negative"
-    #     }), 400)
+    result = update_cart_qty(g.user_id, item_id, qty)
+    if result["success"]:
+        return {"success": True, "total": result["total"], "removed": result.get("removed", False)}
+    return {"success": False, "message": result.get("message", "Unable to update item")}, 400
 
-    return {
-        "item_id": item_id,
-        "qty": qty
-    }, None
-from flask import request, jsonify
 
-def validate_subcategory():
-    data = request.get_json(silent=True)
+# ======================================================================== orders
 
-    if not data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid JSON payload"
-            }),
-            400
-        )
-
-    if "category_id" not in data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "category_id is required"
-            }),
-            400
-        )
-
-    if "name" not in data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Subcategory name is required"
-            }),
-            400
-        )
-
+@app.post("/store_orders")
+@login_required(role="user")
+def store_order():
+    lock_key = f"lock:checkout:{g.user_id}"
+    lock = acquire_lock(lock_key, ttl_seconds=15)
+    if not lock:
+        return {"success": False, "message": "Your order is already being processed"}, 409
     try:
-        category_id = int(data["category_id"])
-    except (ValueError, TypeError):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid category_id"
-            }),
-            400
-        )
+        # time=time.perf_counter()
+        result = store_orders(g.user_id, _body().get("pickup_time"))
+        # print("total_time",time.perf_counter()-time)
+    finally:
+        release_lock(lock_key, lock)
 
-    name = str(data["name"]).strip()
+    if not result["success"]:
+        return {"success": False, "message": result["message"]},500
+    for res_id in result["restaurant_ids"]:
+        socketio.emit("new_order", {"msg": "refresh"}, room=res_id)
+    return {"success": True, "token_no": result["token_no"]}
 
-    if not name:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Subcategory name cannot be empty"
-            }),
-            400
-        )
 
-    if len(name) > 100:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Subcategory name is too long"
-            }),
-            400
-        )
+@app.post("/get_orders/<userid>")
+@login_required(role="user")
+def getOrders(userid):
+    return {"success": True, "orders": get_orders(g.user_id)}
 
-    return {
-        "category_id": category_id,
-        "name": name
-    }, None
-from flask import request, jsonify
 
-from flask import request, jsonify
+@app.route("/seller/orders", methods=["GET", "POST"])
+@login_required(role="seller")
+def getsellerOrders():
+    return {"success": True, "orders": get_seller_orders(g.res_id)}
 
-def validate_category():
-    data = request.get_json(silent=True)
 
-    if not data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid JSON payload"
-            }),
-            400
-        )
+@app.post("/update_order")
+@login_required(role="seller")
+def update_status():
+    data = _body()
+    if not data.get("order_id") or not data.get("status"):
+        return {"success": False, "message": "order_id and status are required"}, 400
+    res = update_order_status_seller(str(data["order_id"]), str(data["status"]), g.res_id)
+    if res["success"]:
+        return {"success": True}
+    return {"success": False, "message": res["message"]}
 
-    cat_name = str(data.get("cat_name", "")).strip()
 
-    if not cat_name:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Category name is required"
-            }),
-            400
-        )
+@app.post("/update_order_user")
+@login_required(role="user")
+def update_status_user():
+    data = _body()
+    result = update_order_status_user(str(data.get("order_id") or ""), str(data.get("status") or ""), g.user_id)
+    return jsonify(result), (200 if result["success"] else 403)
 
-    if len(cat_name) > 100:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Category name is too long"
-            }),
-            400
-        )
 
-    subcats = data.get("subcats")
+# ============================================================== seller dashboard
 
-    if subcats is None:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "subcats is required"
-            }),
-            400
-        )
+@app.post("/stats")
+@login_required(role="seller")
+def returnstats():
+    return {"success": True, "stats": resturant_stats(g.res_id)}
 
-    if not isinstance(subcats, list):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "subcats must be a list"
-            }),
-            400
-        )
 
-    cleaned_subcats = []
-    seen = set()
+@app.post("/seller/analytics")
+@login_required(role="seller")
+def return_seller_stats():
+    return {"success": True, "stats": return_res_analytics(g.res_id)}
 
-    for i, subcat in enumerate(subcats):
-        if not isinstance(subcat, str):
-            return None, (
-                jsonify({
-                    "success": False,
-                    "message": f"Subcategory at index {i} must be a string"
-                }),
-                400
-            )
 
-        subcat = subcat.strip()
+@app.post("/seller/stats")
+@login_required(role="seller")
+def return_seller_statistics():
+    return {"success": True, "stats": get_seller_analytics(g.res_id)}
 
-        if not subcat:
-            continue
 
-        if len(subcat) > 100:
-            return None, (
-                jsonify({
-                    "success": False,
-                    "message": f"Subcategory '{subcat}' is too long"
-                }),
-                400
-            )
+# ===================================================================== Socket.IO
 
-        key = subcat.lower()
+@socketio.on("join_seller_room")
+@socket_auth("seller")
+def handle_join(data=None):
+    join_room(g.res_id)
 
-        if key not in seen:
-            seen.add(key)
-            cleaned_subcats.append(subcat)
 
-    if not cleaned_subcats:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "At least one valid subcategory is required"
-            }),
-            400
-        )
+@socketio.on("join_user_room")
+@socket_auth("user")
+def handle_user_join(data=None):
+    join_room(g.user_id)
 
-    return {
-        "cat_name": cat_name,
-        "subcats": cleaned_subcats
-    }, None
-from flask import request, jsonify
 
-from flask import request, jsonify
+@socketio.on("order_completed")
+@socket_auth("seller")
+def handle_order_completed(data=None):
+    data = data or {}
+    order_id = data.get("order_id")
+    user_id = verify_order(g.res_id, order_id)
+    if user_id is None:
+        return {"success": False, "message": "Unauthorized order"}
+    socketio.emit("order_status_updated",
+                  {"order_id": order_id, "token_no": data.get("token_no"), "res_id": g.res_id,
+                   "status": data.get("status")},
+                  room=user_id)
+    return {"success": True}
 
-def validate_address():
-    data = request.get_json(silent=True)
 
-    if not data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid JSON payload"
-            }),
-            400
-        )
+@socketio.on("user_cancelled_order")
+@socket_auth("user")
+def handle_user_cancel(data=None):
+    data = data or {}
+    for res_id in data.get("res_ids", []):
+        emit("seller_order_cancelled", data, room=res_id)
 
-    address = str(data.get("address", "")).strip()
 
-    if not address:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Address is required"
-            }),
-            400
-        )
-
-    address_type = str(data.get("address_type", "")).strip()
-
-    if not address_type:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Address type is required"
-            }),
-            400
-        )
-
-    # Modify these values if your frontend uses different names
-    allowed_types = {"Home", "Work", "Other"}
-
-    if address_type not in allowed_types:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid address type"
-            }),
-            400
-        )
-
-    coordinates = data.get("cordinates")
-
-    if not isinstance(coordinates, dict):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Coordinates are required"
-            }),
-            400
-        )
-
-    latt = coordinates.get("latt")
-    longitude = coordinates.get("long")
-
-    if latt is None or longitude is None:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Latitude and longitude are required"
-            }),
-            400
-        )
-
-    try:
-        latt = float(latt)
-        longitude = float(longitude)
-    except (ValueError, TypeError):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Coordinates must be valid numbers"
-            }),
-            400
-        )
-
-    if not (-90 <= latt <= 90):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid latitude"
-            }),
-            400
-        )
-
-    if not (-180 <= longitude <= 180):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid longitude"
-            }),
-            400
-        )
-
-    return {
-        "address": address,
-        "address_type": address_type,
-        "cordinates": {
-            "latt": latt,
-            "long": longitude
-        }
-    }, None
-def validate_credentials(data):
-    if not data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Request body is required"
-            }),
-            400
-        )
-
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
-
-    if not email:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Email is required"
-            }),
-            400
-        )
-
-    if not EMAIL_REGEX.match(email):
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Invalid email format"
-            }),
-            400
-        )
-
-    if not password:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Password is required"
-            }),
-            400
-        )
-
-    return {
-        "email": email,
-        "password": password
-    }, None
-def validate_signup(data):
-    if not data:
-        return None, (
-            jsonify({
-                "success": False,
-                "message": "Request body is required"
-            }),
-            400
-        )
-
-    email = data.get("email", "").strip().lower()
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    role = data.get("role", "").strip().lower()
-
-    if not email:
-        return None, (jsonify({"success": False, "message": "Email is required"}), 400)
-
-    if not EMAIL_REGEX.match(email):
-        return None, (jsonify({"success": False, "message": "Invalid email"}), 400)
-
-    if not username:
-        return None, (jsonify({"success": False, "message": "Username is required"}), 400)
-
-    if len(username) < 3:
-        return None, (jsonify({"success": False, "message": "Username is too short"}), 400)
-
-    if not password:
-        return None, (jsonify({"success": False, "message": "Password is required"}), 400)
-
-    if len(password) < 8:
-        return None, (jsonify({"success": False, "message": "Password must be at least 8 characters"}), 400)
-
-    if role not in ("user", "seller"):
-        return None, (jsonify({"success": False, "message": "Invalid role"}), 400)
-
-    return {
-        "email": email,
-        "username": username,
-        "password": password,
-        "role": role
-    }, None
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
-# from waitress import serve
-
-# serve(
-#     app,
-#     host="0.0.0.0",
-#     port=5000,
-#     threads=32,
-#     connection_limit=500
-# )
+    socketio.run(
+        app,
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG") == "1",
+        allow_unsafe_werkzeug=True,
+    )
