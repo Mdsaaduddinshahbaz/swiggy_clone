@@ -1012,7 +1012,7 @@ import { Trend } from 'k6/metrics';
 // Override at runtime, e.g.:
 //   k6 run script.js -e BASE_URL=http://127.0.0.1:5000   (test locally, cloud DBs)
 //   k6 run script.js -e BASE_URL=https://general-online.onrender.com  (test full deploy)
-const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:8000';
+const BASE_URL = __ENV.BASE_URL || 'http://13.233.255.220:5000';
 
 // const tokens = [
 //   // ... paste your 50 tokens here, unchanged from your current script

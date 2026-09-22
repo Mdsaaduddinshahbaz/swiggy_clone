@@ -604,6 +604,7 @@ def store_order():
         return {"success": False, "message": result["message"]},500
     for res_id in result["restaurant_ids"]:
         socketio.emit("new_order", {"msg": "refresh"}, room=res_id)
+    print("returning true")
     return {"success": True, "token_no": result["token_no"]}
 
 
@@ -700,7 +701,7 @@ if __name__ == "__main__":
     socketio.run(
         app,
         host=os.getenv("HOST", "127.0.0.1"),
-        port=int(os.getenv("PORT", "5000")),
+        port=int(os.getenv("PORT", "8000")),
         debug=os.getenv("FLASK_DEBUG") == "1",
         allow_unsafe_werkzeug=True,
     )

@@ -30,9 +30,9 @@ CART_TTL_SECONDS = 7 * 24 * 3600
 pool = redis.ConnectionPool.from_url(
     REDIS_URL,
     decode_responses=True,
-    socket_timeout=5,
-    socket_connect_timeout=5,
-    health_check_interval=30,
+    # socket_timeout=5,
+    # socket_connect_timeout=5,
+    # health_check_interval=30,
 )
 r = redis.Redis(connection_pool=pool)
 
@@ -188,6 +188,9 @@ def get_cart(uid):
     meta, raw_items = pipe.execute()
     if not meta or not raw_items:
         return None
+    for i in meta.keys():
+        print("key=",i)
+    print(raw_items)
     return {
         "uid": str(uid),
         "total": int(meta.get("total", 0)),
