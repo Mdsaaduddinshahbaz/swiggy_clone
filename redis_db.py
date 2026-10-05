@@ -252,7 +252,7 @@ PASSWORD = os.getenv("Redis_PASSWORD")
 # -------------------------
 # Pooled connection (create once, reuse everywhere)
 # -------------------------
-pool = redis.BlockingConnectionPool(
+pool = redis.ConnectionPool(
     host=HOST,
     port=PORT,
     # username=USERNAME,
