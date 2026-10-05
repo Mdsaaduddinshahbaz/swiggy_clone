@@ -2,7 +2,7 @@ from database import create_new_user
 import jwt
 from datetime import datetime,timedelta
 li=[]
-for i in range(51,1001):
+for i in range(5000,6001):
     email=f"user{i}@gmail.com"
     password="sadistic123"
     res=create_new_user(email,"new",password,"user")

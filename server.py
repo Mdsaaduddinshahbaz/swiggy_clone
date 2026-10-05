@@ -1,13 +1,14 @@
 from database import save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
+from flask import make_response
 from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
 from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
-# from verify import upload_image   
-from verifpy1 import upload_image
+from verify import upload_image   
+# from verifpy1 import upload_image
 from functools import wraps
 import jwt
 from datetime import datetime,timedelta
@@ -103,7 +104,8 @@ def login_required(f):
             # response=jsonify({"success": False}), 401
             # return jsonify({"success": False}), 401
             # response=jsonify({"success":True,"res_id":id}),401
-            response=jsonify({"success":True,"msg":"invalid Token"}),401
+            # response=jsonify({"success":True,"msg":"invalid Token"}),401
+            response = make_response(jsonify({"error": "Token has expired","token":token}), 401)
             response.delete_cookie("user_token")
             response.delete_cookie("seller_token")
             return response
@@ -553,7 +555,7 @@ def updateCart():
         print("update_cart error:", e)
         return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
 
-
+import traceback
 @app.post("/add_to_cart")
 #@limiter.limit("30 per minute")
 @login_required
@@ -586,11 +588,12 @@ def addToCart():
         )
 
         if res["success"]:
-            return jsonify({"success": True, "Total": res["total"]})
+            return jsonify({"success": True, "Total": res["total"]}),200
         return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
 
     except Exception as e:
-        print("add_to_cart error:", e)
+        # print("add_to_cart error:", e)
+        traceback.print_exc()
         return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
 @app.get("/seller/menu/<name>/<seller_id>")
 def seller_page(name,seller_id):
@@ -1927,14 +1930,14 @@ def validate_signup(data):
         "password": password,
         "role": role
     }, None
-# if __name__ == "__main__":
-#     socketio.run(app, debug=True)
-from waitress import serve
+if __name__ == "__main__":
+    socketio.run(app, debug=True)
+# from waitress import serve
 
-serve(
-    app,
-    host="0.0.0.0",
-    port=5000,
-    threads=32,
-    connection_limit=500
-)
+# serve(
+#     app,
+#     host="0.0.0.0",
+#     port=5000,
+#     threads=32,
+#     connection_limit=500
+# )

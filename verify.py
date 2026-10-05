@@ -92,7 +92,7 @@ creds = None
 #     with open(TOKEN_FILE, "rb") as token:
 #         creds = pickle.load(token)
 creds=Credentials.from_authorized_user_file(
-    "/etc/secrets/token.json",
+    "token.json",
     SCOPES
 )
 
