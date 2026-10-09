@@ -588,9 +588,10 @@ async function initCartPage() {
         const existingAddr = isEditing ? addresses[editingIdx] : null;
 
         const payload = isEditing
-            ? { user_id: userId, address_id: existingAddr._id, adrs_type, address, phone, coordinates }
-            : { user_id: userId, adrs_type, address, phone, coordinates };
-
+            ? { user_id: userId, address_id: existingAddr._id, address_type:adrs_type, address, phone, coordinates }
+            : { user_id: userId, address_type:adrs_type, address, phone, coordinates };
+        console.log(payload);
+        
         const endpoint = isEditing ? "/update_address" : "/save_address";
 
         saveAddressBtn.disabled = true;

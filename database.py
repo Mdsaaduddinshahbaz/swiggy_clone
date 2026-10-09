@@ -1325,7 +1325,14 @@ def get_seller_analytics(seller_id: str) -> dict:
 reponse=get_seller_analytics("6a48e58dff79b029132edfc2")
 print(reponse)
 # get_orders("69a959defa10620eb63cf31d")
-def save_address(address,type,uid,cordinates):
+def serialize_address(addr):
+    """Mongo ObjectIds aren't JSON serializable — stringify before sending to the client."""
+    if not addr:
+        return None
+    out = dict(addr)
+    out["_id"] = str(out["_id"])
+    return out
+def save_address(address,type,uid,cordinates,phone=None):
     user=users.find_one(ObjectId(uid))
     if user :
         result = users.update_one(

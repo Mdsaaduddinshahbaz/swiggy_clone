@@ -1,4 +1,4 @@
-from database import fetch_profiles, get_preview_items, save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+from database import fetch_profiles, get_preview_items, serialize_address,save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
@@ -7,6 +7,7 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 from verify import upload_image   
+from bson import ObjectId
 # from verifpy1 import upload_image
 from functools import wraps
 import jwt
@@ -810,6 +811,85 @@ def update_profile():
     except Exception as e:
         print(e)
         return jsonify({"success": False, "message": "Internal server error"}), 500
+# @app.post("/update_address")
+# @login_required
+# def update_address():
+#     try:
+#         # data=request.get_json()
+#         # address=data["address"]
+#         # types=data["address_type"]
+#         # # uid=data["userId"]
+#         # uid=g.user_id
+#         # cordinates=data["cordinates"]
+#         # result=save_address(address,types,uid,cordinates)
+#         data, error = validate_address()
+
+#         if error:
+#             return error
+#         phone=data.get("phone")
+#         try:
+#             if phone.isdigit():
+#                 if(len(phone)==10):
+#                     pass
+#         except:
+#             return None, (
+#                 jsonify({
+#                     "success": False,
+#                     "message": "Phone number must contain only 10 digits"
+#                 }),
+#                 400
+#             )
+#         result = save_address(
+#             data["address"],
+#             data["address_type"],
+#             g.user_id,
+#             data["cordinates"],
+#             phone
+#             )
+#         if(result["success"]):
+#             return ({"success":True})
+#         else:
+#             return ({"success":False})
+#     except Exception as e:
+#         print(e)
+#         return jsonify({"success": False,"message": "Internal server error"}), 500
+@app.post("/update_address")
+@login_required
+def update_adress():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        payload = request.get_json(silent=True) or {}
+        address_id_raw = payload.get("address_id")
+
+        if not address_id_raw:
+            return jsonify({"success": False, "message": "address_id is required"}), 400
+
+        try:
+            address_id = ObjectId(address_id_raw)
+            print(address_id)
+        except (TypeError):
+            return jsonify({"success": False, "message": "Invalid address_id"}), 400
+
+        # data, error = validate_address()
+        # if error:
+        #     return error
+        result = update_address(
+            address_id,
+            g.user_id,
+            payload["address"],
+            payload["adrs_type"],
+            payload.get("phone")
+        )
+
+        if result["success"]:
+            return jsonify({"success": True, "address": serialize_address(result["address"])})
+        else:
+            return jsonify({"success": False, "message": result.get("message", "Could not update address")}), 404
+
+    except Exception as e:
+        print(e)
+        return jsonify({"success": False, "message": "Internal server error","error":str(e)}), 500
 @app.route("/seller/orders",methods=["POST","GET"])
 @login_required
 def getsellerOrders():
@@ -2036,6 +2116,7 @@ def validate_address():
             }),
             400
         )
+    
 
     return {
         "address": address,
