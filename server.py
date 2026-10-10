@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+# import eventlet
+# eventlet.monkey_patch()
 from database import save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
@@ -169,6 +169,9 @@ def ratelimit_handler(e):
         "success": False,
         "message": "Too many requests, please slow down"
     }), 429
+@app.route("/health", methods=["GET", "POST"])
+def lands():
+    return ({"success":True}),200
 @app.route("/", methods=["GET", "POST"])
 def land():
     return redirect(url_for('renderLanding'))
@@ -588,6 +591,7 @@ def addToCart():
         )
 
         if res["success"]:
+            print("cart success")
             return jsonify({"success": True, "Total": res["total"]})
         return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
 
@@ -601,35 +605,39 @@ def seller_page(name,seller_id):
     except Exception as e:
         print(e)
         return({"success":False})
+import time
 @app.post("/store_orders")
 #@limiter.limit("5 per minute")
 @login_required
 def store_order():
-    user_id = g.user_id
-    lock_key = f"lock:checkout:{user_id}"
-    token = acquire_lock(lock_key, ttl_seconds=15)
+    # user_id = g.user_id 
+    # lock_key = f"lock:checkout:{user_id}"
+    # token = acquire_lock(lock_key, ttl_seconds=15)
 
-    if not token:
-        return jsonify({
-            "success": False,
-            "message": "Your order is already being processed"
-        }), 409
+    # if not token:
+    #     return jsonify({
+    #         "success": False,
+    #         "message": "Your order is already being processed"
+    #     }), 409
     try:
         # data=request.get_json()
         user_id=g.user_id
+        start=time.perf_counter()
         resids=store_orders(user_id)
+        print("store_orders db took ",time.perf_counter()-start)
         if(resids==404):
             return({"success":False})
         if resids is False:
             return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
         for resid in resids:
             socketio.emit("new_order", {"msg": "refresh"}, room=resid)
+        print("returning true")
         return ({"success":True})
     except Exception as e:
         print(e)
         return({"success":False})
-    finally:
-        release_lock(lock_key, token)
+    # finally:
+    #     release_lock(lock_key, token)
 @app.get("/orders/<userid>")
 def renderOrders(userid):
     try:
@@ -1513,7 +1521,7 @@ def validate_add_to_cart():
             "success": False,
             "message": "Invalid restaurant or item id"
         }), 400)
-
+    print("done cart validation")
     return {
         "resid": resid,
         "item": item,

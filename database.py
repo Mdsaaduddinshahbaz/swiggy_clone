@@ -18,6 +18,7 @@ except Exception as e:
 
 db=client["restaurants"]
 # db.restaurants_name.create_index([("location", "2dsphere")])
+db.resturant_items.create_index("resturant_id")
 # print(db.restaurants.index_information())
 restaurants_name=db["restaurants_name"]
 resturants_items=db["resturants_items"]
@@ -31,6 +32,7 @@ categories=db["categories"]
 MAX_RETRIES = 5
 users.create_index("email", unique=True)
 owners.create_index("email", unique=True)
+
 def add_resturant_owner(username,password):
     owners.insert_one({"username":username,"password":password})
 def add_resturants(name,address,phone,owner_id,long,latt,file_id="1nR05-X2jjSDUdZNbVmpYBr-bsqv5UhVz"):
@@ -209,16 +211,18 @@ def generate_token():
     while True:
         token = str(uuid.uuid4())[:6].upper()
         
-        if not orders.find_one({"token_no": token}):
-            return token
+        # if not orders.find_one({"token_no": token}):
+        #     return token
+        return token
 def store_orders(userid):
     try:
+        print("in db store_orders")
         token = generate_token()
         # order_id = "ORD_" + str(int(datetime.utcnow().timestamp()))
 
         # ✅ 1. Insert into user_orders
         items = get_cart(userid)
-        print("items=",items)
+        # print("items=",items)
         if(items==None or not items.get("cart")):
             return 404
         # ✅ normalize structure
@@ -231,7 +235,7 @@ def store_orders(userid):
         current_time=datetime.utcnow()
         print("items in store_orders",items["cart"])
         cart=items["cart"]
-        print("cart=",cart)
+        # print("cart=",cart)
         for res_id, data in cart.items():
             # print(res_id,data)
             print(res_id,data)
@@ -292,8 +296,8 @@ def store_orders(userid):
 
                         if seller_inventory:
                             result=resturants_items.bulk_write(seller_inventory, session=session)
-                            if result.modified_count != len(seller_inventory):
-                                raise Exception("Failed to update all inventory items.")
+                            # if result.modified_count != len(seller_inventory):
+                            #     raise Exception("Failed to update all inventory items.")
 
                         delete_cart(userid,session=session)
                         print("Order stored successfully")
