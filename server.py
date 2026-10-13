@@ -753,7 +753,13 @@ def store_order():
         pickup_time=data.get("pickup_time")
         print(pickup_time)
         resids=store_orders(user_id,pickup_time)
-        print("resids in server",resids)
+        print(resids)
+             # print("resids in server",resids)
+        try:
+            if not resids["success"]:
+                return jsonify({"success": False, "message": resids["message"]}), 500
+        except:
+            pass
         if(resids==404):
             return({"success":False})
         if resids is False:
@@ -762,6 +768,7 @@ def store_order():
             socketio.emit("new_order", {"msg": "refresh"}, room=resid)
         return ({"success":True})
     except Exception as e:
+        raise Exception
         print(e)
         return({"success":False})
     finally:
@@ -771,6 +778,7 @@ def renderOrders(userid):
     try:
         return render_template("orders.html",page="orders")
     except Exception as e:
+        raise Exception
         print(e)
         return({"success":False})
 @app.post("/get_orders/<userid>")

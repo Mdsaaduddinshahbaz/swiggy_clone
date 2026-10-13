@@ -501,7 +501,7 @@ def store_orders(userid,pickup_time=None):
         # authoritative read — never trust cart's stored price/qty limits
         fresh_docs = resturants_items.find(
             {"_id": {"$in": item_ids}},
-            {"_id": 1, "price": 1, "available": 1}
+            {"_id": 1, "price": 1, "available": 1,"item_qty":1}
         )
         price_map = {str(d["_id"]): d for d in fresh_docs}
 
@@ -514,7 +514,7 @@ def store_orders(userid,pickup_time=None):
             if not fresh:
                 return {"success": False, "message": f"Item no longer available"}
 
-            if fresh["available"] < item["qty"]:
+            if fresh["item_qty"] < item["qty"]:
                 return {"success": False, "message": f"{item.get('item','Item')} is out of stock"}
 
             if fresh["price"] != item["price"]:
@@ -529,8 +529,8 @@ def store_orders(userid,pickup_time=None):
 
             inventory_updates.append(
                 UpdateOne(
-                    {"_id": ObjectId(item_id), "available": {"$gte": item["qty"]}},
-                    {"$inc": {"available": -item["qty"], "sold": item["qty"]}}
+                    {"_id": ObjectId(item_id), "item_qty": {"$gte": item["qty"]}},
+                    {"$inc": {"item_qty": -item["qty"], "sold": item["qty"]}}
                 )
             )
 
@@ -551,11 +551,11 @@ def store_orders(userid,pickup_time=None):
                         UpdateOne(
                             {
                                 "_id": ObjectId(item_id),
-                                "available": {"$gte": item["qty"]}
+                                "item_qty": {"$gte": item["qty"]}
                             },
                             {
                                 "$inc": {
-                                    "available": -item["qty"],
+                                    "item_qty": -item["qty"],
                                     "sold": item["qty"]
                                 }
                             }

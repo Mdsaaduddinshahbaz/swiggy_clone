@@ -30,7 +30,18 @@
 
             <div class="location-overlay" id="locationOverlay"></div>
             <div class="pickup-overlay" id="pickupOverlay"></div>
-
+                <div class="address-options" id="pickupSheet">
+                    <h2>Pickup Time</h2>
+                    <div class="pickup-time-row">
+                        <i class="fa-regular fa-clock"></i>
+                        <input type="time" id="pickupTimeInput" class="pickup-time-input">
+                    </div>
+                    <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
+                    <button class="live-location-btn" id="confirmPickupBtn">
+                        <i class="fa-solid fa-check"></i>
+                        Confirm & Place Order
+                    </button>
+                </div>
             <!-- Pickup time sheet (used from Cart's scheduled-order flow) -->
             <div class="address-options" id="pickupSheet">
                 <h2>Pickup time</h2>

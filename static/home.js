@@ -1420,7 +1420,8 @@ async function initMenuPage() {
         }
 
         try {
-
+            console.log("added item");
+            
             const response = await fetch("/add_to_cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
