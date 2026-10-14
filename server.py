@@ -87,7 +87,7 @@ def login_required(f):
         if not token:
             print(request.endpoint)
             if(request.endpoint=="home"):
-                return redirect(url_for("login", role="seller"))
+                return redirect(url_for("login", role="user"))
             elif(request.endpoint=="sellerTemplate"):
                 return redirect(url_for("login", role="seller"))
             else:
@@ -347,7 +347,9 @@ def add_resturant():
         phone = request.form.get("phone")
         lat = request.form.get("lat")
         lng = request.form.get("lng")
-        
+        delivery_available=request.form.get("delivery_available")
+        delivery_radius=request.form.get("delivery_radius")        
+        print(delivery_available,delivery_radius)
         # owner_id = request.form.get("owner_id")
         photo = request.files.get("photo")
         # Required field validation
@@ -368,6 +370,10 @@ def add_resturant():
 
         if not lat or not lng:
             return jsonify({"success": False, "message": "Latitude and Longitude are required"}), 400
+        
+        if delivery_available:
+            if int(delivery_radius)<=0:
+                return jsonify({"success": False, "message": "Delivery Radious must be greater than 0"}), 400
         try:
             latt = round(float(lat),4)
             long = round(float(lng),4)
@@ -393,7 +399,7 @@ def add_resturant():
                 }), 400
             file_id=upload_image(photo)
             print(file_id)
-            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt,file_id)
+            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt,delivery_available,delivery_radius,file_id)
             # return ({"success":True,"res_id":id})
             response=jsonify({"success":True,"res_id":id})
             response.delete_cookie("seller_res_token")
@@ -423,7 +429,7 @@ def add_resturant():
             )
             return response
         else:
-            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt)
+            id=add_resturants(name,shop_type,address,phone,owner_id,long,latt,delivery_available,delivery_radius)
             response=jsonify({"success":True,"res_id":id})
             response.delete_cookie("seller_res_token")
             # return response
@@ -483,7 +489,8 @@ def list_resturantss():
         res=list_resturants(long,latt,dist)
         return ({"success":True,"results":res})
     except Exception as e:
-        print(e)
+        # print(e)
+        raise Exception
         return({"success":False})
 @app.route("/preview_items", methods=["POST"])
 def preview_items():

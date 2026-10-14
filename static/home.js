@@ -165,17 +165,18 @@ function renderRestaurants(results, containers) {
         else if (distance_km < 7) {
             minutes_per_km = 2.5
         }
-        else{
+        else {
             minutes_per_km = 2.0
         }
 
-       let eta = distance_km * minutes_per_km
-       let lower = Math.floor(eta / 5) * 5;
+        let eta = distance_km * minutes_per_km
+        let lower = Math.floor(eta / 5) * 5;
         let upper = lower + 5;
 
         let displayEta = `${lower}-${upper}`;
 
         console.log("ETA", eta)
+        console.log(detail.delivery_available? true:false)
         return `
         <div class="store-card" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}" style="--i:${index}">
             <div class="store-head">
@@ -184,6 +185,17 @@ function renderRestaurants(results, containers) {
                     <div class="store-badges">
                         <span class="badge-verified"><i class="fa-solid fa-circle-check"></i> Verified Partner</span>
                         <span class="badge-open">Open Now</span>
+                        ${detail.delivery_available ==="true" ? `
+                            <span class="badge-delivery">
+                                <i class="fa-solid fa-truck"></i>
+                                Delivery within ${escapeHtml(detail.delivery_radius)} km
+                            </span>
+                        ` : `
+                            <span class="badge-pickup">
+                                <i class="fa-solid fa-store"></i>
+                                Pickup only
+                            </span>
+                        `}
                     </div>
                 </div>
                 <button
@@ -263,7 +275,7 @@ function getPosition() {
         if (!navigator.geolocation) {
             reject("Geolocation is not supported by your browser");
             return; // bugfix: without this, code fell through and called
-                     // navigator.geolocation.getCurrentPosition on undefined
+            // navigator.geolocation.getCurrentPosition on undefined
         }
         navigator.geolocation.getCurrentPosition(resolve, reject);
     });
@@ -439,7 +451,7 @@ async function initHomePage() {
         const fetchlocation = JSON.parse(localStorage.getItem("userLocation"));
         if (fetchlocation === null) {
             // await getLocation();
-            const position=await getPosition()
+            const position = await getPosition()
             userLatt = position.coords.latitude;
             userLong = position.coords.longitude;
             const address = await reverseGeocode(userLatt, userLong);
@@ -1421,7 +1433,7 @@ async function initMenuPage() {
 
         try {
             console.log("added item");
-            
+
             const response = await fetch("/add_to_cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

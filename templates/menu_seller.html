@@ -117,15 +117,33 @@
           ✕
         </button>
       </div>
+      <label>
+        Category
+        <select id="itemSub"></select>
+      </label>
 
+      <span>Item Name</span>
       <input id="itemName" placeholder="Item name">
-
+      <span>Description</span>
       <textarea id="itemDesc" placeholder="Description"></textarea>
-
-      <input id="itemUnit" placeholder="Pack size">
-
+      <span>Pack size</span>
+      <!-- <input id="itemUnit" placeholder="Pack size"> -->
+      <div class="pack-size">
+        <input id="itemUnitValue" type="number" min="0.01" step="any" placeholder="Enter quantity">
+        <span>Units</span>
+        <select id="itemUnit">
+          <option value="kg" selected>kg</option>
+          <option value="g">g</option>
+          <option value="L">L</option>
+          <option value="ml">ml</option>
+          <option value="piece">Piece</option>
+          <option value="pack">Pack</option>
+          <option value="dozen">Dozen</option>
+        </select>
+      </div>
+      <span>Item Price</span>
       <input id="itemPrice" type="number" placeholder="Price">
-
+      <span>Item Stock</span>
       <input id="itemStock" type="number" placeholder="Stock">
 
 
@@ -136,16 +154,16 @@
                     object-fit:cover;border-radius:15px;margin-top:10px;">
       </div>
 
-      
+      <span>Low Stock Alert at</span>
       <input id="itemLow" type="number" placeholder="Low stock at" value="10">
 
-      <select id="itemSub"></select>
+      <!-- <select id="itemSub"></select> -->
 
       <label>
 
+        Listed for customers
         <input id="itemListed" type="checkbox" checked>
 
-        Listed for customers
 
       </label>
 
@@ -205,21 +223,21 @@ Pulses
     </div>
   </div>
   <div class="floating-nav">
-            <button class="nav-btn {% if page == 'dashboard' %}active{% endif %}" id="DashboardsBtn">
-                <i data-lucide="layout-dashboard"></i>
-                <span>Dashboard</span>
-            </button>
+    <button class="nav-btn {% if page == 'dashboard' %}active{% endif %}" id="DashboardsBtn">
+      <i data-lucide="layout-dashboard"></i>
+      <span>Dashboard</span>
+    </button>
 
-            <button class="nav-btn active" id="InventorysBtn">
-                <i data-lucide="package"></i>
-                <span>Inventory</span>
-            </button>
+    <button class="nav-btn active" id="InventorysBtn">
+      <i data-lucide="package"></i>
+      <span>Inventory</span>
+    </button>
 
-            <button class="nav-btn {% if page == 'orders' %}active{% endif %}" id="OrderrBtn">
-                <i data-lucide="shopping-bag"></i>
-                <span>Orders</span>
-            </button>
-        </div>
+    <button class="nav-btn {% if page == 'orders' %}active{% endif %}" id="OrderrBtn">
+      <i data-lucide="shopping-bag"></i>
+      <span>Orders</span>
+    </button>
+  </div>
   <!-- <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script> -->
   <script>
     lucide.createIcons();

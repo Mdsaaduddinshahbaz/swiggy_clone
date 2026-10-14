@@ -22,7 +22,7 @@
 
 
 function selectRole(role) {
-
+     console.log("selectRole called with:", role, "userId:", localStorage.getItem("userId"));
     /* ========================================================
        CUSTOMER
     ========================================================= */

@@ -2,81 +2,58 @@ const pathParts = window.location.pathname.split("/");
 
 const resId = pathParts[pathParts.length - 1];
 const type = pathParts[pathParts.length - 4];
-const name=pathParts[pathParts.length - 2];
-const resname=pathParts[pathParts.length - 2];
+const name = pathParts[pathParts.length - 2];
+const resname = pathParts[pathParts.length - 2];
 console.log(type);
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const homeBtn=document.getElementById("homeBtn")
-  homeBtn.addEventListener("click",()=>{
-    window.location.href=`/seller/${name}/${resId}`
-  })
+  const homeBtn = document.getElementById("homeBtn");
+  homeBtn.addEventListener("click", () => {
+    window.location.href = `/seller/${name}/${resId}`;
+  });
+
   const res = await fetch("/list_items", {
     method: "POST",
-    "headers": { "Content-Type": "application/json" },
-    body: JSON.stringify({ "res_id": resId, "type": type })
-  })
-  if(res.status ==401){
-        alert("unauthorized,Please Log in")
-        window.location.href="/login/seller";
-        return;    
-    }
-  const data = await res.json()
-  console.log(data)
-  if (data.success) {
-    state.tree =
-      data.categories.categories.map(
-        cat => ({
-          id: String(cat._id),
-          name: cat.name,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ res_id: resId, type: type })
+  });
 
-          subcategories:
-            cat.subcategories.map(
-              sub => ({
-                id: String(sub._id),
-                name: sub.name
-              })
-            )
-        })
-      );
-    state.items =
-      Object.entries(data.res)
-        .map(([id, item]) => ({
-          id: id,
-          name:item.name,
-
-          desc:
-            item.desc || "",
-
-          unit:
-            item.unit || "",
-
-          price:
-            Number(
-              item.price
-            ),
-
-          stock:
-            Number(
-              (item.item_qty-item.sold)
-            ),
-
-          lowAt:
-            Number(
-              item.lowat
-            ),
-
-          available:
-            item.available,
-
-          subId:
-            String(item.sub_id),
-          
-          url:item.file_url
-        }));
-    render();
+  if (res.status == 401) {
+    alert("unauthorized,Please Log in");
+    window.location.href = "/login/seller";
+    return;
   }
 
-})
+  const data = await res.json();
+  console.log(data);
+
+  if (data.success) {
+    state.tree = data.categories.categories.map(cat => ({
+      id: String(cat._id),
+      name: cat.name,
+      subcategories: cat.subcategories.map(sub => ({
+        id: String(sub._id),
+        name: sub.name
+      }))
+    }));
+
+    state.items = Object.entries(data.res).map(([id, item]) => ({
+      id: id,
+      name: item.name,
+      desc: item.desc || "",
+      unit: item.unit || "",
+      price: Number(item.price),
+      stock: Number(item.item_qty - item.sold),
+      lowAt: Number(item.lowat),
+      available: item.available,
+      subId: String(item.sub_id),
+      url: item.file_url
+    }));
+
+    render();
+  }
+});
+
 const seedTree = [
   {
     id: "cat-1",
@@ -158,6 +135,7 @@ const state = {
   },
 
   activeSub: null,
+  activeCat: null, // NEW: selected category (shows all items in its subcategories)
   query: "",
   stockFilter: "all",
 
@@ -167,504 +145,278 @@ const state = {
   activeCategory: null,
   categoryDrawerOpen: false
 };
+
 function openSubcategoryDrawer(cat) {
   state.activeCategory = cat.id;
   state.subcategoryDrawerOpen = true;
 
-  const overlay =
-    document.getElementById(
-      "subcategoryDrawer"
-    );
+  const overlay = document.getElementById("subcategoryDrawer");
+  overlay.classList.add("open");
 
-  overlay.classList.add(
-    "open"
-  );
-
-  const input =
-    overlay.querySelector(
-      "#subcatName"
-    );
-
+  const input = overlay.querySelector("#subcatName");
   input.value = "";
-
   input.focus();
 
-  const title =
-    overlay.querySelector(
-      "#subDrawerTitle"
-    );
-
-  title.textContent =
-    `Add subcategory to ${cat.name}`;
+  const title = overlay.querySelector("#subDrawerTitle");
+  title.textContent = `Add subcategory to ${cat.name}`;
 }
+
 function closeSubcategoryDrawer() {
-  console.log("in closeSubcategory")
-  state.subcategoryDrawerOpen =
-    false;
-
-  state.activeCategory =
-    null;
-
-  document
-    .getElementById(
-      "subcategoryDrawer"
-    )
-    .classList.remove(
-      "open"
-    );
+  console.log("in closeSubcategory");
+  state.subcategoryDrawerOpen = false;
+  state.activeCategory = null;
+  document.getElementById("subcategoryDrawer").classList.remove("open");
 }
-function openItemDrawer(
-  item = null
-) {
-  state.editingItem =
-    item;
 
-  state.drawerOpen =
-    true;
+function openItemDrawer(item = null) {
+  hideNameDropdown();
+  state.editingItem = item;
+  state.drawerOpen = true;
 
-  const drawer =
-    document.getElementById(
-      "itemDrawer"
-    );
+  const drawer = document.getElementById("itemDrawer");
+  drawer.classList.remove("hidden");
 
-  drawer.classList.remove(
-    "hidden"
-  );
-  const title =
-    document.getElementById(
-      "drawerTitle"
-    );
+  document.getElementById("drawerTitle").textContent = item ? "Edit Item" : "Add Item";
 
-  title.textContent =
-    item
-      ? "Edit Item"
-      : "Add Item";
+  document.getElementById("itemName").value = item?.name || "";
+  document.getElementById("itemDesc").value = item?.desc || "";
+  setUnitFields(item?.unit || "");
+  document.getElementById("itemPrice").value = item?.price || "";
+  document.getElementById("itemStock").value = item?.stock || "";
+  document.getElementById("itemLow").value = item?.lowAt || 10;
+  document.getElementById("itemListed").checked = item?.available ?? true;
 
-  document.getElementById(
-    "itemName"
-  ).value =
-    item?.name || "";
-
-  document.getElementById(
-    "itemDesc"
-  ).value =
-    item?.desc || "";
-
-  document.getElementById(
-    "itemUnit"
-  ).value =
-    item?.unit || "";
-
-  document.getElementById(
-    "itemPrice"
-  ).value =
-    item?.price || "";
-
-  document.getElementById(
-    "itemStock"
-  ).value =
-    item?.stock || "";
-
-  document.getElementById(
-    "itemLow"
-  ).value =
-    item?.lowAt || 10;
-
-  document.getElementById(
-    "itemListed"
-  ).checked =
-    item?.available ??
-    true;
-
-  const select =
-    document.getElementById(
-      "itemSub"
-    );
-
+  const select = document.getElementById("itemSub");
   select.innerHTML = "";
 
-  state.tree.forEach(
-    cat => {
+  state.tree.forEach(cat => {
+    const group = document.createElement("optgroup");
+    group.label = cat.name;
 
-      const group =
-        document.createElement(
-          "optgroup"
-        );
+    cat.subcategories.forEach(sub => {
+      const option = document.createElement("option");
+      option.value = sub.id;
+      option.textContent = sub.name;
+      group.appendChild(option);
+    });
 
-      group.label =
-        cat.name;
-
-      cat.subcategories.forEach(
-        sub => {
-
-          const option =
-            document.createElement(
-              "option"
-            );
-
-          option.value =
-            sub.id;
-
-          option.textContent =
-            sub.name;
-
-          group.appendChild(
-            option
-          );
-        }
-      );
-
-      select.appendChild(
-        group
-      );
-    }
-  );
+    select.appendChild(group);
+  });
 
   select.value =
     item?.subId ||
     state.activeSub ||
-    state.tree[0]
-      .subcategories[0]
-      .id;
+    state.tree[0].subcategories[0].id;
 }
 
 function closeDrawer() {
-  state.drawerOpen =
-    false;
-
-  document
-    .getElementById(
-      "itemDrawer"
-    )
-    .classList.add(
-      "hidden"
-    );
+  state.drawerOpen = false;
+  document.getElementById("itemDrawer").classList.add("hidden");
 }
 
 async function saveItem() {
   const file = document.getElementById("photo").files[0];
   const item = {
-    id:
-      state.editingItem?.id ||
-      `SKU-${Date.now()}`,
-
-    name:
-      document.getElementById(
-        "itemName"
-      ).value,
-
-    desc:
-      document.getElementById(
-        "itemDesc"
-      ).value,
-
-    unit:
-      document.getElementById(
-        "itemUnit"
-      ).value,
-
-    price: Number(
-      document.getElementById(
-        "itemPrice"
-      ).value
-    ),
-
-    stock: Number(
-      document.getElementById(
-        "itemStock"
-      ).value
-    ),
-
-    lowAt: Number(
-      document.getElementById(
-        "itemLow"
-      ).value
-    ),
-
-    subId:
-      document.getElementById(
-        "itemSub"
-      ).value,
-
-    available:
-      document.getElementById(
-        "itemListed"
-      ).checked,
-
-    url:null
+    id: state.editingItem?.id || `SKU-${Date.now()}`,
+    name: document.getElementById("itemName").value,
+    desc: document.getElementById("itemDesc").value,
+    unit: getUnitString(),
+    price: Number(document.getElementById("itemPrice").value),
+    stock: Number(document.getElementById("itemStock").value),
+    lowAt: Number(document.getElementById("itemLow").value),
+    subId: document.getElementById("itemSub").value,
+    available: document.getElementById("itemListed").checked,
+    url: state.editingItem?.url || null // keep existing image when editing
   };
-  console.log(item.subId)
+  console.log(item.subId);
+
   const formData = new FormData();
-  
-  formData.append("res_id", resId)
-  formData.append("sub_id", item.subId)
-  formData.append("desc", item.desc)
-  formData.append("itm_name", item.name)
-  formData.append("unit", item.unit)
-  formData.append("price", item.price)
-  formData.append("itm_qty", item.stock)
-  formData.append("lowat", item.lowAt)
-  formData.append("available", item.available)
-  formData.append("sold", 0)
-    if (file) {
-        formData.append("photo", file);
-    }
+
+  formData.append("res_id", resId);
+  formData.append("sub_id", item.subId);
+  formData.append("desc", item.desc);
+  formData.append("itm_name", item.name);
+  formData.append("unit", item.unit);
+  formData.append("price", item.price);
+  formData.append("itm_qty", item.stock);
+  formData.append("lowat", item.lowAt);
+  formData.append("available", item.available);
+  formData.append("sold", 0);
+  if (file) {
+    formData.append("photo", file);
+  }
+
   if (state.editingItem) {
-    formData.append("item_id", item.id)
-    // console.log(formData)
-    formData.append("name", item.name)
-    formData.append("unit", item.unit)
-    formData.append("price", item.price)
-    formData.append("lowAt", item.lowAt)
-    formData.append("desc", item.desc)
-    formData.append("subId", item.subId)
-    formData.append("stock", item.stock)
-    formData.append("available", item.available)
+    formData.append("item_id", item.id);
+    formData.append("name", item.name);
+    formData.append("unit", item.unit);
+    formData.append("price", item.price);
+    formData.append("lowAt", item.lowAt);
+    formData.append("desc", item.desc);
+    formData.append("subId", item.subId);
+    formData.append("stock", item.stock);
+    formData.append("available", item.available);
     if (file) {
-        formData.append("photo", file);
+      formData.append("photo", file);
     }
+
     const res = await fetch("/update_item_details", {
       method: "POST",
-      // headers: { "Content-Type": "application/json" },
-      // body: JSON.stringify({
-      //   "item_id": item.id,
-      //   "name": item.name,
-      //   "unit": item.unit,
-      //   "price": item.price,
-      //   "lowAt": item.lowAt,
-      //   "desc": item.desc,
-      //   "subId": item.subId,
-      //   "stock": item.stock,
-      //   "available": item.available
-      // })
       body: formData
-    })
-    const data = await res.json()
-    console.log(data)
+    });
+    const data = await res.json();
+    console.log(data);
+
     if (data.success) {
-
-      state.items =
-        state.items.map(
-          i =>
-            i.id === item.id
-              ? item
-              : i
-        );
+      if (data.img_url) item.url = data.img_url;
+      state.items = state.items.map(i => (i.id === item.id ? item : i));
+    } else {
     }
-    else {
-
-    }
-  }
-  else {
-    // const res = await fetch("/add_res_items", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({
-    //     "res_id": resId,
-    //     "sub_id": item.subId,
-    //     "description": item.desc,
-    //     "itm_name": item.name,
-    //     "unit": item.unit,
-    //     "price": item.price,
-    //     "itm_qty": item.stock,
-    //     "lowAt": item.lowAt,
-    //     "available": item.available,
-    //     "sold": 0
-    //   })
-    // })
-    
+  } else {
     const res = await fetch("/add_res_items", {
       method: "POST",
       body: formData
-    })
-    const data = await res.json()
+    });
+    const data = await res.json();
     if (data.success) {
-      console.log(data)
-      item.id = data.id
-      item.url=data.img_url
-      state.items.unshift(
-        item
-      );
-    }
-    else {
-
+      console.log(data);
+      item.id = data.id;
+      item.url = data.img_url;
+      state.items.unshift(item);
+    } else {
     }
   }
+
   state.editingItem = null;
   closeDrawer();
   render();
 }
-function deleteItem(id) {
-  state.items =
-    state.items.filter(
-      i =>
-        i.id !== id
-    );
 
+function deleteItem(id) {
+  state.items = state.items.filter(i => i.id !== id);
   render();
 }
-function renderTree() {
-  const tree =
-    document.getElementById(
-      "categoryTree"
-    );
 
+function renderTree() {
+  const tree = document.getElementById("categoryTree");
   tree.innerHTML = "";
 
-  const allBtn =
-    document.getElementById(
-      "allItemsBtn"
-    );
-
+  const allBtn = document.getElementById("allItemsBtn");
   allBtn.classList.toggle(
     "active",
-    state.activeSub === null
+    state.activeSub === null && state.activeCat === null
   );
 
-  state.tree.forEach(
-    (cat, index) => {
+  state.tree.forEach((cat, index) => {
+    const wrapper = document.createElement("div");
+    const btn = document.createElement("button");
 
-      const wrapper =
-        document.createElement("div");
+    btn.style.cssText = `
+      width:100%;
+      text-align:left;
+      padding:10px 20px;
+      border:none;
+      background:${state.activeCat === cat.id ? "#EAE6D9" : "none"};
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-family:Fraunces;
+      font-size:14px;
+      font-weight:600;
+    `;
 
-      const btn =
-        document.createElement(
-          "button"
-        );
+    btn.innerHTML = `
+      <span>
+        ${state.expanded[cat.id] ? "▼" : "▶"}
+      </span>
 
-      btn.style.cssText = `
-        width:100%;
-        text-align:left;
-        padding:10px 20px;
-        border:none;
-        background:none;
-        cursor:pointer;
-        display:flex;
-        align-items:center;
-        gap:8px;
-        font-family:Fraunces;
-        font-size:14px;
-        font-weight:600;
-      `;
-      
-      btn.innerHTML = `
-        <span>
-          ${state.expanded[cat.id]
-          ? "▼"
-          : "▶"
-        }
-        </span>
+      <span>
+        ${index + 1}.
+        ${cat.name}
+      </span>
+    `;
 
-        <span>
-          ${index + 1}.
-          ${cat.name}
-        </span>
-      `;
+    // Category click: toggle expand + select category (shows all its items)
+    btn.onclick = () => {
+      state.expanded[cat.id] = !state.expanded[cat.id];
+      state.activeCat = cat.id;
+      state.activeSub = null;
+      render();
+    };
 
-      btn.onclick = () => {
-        console.log(state.expanded[cat.id])
-        state.expanded[cat.id] =
-          !state.expanded[cat.id];
+    wrapper.appendChild(btn);
 
-        render();
-      };
+    if (state.expanded[cat.id]) {
+      cat.subcategories.forEach(sub => {
+        const count = state.items.filter(i => i.subId === sub.id).length;
 
-      wrapper.appendChild(btn);
+        const subBtn = document.createElement("button");
 
-      if (state.expanded[cat.id]) {
-        cat.subcategories.forEach(
-          sub => {
+        subBtn.style.cssText = `
+          width:100%;
+          border:none;
+          background:${state.activeSub === sub.id ? "#EAE6D9" : "transparent"};
+          cursor:pointer;
+          padding:8px 20px 8px 42px;
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+        `;
 
-            const count =
-              state.items.filter(
-                i =>
-                  i.subId === sub.id
-              ).length;
+        subBtn.innerHTML = `
+          <span>
+            ${sub.name}
+          </span>
 
-            const subBtn =
-              document.createElement(
-                "button"
-              );
+          <span
+            style="
+              font-family:'JetBrains Mono';
+              font-size:11px;
+              color:#87897F;
+            "
+          >
+            ${count}
+          </span>
+        `;
 
-            subBtn.style.cssText = `
-              width:100%;
-              border:none;
-              background:${state.activeSub ===
-                sub.id
-                ? "#EAE6D9"
-                : "transparent"
-              };
-              cursor:pointer;
-              padding:8px 20px 8px 42px;
-              display:flex;
-              justify-content:space-between;
-              align-items:center;
-            `;
-
-            subBtn.innerHTML = `
-              <span>
-                ${sub.name}
-              </span>
-
-              <span
-                style="
-                  font-family:'JetBrains Mono';
-                  font-size:11px;
-                  color:#87897F;
-                "
-              >
-                ${count}
-              </span>
-            `;
-
-            subBtn.onclick =
-              () => {
-
-                state.activeSub =
-                  sub.id;
-
-                render();
-                if (
-                  window.innerWidth <= 768
-                ) {
-                  closeSidebar();
-                }
-              };
-
-            wrapper.appendChild(
-              subBtn
-            );
+        subBtn.onclick = () => {
+          state.activeSub = sub.id;
+          state.activeCat = null;
+          render();
+          if (window.innerWidth <= 768) {
+            closeSidebar();
           }
-        );
-        // Add Subcategory button
-        const addBtn =
-          document.createElement("button");
-
-        addBtn.style.cssText = `
-                width:100%;
-                border:none;
-                background:transparent;
-                cursor:pointer;
-                padding:10px 20px 10px 42px;
-                text-align:left;
-                color:#2E6F4E;
-                font-weight:600;
-              `;
-        addBtn.className =
-          "tree-add-sub";
-        addBtn.innerHTML =
-          "+ Add subcategory";
-
-        addBtn.onclick = () => {
-          openSubcategoryDrawer(cat);
         };
 
-        wrapper.appendChild(addBtn);
-      }
+        wrapper.appendChild(subBtn);
+      });
 
-      tree.appendChild(wrapper);
+      // Add Subcategory button
+      const addBtn = document.createElement("button");
+
+      addBtn.style.cssText = `
+        width:100%;
+        border:none;
+        background:transparent;
+        cursor:pointer;
+        padding:10px 20px 10px 42px;
+        text-align:left;
+        color:#2E6F4E;
+        font-weight:600;
+      `;
+      addBtn.className = "tree-add-sub";
+      addBtn.innerHTML = "+ Add subcategory";
+
+      addBtn.onclick = () => {
+        openSubcategoryDrawer(cat);
+      };
+
+      wrapper.appendChild(addBtn);
     }
-  );
+
+    tree.appendChild(wrapper);
+  });
 }
 
 function getSubLookup() {
@@ -682,61 +434,44 @@ function getSubLookup() {
 
   return map;
 }
-async function renderCards() {
-  const grid =
-    document.getElementById(
-      "itemsGrid"
-    );
 
+// Returns items belonging to the currently selected category (all subcategories)
+function getCategoryItems(catId) {
+  const catObj = state.tree.find(c => c.id === catId);
+  if (!catObj) return [];
+  const subIds = catObj.subcategories.map(s => s.id);
+  return state.items.filter(i => subIds.includes(i.subId));
+}
+
+async function renderCards() {
+  const grid = document.getElementById("itemsGrid");
   grid.innerHTML = "";
 
-  let items =
-    state.items.filter(item => {
+  const catObj = state.tree.find(c => c.id === state.activeCat);
+  const catSubIds = catObj ? catObj.subcategories.map(s => s.id) : [];
 
-      const subMatch =
-        !state.activeSub ||
-        item.subId ===
-        state.activeSub;
+  let items = state.items.filter(item => {
+    const subMatch = state.activeSub
+      ? item.subId === state.activeSub
+      : state.activeCat
+        ? catSubIds.includes(item.subId)
+        : true;
 
-      const searchMatch =
-        item.name
-          .toLowerCase()
-          .includes(
-            state.query.toLowerCase()
-          ) ||
-        item.id
-          .toLowerCase()
-          .includes(
-            state.query.toLowerCase()
-          );
+    const searchMatch =
+      item.name.toLowerCase().includes(state.query.toLowerCase()) ||
+      item.id.toLowerCase().includes(state.query.toLowerCase());
 
-      const stockMatch =
-        state.stockFilter ===
-        "all" ||
+    const stockMatch =
+      state.stockFilter === "all" ||
+      (state.stockFilter === "low" &&
+        item.stock > 0 &&
+        item.stock <= item.lowAt) ||
+      (state.stockFilter === "out" && item.stock === 0);
 
-        (
-          state.stockFilter ===
-          "low" &&
-          item.stock > 0 &&
-          item.stock <=
-          item.lowAt
-        ) ||
-
-        (
-          state.stockFilter ===
-          "out" &&
-          item.stock === 0
-        );
-
-      return (
-        subMatch &&
-        searchMatch &&
-        stockMatch
-      );
-    });
+    return subMatch && searchMatch && stockMatch;
+  });
 
   if (!items.length) {
-
     grid.innerHTML = `
       <div
         style="
@@ -749,29 +484,16 @@ async function renderCards() {
         No items match here yet.
       </div>
     `;
-
     return;
   }
 
   items.forEach(item => {
+    const low = item.stock > 0 && item.stock <= item.lowAt;
+    const out = item.stock === 0;
 
-    const low =
-      item.stock > 0 &&
-      item.stock <= item.lowAt;
-
-    const out =
-      item.stock === 0;
-
-    const card =
-      document.createElement(
-        "div"
-      );
-
-    card.className =
-      "card";
-
-    card.style.position =
-      "relative";
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.position = "relative";
 
     let badge = "";
 
@@ -831,13 +553,13 @@ async function renderCards() {
         ${item.id}
       </div>
       <img src="${item.url}" alt="food" style="
-    position: absolute; 
-    right: 18px;
-    top: 48px;
-    height: 86px;
-    border-radius: 20px;
-    object-fit: cover;
-    width: 86px;
+        position: absolute;
+        right: 18px;
+        top: 48px;
+        height: 86px;
+        border-radius: 20px;
+        object-fit: cover;
+        width: 86px;
       ">
       <h3 style="display: block;word-wrap: anywhere;width: 60%;">
         ${item.name}
@@ -861,26 +583,15 @@ async function renderCards() {
         class="card-stock"
         style="
           color:
-            ${out
-        ? "#B23B30"
-        : low
-          ? "#C97A1F"
-          : "#2E6F4E"
-      };
+            ${out ? "#B23B30" : low ? "#C97A1F" : "#2E6F4E"};
         "
       >
-        ${out
-        ? "Out of stock"
-        : `${item.stock} in stock`
-      }
+        ${out ? "Out of stock" : `${item.stock} in stock`}
       </div>
     `;
 
-    const controls =
-      document.createElement(
-        "div"
-      );
-    controls.className="controlsContainer"
+    const controls = document.createElement("div");
+    controls.className = "controlsContainer";
     controls.style.cssText = `
 display:flex;
 justify-content:flex-end;
@@ -888,14 +599,8 @@ gap:10px;
 margin-top:15px;
 `;
 
-    const edit =
-      document.createElement(
-        "button"
-      );
-
-    edit.textContent =
-      "Edit";
-
+    const edit = document.createElement("button");
+    edit.textContent = "Edit";
     edit.style.cssText = `
 padding:6px 10px;
 border:1px solid #E1DED2;
@@ -903,19 +608,10 @@ background:white;
 border-radius:6px;
 cursor:pointer;
 `;
-    edit.onclick =
-      async () =>
-        openItemDrawer(
-          item
-        );
+    edit.onclick = async () => openItemDrawer(item);
 
-    const del =
-      document.createElement(
-        "button"
-      );
-
-    del.textContent =
-      "Delete";
+    const del = document.createElement("button");
+    del.textContent = "Delete";
     del.style.cssText = `
 padding:6px 10px;
 border:1px solid #E1DED2;
@@ -924,93 +620,52 @@ border-radius:6px;
 cursor:pointer;
 color:#B23B30;
 `;
-    del.onclick =
-      async () => {
-        const res = await fetch("/remove_items", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ "item_id": item.id })
-        })
-        const data = await res.json()
-        if (data.success) {
-          deleteItem(item.id);
-        }
-        else {
-
-        }
+    del.onclick = async () => {
+      const res = await fetch("/remove_items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: item.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        deleteItem(item.id);
+      } else {
       }
+    };
 
-    controls.appendChild(
-      edit
-    );
-
-    controls.appendChild(
-      del
-    );
-
-    card.appendChild(
-      controls
-    );
-
-    grid.appendChild(
-      card
-    );
+    controls.appendChild(edit);
+    controls.appendChild(del);
+    card.appendChild(controls);
+    grid.appendChild(card);
   });
 }
+
 function closeCategoryDrawer() {
-  console.log("closeCategoryDrawer clicked")
-  state.categoryDrawerOpen =
-    false;
-
-  document
-    .getElementById(
-      "categoryDrawer"
-    )
-    .classList.add(
-      "hidden"
-    );
+  console.log("closeCategoryDrawer clicked");
+  state.categoryDrawerOpen = false;
+  document.getElementById("categoryDrawer").classList.add("hidden");
 }
+
 function showCategoryDrawer() {
-  console.log("closeCategoryDrawer clicked")
-  state.categoryDrawerOpen =
-    true;
-
-  document
-    .getElementById(
-      "categoryDrawer"
-    )
-    .classList.remove(
-      "hidden"
-    );
+  console.log("showCategoryDrawer clicked");
+  state.categoryDrawerOpen = true;
+  document.getElementById("categoryDrawer").classList.remove("hidden");
 }
+
 function renderStats() {
-  document.getElementById(
-    "totalItems"
-  ).textContent =
-    state.items.length;
+  document.getElementById("totalItems").textContent = state.items.length;
 
-  document.getElementById(
-    "listedItems"
-  ).textContent =
-    state.items.filter(
-      i => i.available
-    ).length;
+  document.getElementById("listedItems").textContent = state.items.filter(
+    i => i.available
+  ).length;
 
-  document.getElementById(
-    "lowItems"
-  ).textContent =
-    state.items.filter(
-      i =>
-        i.stock > 0 &&
-        i.stock <= i.lowAt
-    ).length;
+  document.getElementById("lowItems").textContent = state.items.filter(
+    i => i.stock > 0 && i.stock <= i.lowAt
+  ).length;
 
-  document.getElementById(
-    "outItems"
-  ).textContent =
-    state.items.filter(
-      i => i.stock === 0
-    ).length;
+  document.getElementById("outItems").textContent = state.items.filter(
+    i => i.stock === 0
+  ).length;
 }
 
 function render() {
@@ -1021,194 +676,95 @@ function render() {
 }
 
 function renderHeader() {
-  const lookup =
-    getSubLookup();
+  const lookup = getSubLookup();
+  const title = document.getElementById("headerTitle");
+  const crumb = document.getElementById("breadcrumb");
 
-  const title =
-    document.getElementById(
-      "headerTitle"
-    );
+  // Category selected: show category name + names of all items in it
+  if (state.activeCat) {
+    const cat = state.tree.find(c => c.id === state.activeCat);
+    if (cat) {
+      const names = getCategoryItems(cat.id).map(i => i.name);
+      title.textContent = cat.name;
+      crumb.textContent = names.length
+        ? `Items: ${names.join(", ")}`
+        : "No items in this category yet";
+      return;
+    }
+  }
 
-  const crumb =
-    document.getElementById(
-      "breadcrumb"
-    );
-
-  if (
-    !state.activeSub
-  ) {
-    title.textContent =
-      "All items";
-
-    crumb.textContent =
-      "Every category";
-
+  if (!state.activeSub) {
+    title.textContent = "All items";
+    crumb.textContent = "Every category";
     return;
   }
 
-  const sub =
-    lookup[
-    state.activeSub
-    ];
+  const sub = lookup[state.activeSub];
 
-  title.textContent =
-    sub.name;
-
-  crumb.textContent =
-    `${sub.catName} / ${sub.name}`;
+  title.textContent = sub.name;
+  crumb.textContent = `${sub.catName} / ${sub.name}`;
 }
-document
-  .getElementById("searchInput")
-  .addEventListener(
-    "input",
-    e => {
-      state.query = e.target.value;
-      render();
-    }
-  );
-document
-  .getElementById("allItemsBtn")
-  .onclick = () => {
-    state.activeSub = null;
-    render();
-    if (
-      window.innerWidth <= 768
-    ) {
-      closeSidebar();
-    }
-  };
 
-document
-  .getElementById(
-    "stockFilter"
-  )
-  .addEventListener(
-    "change",
-    e => {
-      state.stockFilter =
-        e.target.value;
-
-      render();
-    }
-  );
-document.getElementById("hideCategoryBtn").addEventListener("click", function () {
-
-  closeSidebar()
+document.getElementById("searchInput").addEventListener("input", e => {
+  state.query = e.target.value;
+  render();
 });
 
+document.getElementById("allItemsBtn").onclick = () => {
+  state.activeSub = null;
+  state.activeCat = null;
+  render();
+  if (window.innerWidth <= 768) {
+    closeSidebar();
+  }
+};
 
+document.getElementById("stockFilter").addEventListener("change", e => {
+  state.stockFilter = e.target.value;
+  render();
+});
 
-document
-  .getElementById(
-    "addItemBtn"
-  )
-  .onclick =
-  () =>
-    openItemDrawer();
-document
-  .getElementById(
-    "cancelSubBtn"
-  )
-  .onclick =
-  closeSubcategoryDrawer;
-document
-  .getElementById(
-    "closeDrawer"
-  )
-  .onclick =
-  closeDrawer;
-document
-  .getElementById(
-    "closeCategoryDrawer"
-  )
-  .onclick =
-  closeCategoryDrawer;
+document.getElementById("hideCategoryBtn").addEventListener("click", function () {
+  closeSidebar();
+});
 
-document
-  .getElementById(
-    "addCategoryBtn"
-  )
-  .onclick =
-  showCategoryDrawer;
+document.getElementById("addItemBtn").onclick = () => openItemDrawer();
+document.getElementById("cancelSubBtn").onclick = closeSubcategoryDrawer;
+document.getElementById("closeDrawer").onclick = closeDrawer;
+document.getElementById("closeCategoryDrawer").onclick = closeCategoryDrawer;
+document.getElementById("addCategoryBtn").onclick = showCategoryDrawer;
+document.getElementById("saveItemBtn").onclick = saveItem;
+document.getElementById("menuToggle").onclick = openSidebar;
+document.getElementById("sidebarOverlay").onclick = closeSidebar;
 
-document
-  .getElementById(
-    "saveItemBtn"
-  )
-  .onclick =
-  saveItem;
-document
-  .getElementById(
-    "menuToggle"
-  )
-  .onclick =
-  openSidebar;
-
-document
-  .getElementById(
-    "sidebarOverlay"
-  )
-  .onclick =
-  closeSidebar;
 render();
+
 function openSidebar() {
   state.sidebarOpen = true;
-
-  document
-    .querySelector(
-      ".sidebar"
-    )
-    .classList.add(
-      "open"
-    );
-
-  document
-    .getElementById(
-      "sidebarOverlay"
-    )
-    .classList.remove(
-      "hidden"
-    );
+  document.querySelector(".sidebar").classList.add("open");
+  document.getElementById("sidebarOverlay").classList.remove("hidden");
 }
 
 function closeSidebar() {
   state.sidebarOpen = false;
-
-  document
-    .querySelector(
-      ".sidebar"
-    )
-    .classList.remove(
-      "open"
-    );
-
-  document
-    .getElementById(
-      "sidebarOverlay"
-    )
-    .classList.add(
-      "hidden"
-    );
+  document.querySelector(".sidebar").classList.remove("open");
+  document.getElementById("sidebarOverlay").classList.add("hidden");
 }
 
-const saveCategoryBtn = document.getElementById("saveCategoryBtn")
+const saveCategoryBtn = document.getElementById("saveCategoryBtn");
 saveCategoryBtn.addEventListener("click", async () => {
   const cat = document.querySelector("#categoryDrawer");
   const drawer = cat.querySelector(".drawer");
-  // console.log(drawer)
   const catName = drawer.querySelector("#catName").value;
   const subNames = drawer
     .querySelector("#subNames")
-    .value
-    .split("\n")
+    .value.split("\n")
     .map(item => item.trim())
     .filter(item => item !== "");
   console.log(catName);
   console.log(subNames);
-  if (
-    !catName.trim() ||
-    !subNames.length
-  ) {
+
+  if (!catName.trim() || !subNames.length) {
     return;
   }
 
@@ -1216,108 +772,229 @@ saveCategoryBtn.addEventListener("click", async () => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      "res_id": resId,
-      "cat_name": catName,
-      "subcats": subNames
+      res_id: resId,
+      cat_name: catName,
+      subcats: subNames
     })
-  })
-  const data = await res.json()
-  console.log(data)
+  });
+  const data = await res.json();
+  console.log(data);
+
   if (data.success) {
     console.log("updated");
     const cat = data.category;
-    // state.tree.push({
-    //   id: `cat-${data.cat_id}`,
-    //   name: catName,
-    //   subcategories: subNames.map((name, i) => ({
-    //     id: `sub-${Date.now()}-${i}`,
-    //     name
-    //   }))
-    // });
     state.tree.push({
       id: String(cat._id),
       name: cat.name,
-      subcategories:
-        cat.subcategories.map(sub => ({
-          id: String(sub._id),
-          name: sub.name
-        }))
+      subcategories: cat.subcategories.map(sub => ({
+        id: String(sub._id),
+        name: sub.name
+      }))
     });
-
 
     render();
     closeCategoryDrawer();
-
-  }
-  else {
+  } else {
     console.log("not updated");
+  }
+});
 
+document.getElementById("saveSubBtn").onclick = async () => {
+  const name = document.getElementById("subcatName").value.trim();
+
+  if (!name) return;
+
+  const res = await fetch("/save_subcategory", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      res_id: resId,
+      category_id: state.activeCategory,
+      name
+    })
+  });
+
+  const data = await res.json();
+  console.log(data);
+  if (!data.success) return;
+
+  const category = state.tree.find(
+    c => c.id === String(state.activeCategory)
+  );
+
+  category.subcategories.push({
+    id: String(data.subcategory._id),
+    name: data.subcategory.name
+  });
+
+  render();
+  closeSubcategoryDrawer();
+};
+
+
+/* ---------- Item name dropdown (Add / Edit item drawer) ----------
+   Click the item name box -> shows all existing items in the same
+   category as the selected subcategory. Click one to fill the name. */
+const itemNameInput = document.getElementById("itemName");
+const itemSubSelect = document.getElementById("itemSub");
+
+const nameWrap = document.createElement("div");
+nameWrap.style.position = "relative";
+itemNameInput.parentNode.insertBefore(nameWrap, itemNameInput);
+nameWrap.appendChild(itemNameInput);
+
+const nameDropdown = document.createElement("div");
+nameDropdown.style.cssText = `
+  display:none;
+  position:absolute;
+  left:0;
+  right:0;
+  top:100%;
+  margin-top:4px;
+  z-index:50;
+  max-height:220px;
+  overflow-y:auto;
+  background:#fff;
+  border:1px solid #E1DED2;
+  border-radius:8px;
+  box-shadow:0 8px 20px rgba(0,0,0,.12);
+`;
+nameWrap.appendChild(nameDropdown);
+
+function hideNameDropdown() {
+  nameDropdown.style.display = "none";
+}
+
+function renderNameDropdown() {
+  const info = getSubLookup()[itemSubSelect.value];
+  if (!info) return hideNameDropdown();
+
+  const q = itemNameInput.value.trim().toLowerCase();
+  const subLookup = getSubLookup();
+  const list = getCategoryItems(info.catId).filter(i =>
+    i.name.toLowerCase().includes(q)
+  );
+
+  nameDropdown.innerHTML = "";
+
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.textContent = "No items in this category yet";
+    empty.style.cssText = "padding:10px 12px;color:#87897F;font-size:13px;";
+    nameDropdown.appendChild(empty);
   }
 
+  list.forEach(i => {
+    const row = document.createElement("div");
+    row.style.cssText = `
+      padding:8px 12px;
+      cursor:pointer;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      font-size:14px;
+    `;
 
-})
-document
-  .getElementById(
-    "saveSubBtn"
-  )
-  .onclick =
-  async () => {
+    const label = document.createElement("span");
+    label.textContent = i.name;
 
-    const name =
-      document
-        .getElementById(
-          "subcatName"
-        )
-        .value
-        .trim();
+    const subLabel = document.createElement("span");
+    subLabel.textContent = subLookup[i.subId]?.name || "";
+    subLabel.style.cssText = "color:#87897F;font-size:11px;white-space:nowrap;";
 
-    if (!name) return;
+    row.appendChild(label);
+    row.appendChild(subLabel);
 
-    const res =
-      await fetch(
-        "/save_subcategory",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-          body:
-            JSON.stringify({
-              res_id: resId,
-              category_id:
-                state.activeCategory,
-              name
-            })
-        }
-      );
+    row.onmouseenter = () => (row.style.background = "#F4F1E8");
+    row.onmouseleave = () => (row.style.background = "transparent");
+    row.onmousedown = e => e.preventDefault(); // keep input focused
+    row.onclick = () => {
+      itemNameInput.value = i.name;
+      document.getElementById("itemDesc").value = i.desc || "";
+      setUnitFields(i.unit || "");
+      document.getElementById("itemPrice").value = i.price || "";
+      document.getElementById("itemLow").value = i.lowAt || 10;
+      document.getElementById("itemListed").checked = i.available ?? true;
+      itemSubSelect.value = i.subId;
 
-    const data =
-      await res.json();
-    console.log(data)
-    if (!data.success)
-      return;
+      // stock is left empty on purpose -> blink it so the user fills it
+      const stockInput = document.getElementById("itemStock");
+      stockInput.value = "";
+      hideNameDropdown();
+      blinkInput(stockInput);
+    };
 
-    const category =
-      state.tree.find(
-        c =>
-          c.id ===
-          String(
-            state.activeCategory
-          )
-      );
+    nameDropdown.appendChild(row);
+  });
 
-    category.subcategories.push({
-      id: String(
-        data.subcategory._id
-      ),
-      name:
-        data.subcategory.name
-    });
+  nameDropdown.style.display = "block";
+}
 
-    render();
-    closeSubcategoryDrawer();
-  };
-// document.addEventListener("DOMContentLoaded",()=>{
-//   render()
-// })
+itemNameInput.addEventListener("focus", renderNameDropdown);
+itemNameInput.addEventListener("click", renderNameDropdown);
+itemNameInput.addEventListener("input", renderNameDropdown);
+itemSubSelect.addEventListener("change", () => {
+  if (nameDropdown.style.display === "block") renderNameDropdown();
+});
+document.addEventListener("click", e => {
+  if (!nameWrap.contains(e.target)) hideNameDropdown();
+});
+
+
+/* ---------- Blink effect for the stock input ---------- */
+const blinkStyle = document.createElement("style");
+blinkStyle.textContent = `
+  @keyframes inputBlink {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(46,111,78,0); border-color: #E1DED2; background: inherit; }
+    50% { box-shadow: 0 0 0 4px rgba(46,111,78,.35); border-color: #2E6F4E; background: #EAF4EE; }
+  }
+  .input-blink { animation: inputBlink .6s ease-in-out 3; }
+`;
+document.head.appendChild(blinkStyle);
+
+function blinkInput(el) {
+  el.classList.remove("input-blink");
+  void el.offsetWidth; // restart animation
+  el.classList.add("input-blink");
+  el.focus();
+  el.addEventListener("animationend", () => el.classList.remove("input-blink"), { once: true });
+}
+
+
+/* ---------- Pack size helpers (quantity input + unit select) ----------
+   Stored/sent as one string, e.g. "5 kg". Existing values like "5 kg bag"
+   are split into quantity "5" and unit "kg bag" (added to the select if new). */
+function getUnitString() {
+  const val = document.getElementById("itemUnitValue").value.trim();
+  const unit = document.getElementById("itemUnit").value;
+  return val ? `${val} ${unit}` : unit;
+}
+
+function setUnitFields(str) {
+  const valInput = document.getElementById("itemUnitValue");
+  const unitSelect = document.getElementById("itemUnit");
+
+  const m = String(str || "").trim().match(/^([\d.]+)\s*(.*)$/);
+  const val = m ? m[1] : "";
+  const unit = m ? m[2].trim() : String(str || "").trim();
+
+  valInput.value = val;
+
+  if (!unit) {
+    unitSelect.value = "kg";
+    return;
+  }
+
+  let opt = Array.from(unitSelect.options).find(
+    o => o.value.toLowerCase() === unit.toLowerCase()
+  );
+  if (!opt) {
+    opt = document.createElement("option");
+    opt.value = unit;
+    opt.textContent = unit;
+    unitSelect.appendChild(opt);
+  }
+  unitSelect.value = opt.value;
+}

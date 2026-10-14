@@ -319,7 +319,7 @@ body {
 .drawer textarea,
 .drawer select {
   width: 100%;
-  margin-top: 15px;
+  margin-bottom: 15px;
   padding: 12px;
   border: 1px solid #D3CEBA;
   border-radius: 8px;
