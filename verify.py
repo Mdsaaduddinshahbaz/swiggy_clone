@@ -100,7 +100,7 @@ creds = None
 # )
 try:
     creds = Credentials.from_authorized_user_file(
-        "token.json",
+        "/etc/secrets/token.json",
         SCOPES
     )
 except FileNotFoundError:
