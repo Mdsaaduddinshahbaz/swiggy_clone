@@ -440,6 +440,46 @@ function ensureScannerUI() {
         #scanResult button { width: 100%; border: none; border-radius: 12px; padding: 14px 0; font-weight: 700; font-size: 15px; cursor: pointer; margin-top: 8px; }
         #scanResult .srPrimary { background: #1F8A4C; color: #fff; }
         #scanResult .srGhost { background: transparent; color: #6b5f58; border: 1px solid #E7D8C3; }
+        #qrScanner video {
+    background: #000;
+}
+
+#qrScanner .cameraLoading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: #101010;
+    color: #fff;
+    font-size: 14px;
+}
+
+#qrScanner .cameraLoading .spinner {
+    width: 30px;
+    height: 30px;
+    border: 3px solid #444;
+    border-top-color: #E8491D;
+    border-radius: 50%;
+    animation: cameraSpin 0.8s linear infinite;
+}
+
+@keyframes cameraSpin {
+    to { transform: rotate(360deg); }
+}
+
+#qrScanner.camera-ready .cameraLoading {
+    display: none;
+}
+
+#qrScanner:not(.camera-ready) .scanFrame,
+#qrScanner:not(.camera-ready) .scanTop,
+#qrScanner:not(.camera-ready) .scanHint {
+    visibility: hidden;
+}
     `;
     document.head.appendChild(style);
 
@@ -447,6 +487,10 @@ function ensureScannerUI() {
     root.id = "qrScanner";
     root.innerHTML = `
         <video playsinline muted autoplay></video>
+        <div class="cameraLoading">
+    <div class="spinner"></div>
+    <span>Starting camera...</span>
+</div>
         <div class="scanTop">
             <span class="scanTitle">Scan customer QR</span>
             <button type="button" class="scanClose" aria-label="Close scanner">✕</button>
@@ -482,6 +526,7 @@ function setScanHint(text) {
 
 async function openScanner() {
     const root = ensureScannerUI();
+    root.classList.remove("camera-ready");
     const video = root.querySelector("video");
 
     hideScanResult();
@@ -520,6 +565,20 @@ async function openScanner() {
         video.muted = true;
         await video.play();
 
+        // Wait until the camera provides actual video frames
+        if (video.readyState < 2) {
+            await new Promise((resolve, reject) => {
+                video.addEventListener("loadeddata", resolve, { once: true });
+                video.addEventListener("error", reject, { once: true });
+            });
+        }
+
+        if (!root.classList.contains("show")) {
+            stopCamera();
+            return;
+        }
+
+        root.classList.add("camera-ready");
         setScanHint("Align the QR code inside the square");
         startScanLoop();
     } catch (err) {
