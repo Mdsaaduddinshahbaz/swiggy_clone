@@ -288,7 +288,7 @@ document.addEventListener("click", async (e) => {
 // QR SCANNER  (full-screen in-app camera, square scan frame in the centre)
 // ===============================================================
 
-const JSQR_URL = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
+const JSQR_URL = "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js";
 let jsQRPromise = null;
 
 const scanner = {
