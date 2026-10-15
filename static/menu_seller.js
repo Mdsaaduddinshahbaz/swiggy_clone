@@ -686,9 +686,6 @@ function renderHeader() {
     if (cat) {
       const names = getCategoryItems(cat.id).map(i => i.name);
       title.textContent = cat.name;
-      crumb.textContent = names.length
-        ? `Items: ${names.join(", ")}`
-        : "No items in this category yet";
       return;
     }
   }
