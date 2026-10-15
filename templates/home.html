@@ -30,18 +30,18 @@
 
             <div class="location-overlay" id="locationOverlay"></div>
             <div class="pickup-overlay" id="pickupOverlay"></div>
-                <div class="address-options" id="pickupSheet">
-                    <h2>Pickup Time</h2>
-                    <div class="pickup-time-row">
-                        <i class="fa-regular fa-clock"></i>
-                        <input type="time" id="pickupTimeInput" class="pickup-time-input">
-                    </div>
-                    <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
-                    <button class="live-location-btn" id="confirmPickupBtn">
-                        <i class="fa-solid fa-check"></i>
-                        Confirm & Place Order
-                    </button>
+            <div class="address-options" id="pickupSheet">
+                <h2>Pickup Time</h2>
+                <div class="pickup-time-row">
+                    <i class="fa-regular fa-clock"></i>
+                    <input type="time" id="pickupTimeInput" class="pickup-time-input">
                 </div>
+                <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
+                <button class="live-location-btn" id="confirmPickupBtn">
+                    <i class="fa-solid fa-check"></i>
+                    Confirm & Place Order
+                </button>
+            </div>
             <!-- Pickup time sheet (used from Cart's scheduled-order flow) -->
             <div class="address-options" id="pickupSheet">
                 <h2>Pickup time</h2>
@@ -108,10 +108,12 @@
             <div class="searchBarContainer">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" placeholder="Search for Aashirvaad Atta, Dal, Milk, or brands" id="searchInput">
-                <button class="search-icon-btn" id="voiceSearchBtn" type="button" aria-label="Voice search" title="Voice search">
+                <button class="search-icon-btn" id="voiceSearchBtn" type="button" aria-label="Voice search"
+                    title="Voice search">
                     <i class="fa-solid fa-microphone"></i>
                 </button>
-                <button class="search-icon-btn" id="uploadListBtn" type="button" aria-label="Upload handwritten list" title="Upload Handwritten List">
+                <button class="search-icon-btn" id="uploadListBtn" type="button" aria-label="Upload handwritten list"
+                    title="Upload Handwritten List">
                     <i class="fa-solid fa-camera"></i>
                 </button>
             </div>
@@ -249,10 +251,30 @@
 
             <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
             <section class="restaurant-grid" id="resturants_container">
-                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
-                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
-                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
-                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true">
+                    <div class="skeleton-img"></div>
+                    <div class="skeleton-line w-70"></div>
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-55"></div>
+                </div>
+                <div class="skeleton-card" aria-hidden="true">
+                    <div class="skeleton-img"></div>
+                    <div class="skeleton-line w-70"></div>
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-55"></div>
+                </div>
+                <div class="skeleton-card" aria-hidden="true">
+                    <div class="skeleton-img"></div>
+                    <div class="skeleton-line w-70"></div>
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-55"></div>
+                </div>
+                <div class="skeleton-card" aria-hidden="true">
+                    <div class="skeleton-img"></div>
+                    <div class="skeleton-line w-70"></div>
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-55"></div>
+                </div>
             </section>
 
             <p id="no-search-matches">No restaurants match your search. Try a different name.</p>
@@ -327,7 +349,25 @@
             </div>
 
             <div class="cart-left">
-                <div class="checkout-card active-step">
+                <div class="checkout-card" id="orderTypeCard">
+                    <div class="step-header">
+                        <i class="fa-solid fa-bag-shopping"></i>
+                        <div>
+                            <h3>Order Type</h3>
+                        </div>
+                    </div>
+                    <div id="orderTypeOptions" class="payment-options order-type-options">
+                        <label class="payment-option" id="optPickup">
+                            <input type="radio" name="orderType" value="pickup" checked>
+                            <span>🏪 Pickup from shop</span>
+                        </label>
+                        <label class="payment-option" id="optDelivery">
+                            <input type="radio" name="orderType" value="delivery">
+                            <span>🛵 Delivery <small id="deliveryNote"></small></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="checkout-card active-step" id="addressCard">
                     <div class="step-header">
                         <i class="fa-solid fa-location-dot"></i>
                         <div>
@@ -336,6 +376,7 @@
                             <p id="Deliveryaddress">Home - Madhapur, Hyderabad, Telangana 500081</p>
                         </div>
                     </div>
+                    <div id="deliveryWarning" class="delivery-warning"></div>
                     <button class="change-btn" id="ChangeAdrs">CHANGE</button>
 
                     <div id="loading_container">
@@ -346,87 +387,88 @@
                     <div id="addressOptions" class="address-options">
                         <div id="savedAddressList" class="saved-address-list"></div>
 
-                    <button type="button" id="addAddressBtn" class="add-address-btn">
-                        + Add New Address
-                    </button>
-
-                    <div id="addAddressForm" class="add-address-form">
-                        <select id="newAddrType">
-                            <option value="Home">Home</option>
-                            <option value="Work">Work</option>
-                            <option value="Other">Other</option>
-                        </select>
-
-                        <textarea id="newAddrText" placeholder="Flat / house no., street, area, city"></textarea>
-
-                        <input type="tel" id="newAddrPhone" placeholder="10-digit phone number for this address" maxlength="13">
-
-                        <button type="button" id="useLocationForNewAddr">📍 Use Current Location</button>
-
-                        <div class="form-actions">
-                            <button type="button" id="saveAddressBtn">Save Address</button>
-                            <button type="button" id="cancelAddressBtn">Cancel</button>
-                        </div>
-                        <button id="cart-liveLocationBtn" class="live-location-btn">
-                            <i class="fa-solid fa-location-crosshairs"></i>
-                            Use Current Location
+                        <button type="button" id="addAddressBtn" class="add-address-btn">
+                            + Add New Address
                         </button>
-                        <h2>Saved Location</h2>
-                    </div>
-                </div>
 
-            </div>
-            <div class="checkout-card">
-                <div class="step-header">
-                    <i class="fa-solid fa-wallet"></i>
-                    <div>
-                        <h3>Payment</h3>
-                    </div>
-                </div>
-                <p class="payment-hint">Select your payment method after reviewing the items.</p>
+                        <div id="addAddressForm" class="add-address-form">
+                            <select id="newAddrType">
+                                <option value="Home">Home</option>
+                                <option value="Work">Work</option>
+                                <option value="Other">Other</option>
+                            </select>
 
-                <div id="paymentOptions" class="payment-options">
-                    <label class="payment-option">
-                        <input type="radio" name="payment" value="cash" checked>
-                        <span>💵 Cash on Delivery</span>
-                    </label>
-                    <label class="payment-option">
-                        <input type="radio" name="payment" value="upi">
-                        <span>📱 UPI</span>
-                    </label>
-                    <label class="payment-option">
-                        <input type="radio" name="payment" value="card">
-                        <span>💳 Card</span>
-                    </label>
-                </div>
-            </div>
+                            <textarea id="newAddrText" placeholder="Flat / house no., street, area, city"></textarea>
 
-            <div class="cart-right">
-                <div class="order-summary-card">
-                    <div class="res-mini-header">
-                        <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80"
-                            alt="Res">
-                        <div class="res-info">
-                            <h4>Burger King</h4>
+                            <input type="tel" id="newAddrPhone" placeholder="10-digit phone number for this address"
+                                maxlength="13">
+
+                            <button type="button" id="useLocationForNewAddr">📍 Use Current Location</button>
+
+                            <div class="form-actions">
+                                <button type="button" id="saveAddressBtn">Save Address</button>
+                                <button type="button" id="cancelAddressBtn">Cancel</button>
+                            </div>
+                            <button id="cart-liveLocationBtn" class="live-location-btn">
+                                <i class="fa-solid fa-location-crosshairs"></i>
+                                Use Current Location
+                            </button>
+                            <h2>Saved Location</h2>
                         </div>
                     </div>
-                    <div class="cart-items" id="cart_items"></div>
+
+                </div>
+                <div class="checkout-card">
+                    <div class="step-header">
+                        <i class="fa-solid fa-wallet"></i>
+                        <div>
+                            <h3>Payment</h3>
+                        </div>
+                    </div>
+                    <p class="payment-hint">Select your payment method after reviewing the items.</p>
+
+                    <div id="paymentOptions" class="payment-options">
+                        <label class="payment-option">
+                            <input type="radio" name="payment" value="cash" checked>
+                            <span>💵 Cash on Delivery</span>
+                        </label>
+                        <label class="payment-option">
+                            <input type="radio" name="payment" value="upi">
+                            <span>📱 UPI</span>
+                        </label>
+                        <label class="payment-option">
+                            <input type="radio" name="payment" value="card">
+                            <span>💳 Card</span>
+                        </label>
+                    </div>
                 </div>
 
-                <div class="coupon-box">
-                    <i class="fa-solid fa-percent"></i>
-                    <input type="text" placeholder="Apply Coupon">
-                </div>
+                <div class="cart-right">
+                    <div class="order-summary-card">
+                        <div class="res-mini-header">
+                            <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80"
+                                alt="Res">
+                            <div class="res-info">
+                                <h4>Burger King</h4>
+                            </div>
+                        </div>
+                        <div class="cart-items" id="cart_items"></div>
+                    </div>
 
-                <div class="bill-details">
-                    <h5>Bill Details</h5>
-                    <div class="bill-row"><span>Item Total</span><span id="totalPrice">₹0</span></div>
-                    <hr>
-                    <div class="bill-row total"><span>TO PAY</span><span id="toPay">₹0</span></div>
-                </div>
+                    <div class="coupon-box">
+                        <i class="fa-solid fa-percent"></i>
+                        <input type="text" placeholder="Apply Coupon">
+                    </div>
 
-                <button id="placeorder" class="pay-btn">Place Order</button>
-            </div>
+                    <div class="bill-details">
+                        <h5>Bill Details</h5>
+                        <div class="bill-row"><span>Item Total</span><span id="totalPrice">₹0</span></div>
+                        <hr>
+                        <div class="bill-row total"><span>TO PAY</span><span id="toPay">₹0</span></div>
+                    </div>
+
+                    <button id="placeorder" class="pay-btn">Place Order</button>
+                </div>
         </main>
     </template>
 
@@ -446,7 +488,8 @@
             <section class="res-strip">
 
                 <nav class="breadcrumbs">
-                    <a href="#home" class="breadcrumb-home">Home</a> / <span id="menuAreaCrumb"></span> / <span id="menuNameCrumb"></span>
+                    <a href="#home" class="breadcrumb-home">Home</a> / <span id="menuAreaCrumb"></span> / <span
+                        id="menuNameCrumb"></span>
                 </nav>
 
                 <div class="res-header">

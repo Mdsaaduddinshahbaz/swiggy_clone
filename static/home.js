@@ -1012,7 +1012,8 @@ async function initMenuPage() {
         if (!response.ok) throw new Error("Failed to load cart");
 
         cartData = await response.json();
-
+        console.log(cartData);
+        
         if (cartData?.results && cartData.results.total > 0) {
             footer.classList.add("show");
             totalAmount.textContent = cartData.results.total;

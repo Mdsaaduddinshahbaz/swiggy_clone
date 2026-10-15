@@ -9,7 +9,15 @@ let activeInit = null;              // AbortController of the currently active p
 // ---------------------------------------------------------------
 // Generic helpers
 // ---------------------------------------------------------------
-
+function haversineKm(lat1, lon1, lat2, lon2) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+}
 function escapeHtml(str) {
     return String(str ?? "").replace(/[&<>"']/g, (c) => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -190,17 +198,27 @@ async function initCartPage() {
     const pickupError = document.getElementById("pickupError");
     const confirmPickupBtn = document.getElementById("confirmPickupBtn");
 
+    const addressCard = document.getElementById("addressCard");
+    const deliveryWarning = document.getElementById("deliveryWarning");
+    const orderTypeBox = document.getElementById("orderTypeOptions");
+    const optDelivery = document.getElementById("optDelivery");
+    const deliveryNote = document.getElementById("deliveryNote");
+    const cashLabel = document.getElementById("cashLabel");
+    const deliveryRadio = document.querySelector('input[name="orderType"][value="delivery"]');
+    const pickupRadio = document.querySelector('input[name="orderType"][value="pickup"]');
     const no_order_container = document.getElementById("No_orders_container");
     const cartContainer = document.querySelector(".cart-container");
 
     const CART_CACHE_KEY = `cachedCart_${userId}`;
     const SELECTED_ADDR_KEY = `selectedAddress_${userId}`;
+    const ORDER_TYPE_KEY = `orderType_${userId}`;
 
     /*
         restaurants = {
             "<res_id>": {
                 name: "New kirana",
-                items: { "<item_id>": { name, price, qty, available_qty } }
+                items: { "<item_id>": { name, price, qty, available_qty } },
+                delivery: { delivery_available, delivery_radius, long, latt }
             }
         }
     */
@@ -209,6 +227,8 @@ async function initCartPage() {
     let editingIdx = null;    // index into `addresses` when editing, else null
     let addresses = [];       // [{ _id, adrs_type, address, phone, coordinates: { long, latt } }]
     let selectedAddressId = null;
+    let selectedAddress = null;
+    let preferredOrderType = safeStorageGet(localStorage, ORDER_TYPE_KEY) === "delivery" ? "delivery" : "pickup";
 
     // ---------------------------------------------------------------
     // Cart helpers
@@ -234,6 +254,81 @@ async function initCartPage() {
 
     function persistCart() {
         safeStorageSet(sessionStorage, CART_CACHE_KEY, JSON.stringify(restaurants));
+    }
+
+    // ---------------------------------------------------------------
+    // Order type (pickup / delivery) + delivery range check
+    // ---------------------------------------------------------------
+
+    // Delivery info comes from /get_cart_items (cart is single-restaurant)
+    function getDeliveryInfo() {
+        const first = Object.values(restaurants)[0];
+        return first?.delivery || null;
+    }
+
+    function isDeliveryOffered() {
+        const d = getDeliveryInfo();
+        return !!(d && d.delivery_available);
+    }
+
+    // Delivery is only effective if the shop offers it
+    function getOrderType() {
+        return preferredOrderType === "delivery" && isDeliveryOffered() ? "delivery" : "pickup";
+    }
+
+    // Returns { ok, message }
+    function checkDelivery() {
+        if (getOrderType() !== "delivery") return { ok: true, message: "" };
+
+        const d = getDeliveryInfo();
+        if (!selectedAddress || !selectedAddress.coordinates) {
+            return { ok: false, message: "Please select a delivery address." };
+        }
+        if (d.long == null || d.latt == null) {
+            return { ok: false, message: "Couldn't verify the shop's location. Please select pickup." };
+        }
+
+        const km = haversineKm(
+            Number(selectedAddress.coordinates.latt), Number(selectedAddress.coordinates.long),
+            Number(d.latt), Number(d.long)
+        );
+
+        if (km > Number(d.delivery_radius)) {
+            return {
+                ok: false,
+                message: `Your location is ${km.toFixed(1)} km away, which is outside this shop's ${d.delivery_radius} km delivery range. Please try changing the location or select pickup.`
+            };
+        }
+        return { ok: true, message: "" };
+    }
+
+    function updateOrderTypeUI() {
+        const offered = isDeliveryOffered();
+        const type = getOrderType();
+        const d = getDeliveryInfo();
+
+        if (cashLabel) {
+            cashLabel.textContent = type === "delivery" ? "💵 Cash on Delivery" : "🏪 Pay at shop";
+        }
+
+        if (deliveryRadio) deliveryRadio.disabled = !offered;
+        optDelivery?.classList.toggle("disabled", !offered);
+        if (deliveryNote) {
+            deliveryNote.textContent = offered
+                ? `(within ${d.delivery_radius} km)`
+                : "(not offered by this shop)";
+        }
+        if (deliveryRadio) deliveryRadio.checked = type === "delivery";
+        if (pickupRadio) pickupRadio.checked = type === "pickup";
+
+        if (addressCard) addressCard.style.display = type === "delivery" ? "" : "none";
+
+        const check = checkDelivery();
+        if (deliveryWarning) {
+            deliveryWarning.textContent = check.message;
+            deliveryWarning.classList.toggle("show", !check.ok);
+        }
+        if (placeorder) placeorder.disabled = !check.ok;
     }
 
     // ---------------------------------------------------------------
@@ -312,7 +407,7 @@ async function initCartPage() {
         cart_items_container.innerHTML = html;
         if (totalPrice) totalPrice.innerText = total;
         if (toPay) toPay.innerText = total;
-
+        updateOrderTypeUI();
         return total;
     }
 
@@ -334,6 +429,7 @@ async function initCartPage() {
             }
 
             const data = await res.json();
+
             if (signal.aborted) return;
 
             if (data.success) {
@@ -429,6 +525,13 @@ async function initCartPage() {
         }
     });
 
+    on(orderTypeBox, "change", (e) => {
+        if (e.target.name !== "orderType") return;
+        preferredOrderType = e.target.value === "delivery" ? "delivery" : "pickup";
+        safeStorageSet(localStorage, ORDER_TYPE_KEY, preferredOrderType);
+        updateOrderTypeUI();
+    });
+
     await loadCart();
     if (signal.aborted) return;
 
@@ -447,11 +550,14 @@ async function initCartPage() {
         }
 
         selectedAddressId = addr._id ?? null;
+        selectedAddress = addr;
         safeStorageSet(localStorage, SELECTED_ADDR_KEY, JSON.stringify(addr));
+        updateOrderTypeUI();
     }
 
     function clearSelectedAddress() {
         selectedAddressId = null;
+        selectedAddress = null;
         safeStorageRemove(localStorage, SELECTED_ADDR_KEY);
         if (typeaddrs) typeaddrs.innerText = "";
         if (deliveryAdrs) {
@@ -461,6 +567,7 @@ async function initCartPage() {
             deliveryAdrs.dataset.phone = "";
             deliveryAdrs.dataset.type = "";
         }
+        updateOrderTypeUI();
     }
 
     function renderAddressList() {
@@ -740,50 +847,27 @@ async function initCartPage() {
     }
 
     // ---------------------------------------------------------------
-    // Place order (pickup)
+    // Place order (pickup or delivery)
     // ---------------------------------------------------------------
 
-    on(placeorder, "click", () => {
-        if (isCartEmpty(restaurants)) {
-            alert("Your cart is empty");
-            return;
-        }
+    async function submitOrder(pickupTime) {
+        const type = getOrderType();
+        const body = {
+            user_id: userId,
+            items: restaurants,
+            pickup_time: type === "pickup" ? pickupTime : null,
+            order_type: type
+        };
+        if (type === "delivery") body.address_id = selectedAddress?._id;
 
-        pickupError?.classList.remove("show");
-        pickupSheet?.classList.add("show");
-        overlay?.classList.add("show");
-    });
-
-    on(confirmPickupBtn, "click", async () => {
-        const pickupTime = pickupTimeInput.value; // "HH:MM" 24hr, or "" if unset
-
-        if (!pickupTime) {
-            pickupError?.classList.add("show");
-            return;
-        }
-        pickupError?.classList.remove("show");
-
-        // Pickup time can't be in the past (today)
-        const [hh, mm] = pickupTime.split(":").map(Number);
-        const pickupDate = new Date();
-        pickupDate.setHours(hh, mm, 0, 0);
-        if (pickupDate < new Date()) {
-            alert("Please choose a pickup time that is later than now");
-            return;
-        }
-
-        if (isCartEmpty(restaurants)) {
-            alert("Your cart is empty");
-            return;
-        }
-
-        confirmPickupBtn.disabled = true;
+        if (placeorder) placeorder.disabled = true;
+        if (confirmPickupBtn) confirmPickupBtn.disabled = true;
 
         try {
             const orderRes = await fetch("/store_orders", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: userId, items: restaurants, pickup_time: pickupTime })
+                body: JSON.stringify(body)
             });
 
             if (orderRes.status === 401) {
@@ -803,14 +887,61 @@ async function initCartPage() {
                 goToPage("orders");
             } else {
                 alert(orderData.message || "Error while placing order");
-                await loadCart(); // resync (stock may have changed) without re-initialising the page
+                await loadCart(); // resync (stock may have changed)
             }
         } catch (err) {
             console.error("place order failed", err);
             alert("Network error while placing order. Please try again.");
         } finally {
-            confirmPickupBtn.disabled = false;
+            if (confirmPickupBtn) confirmPickupBtn.disabled = false;
+            updateOrderTypeUI(); // re-evaluates whether Place Order should be enabled
         }
+    }
+
+    on(placeorder, "click", () => {
+        if (isCartEmpty(restaurants)) {
+            alert("Your cart is empty");
+            return;
+        }
+
+        if (getOrderType() === "delivery") {
+            const check = checkDelivery();
+            if (!check.ok) {
+                alert(check.message);
+                return;
+            }
+            submitOrder(null); // delivery has no pickup-time step
+            return;
+        }
+
+        pickupError?.classList.remove("show");
+        pickupSheet?.classList.add("show");
+        overlay?.classList.add("show");
+    });
+
+    on(confirmPickupBtn, "click", async () => {
+        const pickupTime = pickupTimeInput.value; // "HH:MM" 24hr, or "" if unset
+
+        if (!pickupTime) {
+            pickupError?.classList.add("show");
+            return;
+        }
+        pickupError?.classList.remove("show");
+
+        const [hh, mm] = pickupTime.split(":").map(Number);
+        const pickupDate = new Date();
+        pickupDate.setHours(hh, mm, 0, 0);
+        if (pickupDate < new Date()) {
+            alert("Please choose a pickup time that is later than now");
+            return;
+        }
+
+        if (isCartEmpty(restaurants)) {
+            alert("Your cart is empty");
+            return;
+        }
+
+        await submitOrder(pickupTime);
     });
 
     on(orderBtn, "click", () => goToPage("orders"));

@@ -214,7 +214,42 @@ body {
 /* ============================================================
    CHECKOUT CARDS (address / payment)
    ============================================================ */
+/* Order type + delivery range warning */
+.order-type-options { margin-top: 14px; }
 
+.payment-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.payment-option small {
+    margin-left: 6px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink-soft);
+}
+
+.delivery-warning {
+    display: none;
+    margin: 14px 0 0;
+    padding: 11px 14px;
+    background: #FDE8E2;
+    border: 1px solid var(--flame);
+    border-radius: 10px;
+    color: var(--flame-dark);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.delivery-warning.show { display: block; }
+
+.pay-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 0 var(--flame-dark);
+}
 .checkout-card {
     position: relative;
     background: var(--white);

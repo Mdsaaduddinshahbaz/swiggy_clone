@@ -1,4 +1,4 @@
-from database import fetch_profiles, get_preview_items, serialize_address,save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
+from database import fetch_profiles, get_preview_items, get_restaurant_delivery,serialize_address,save_category,get_seller_analytics,get_resturantItem_price,add_subcategory,add_resturant_items,check_existing_owner,set_verified,fetch_address,add_resturants,list_resturant_items,list_resturants,add_customer_items, update_profiles,update_resturant_item,remove_itemss,store_orders,get_orders,store_seller_orders,get_seller_ordes,check_existing_user,create_new_user,update_order_status_seller,update_order_status_user,resturant_stats,return_res_analytics,check_existing_owner,save_address, verify_order
 from flask import Flask,request,render_template,redirect,url_for,jsonify,g
 from flask_socketio import SocketIO, emit,join_room
 from redis_db import add_cart,get_cart,update_cart_qty,acquire_lock,release_lock
@@ -606,19 +606,32 @@ def cartss(userid):
         return render_template("cart.html",page="cart")
     except Exception as e:
         return({"success":False})
+# @app.post("/get_cart_items")
+# @login_required
+# def list_cart_items():
+#     try:
+#         print("in get cart",g.__dict__)
+#         data=request.get_json()
+#         # userid=data["userid"]
+#         userid=g.user_id
+#         res=get_cart(userid)
+#         return ({"success":True,"results":res})
+#     except Exception as e:
+#         print(e)
+#         return({"success":False})
 @app.post("/get_cart_items")
 @login_required
 def list_cart_items():
     try:
-        print("in get cart",g.__dict__)
-        data=request.get_json()
-        # userid=data["userid"]
-        userid=g.user_id
-        res=get_cart(userid)
-        return ({"success":True,"results":res})
+        userid = g.user_id
+        res = get_cart(userid)
+        if res and res.get("cart"):
+            res_id = next(iter(res["cart"]))   # cart is single-restaurant
+            res["cart"][res_id]["delivery"] = get_restaurant_delivery(res_id)
+        return ({"success": True, "results": res})
     except Exception as e:
         print(e)
-        return({"success":False})
+        return ({"success": False})
 # @app.post("/add_to_cart")
 # @login_required
 # def addToCart():

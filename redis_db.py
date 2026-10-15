@@ -542,3 +542,17 @@ def release_lock(key, token):
     except Exception as e:
         print("release_lock error:", e)
 # delete_cart("6a56037c0d65ee6492341c02")
+# ---------------------------------------------------------
+# Restaurant delivery cache (cache-aside, used by /get_cart_items)
+# ---------------------------------------------------------
+DELIVERY_TTL = 600  # seconds
+
+def get_cached_delivery(res_id):
+    val = r.get(f"res:{res_id}:delivery")
+    return orjson.loads(val) if val else None
+
+def set_cached_delivery(res_id, data, ttl=DELIVERY_TTL):
+    r.set(f"res:{res_id}:delivery", orjson.dumps(data).decode(), ex=ttl)
+
+def invalidate_restaurant_delivery(res_id):
+    r.delete(f"res:{res_id}:delivery")

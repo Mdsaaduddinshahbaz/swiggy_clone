@@ -6,7 +6,8 @@ from datetime import datetime
 import time
 
 import os
-from redis_db import delete_cart,get_cart
+# from redis_db import delete_cart,get_cart
+from redis_db import delete_cart, get_cart, get_cached_delivery, set_cached_delivery, invalidate_restaurant_delivery
 load_dotenv(override=True)
 api=os.getenv("MONGO_URI",None)
 client = MongoClient(api)
@@ -1434,3 +1435,36 @@ def save_category(res_id, category, subcats):
             "success": False,
             "error": str(e)
         }
+
+def _to_bool(v):
+    return str(v).lower() in ("true", "1")
+
+def get_restaurant_delivery(res_id):
+    cached = get_cached_delivery(res_id)
+    if cached:
+        return cached
+
+    try:
+        doc = restaurants_name.find_one(
+            {"_id": ObjectId(res_id)},
+            {"_id": 0, "delivery_available": 1, "delivery_radius": 1, "location": 1}
+        )
+    except Exception:
+        return None
+    if not doc:
+        return None
+
+    coords = (doc.get("location") or {}).get("coordinates") or [None, None]
+    try:
+        radius = int(doc.get("delivery_radius") or 0)
+    except (TypeError, ValueError):
+        radius = 0
+
+    data = {
+        "delivery_available": _to_bool(doc.get("delivery_available", False)),
+        "delivery_radius": radius,
+        "long": coords[0],
+        "latt": coords[1],
+    }
+    set_cached_delivery(res_id, data)
+    return data
