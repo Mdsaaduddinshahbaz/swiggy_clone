@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import requests
 import os
 import re
-
+from foodfacts_data import get_product_details
 load_dotenv(override=True)
 mail_sever_name = os.getenv("Mail_server")
 mail_port = int(os.getenv("Mail_port"))
@@ -550,8 +550,27 @@ def list_cart_items():
     except Exception as e:
         print(e)
         return ({"success": False})
-
-
+################# get item details from barcode #########################
+@app.post("/get_item_details")
+# @login_required
+def get_item_details():
+    try:
+        data = request.get_json(force=True) or {}
+        barcode = re.sub(r"\D", "", str(data.get("barcode") or ""))  # digits only
+ 
+        if not barcode:
+            return jsonify({"success": False, "message": "barcode is required"}), 400
+ 
+        details = get_product_details(barcode)
+        if details is None:
+            return jsonify({"success": False, "message": "Item Not Found"}), 404
+ 
+        return jsonify({"success": True, "details": details})
+ 
+    except Exception as e:
+        print("get_item_details error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+ 
 @app.post("/update_cart")
 @login_required
 #@limiter.limit("120 per minute")

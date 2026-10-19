@@ -186,6 +186,14 @@ function openItemDrawer(item = null) {
   document.getElementById("itemLow").value = item?.lowAt || 10;
   document.getElementById("itemListed").checked = item?.available ?? true;
 
+  // ---- barcode scanner: only show "Scan barcode" when ADDING, reset photo/status ----
+  scanWrap.style.display = item ? "none" : "block";
+  setScanStatus("");
+  document.getElementById("photo").value = "";
+  const previewImg = document.getElementById("preview");
+  previewImg.style.display = "none";
+  previewImg.removeAttribute("src");
+
   const select = document.getElementById("itemSub");
   select.innerHTML = "";
 
@@ -994,4 +1002,260 @@ function setUnitFields(str) {
     unitSelect.appendChild(opt);
   }
   unitSelect.value = opt.value;
+}
+
+
+/* =====================================================================
+   BARCODE SCANNER (Add item drawer)
+   Scan button -> camera -> barcode number -> POST /get_item_details
+   -> autofill name / pack size / photo, or "not found, enter manually".
+   The html5-qrcode library is loaded automatically on the first scan.
+   Camera access requires HTTPS (or localhost).
+   ===================================================================== */
+const scanStyle = document.createElement("style");
+scanStyle.textContent = `
+  .scan-btn {
+    width: 100%;
+    padding: 12px;
+    margin: 4px 0 6px;
+    border: 1.5px dashed #2E6F4E;
+    background: #EAF4EE;
+    color: #2E6F4E;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .scan-btn:disabled { opacity: .6; cursor: default; }
+  .scan-status {
+    display: none;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .scan-status.info { display: block; background: #EEF2F7; color: #34506E; }
+  .scan-status.ok   { display: block; background: #EAF4EE; color: #2E6F4E; }
+  .scan-status.warn { display: block; background: #FCEFDE; color: #C97A1F; }
+  .scan-status.err  { display: block; background: #FBEAE7; color: #B23B30; }
+
+  .scanner-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, .85);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    gap: 14px;
+  }
+  .scanner-overlay.open { display: flex; }
+  .scanner-box {
+    width: 100%;
+    max-width: 420px;
+    background: #000;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .scanner-hint { color: #fff; font-size: 14px; text-align: center; }
+  .scanner-cancel {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 8px;
+    background: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+`;
+document.head.appendChild(scanStyle);
+
+// Scan button + status line, placed right under the drawer header
+const scanWrap = document.createElement("div");
+scanWrap.id = "scanWrap";
+scanWrap.innerHTML = `
+  <button type="button" id="scanBarcodeBtn" class="scan-btn">📷 Scan barcode</button>
+  <div id="scanStatus" class="scan-status"></div>
+`;
+document.querySelector("#itemDrawer .drawer-header").after(scanWrap);
+
+// Fullscreen camera overlay
+const scannerOverlay = document.createElement("div");
+scannerOverlay.className = "scanner-overlay";
+scannerOverlay.innerHTML = `
+  <div class="scanner-box"><div id="barcodeReader"></div></div>
+  <div class="scanner-hint">Point the camera at the product barcode</div>
+  <button type="button" class="scanner-cancel" id="scannerCancel">Cancel</button>
+`;
+document.body.appendChild(scannerOverlay);
+
+const scanBtn = document.getElementById("scanBarcodeBtn");
+const scanStatusEl = document.getElementById("scanStatus");
+
+function setScanStatus(msg, kind = "info") {
+  scanStatusEl.textContent = msg;
+  scanStatusEl.className = "scan-status " + (msg ? kind : "");
+}
+
+let scanner = null;
+let scanHandled = false;
+let scanLibPromise = null;
+
+function loadScannerLib() {
+  if (window.Html5Qrcode) return Promise.resolve();
+  if (scanLibPromise) return scanLibPromise;
+  scanLibPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+    s.onload = resolve;
+    s.onerror = () => {
+      scanLibPromise = null;
+      reject(new Error("scanner library failed to load"));
+    };
+    document.head.appendChild(s);
+  });
+  return scanLibPromise;
+}
+
+async function stopScanner() {
+  if (!scanner) return;
+  try {
+    if (scanner.isScanning) await scanner.stop();
+    scanner.clear();
+  } catch (e) {
+    console.log("scanner stop:", e);
+  }
+  scanner = null;
+}
+
+async function closeScanner() {
+  await stopScanner();
+  scannerOverlay.classList.remove("open");
+}
+
+async function openScanner() {
+  setScanStatus("");
+
+  try {
+    await loadScannerLib();
+  } catch (e) {
+    setScanStatus("Scanner could not load. Please enter the details manually.", "err");
+    return;
+  }
+
+  scanHandled = false;
+  scannerOverlay.classList.add("open");
+
+  scanner = new Html5Qrcode("barcodeReader", {
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128
+    ],
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    verbose: false
+  });
+
+  try {
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 280, height: 140 } },
+      async decodedText => {
+        if (scanHandled) return;
+        scanHandled = true;
+        await closeScanner();
+        lookupBarcode(decodedText);
+      },
+      () => {} // per-frame "no code found", ignore
+    );
+  } catch (err) {
+    console.log("camera error:", err);
+    await closeScanner();
+    setScanStatus(
+      "Could not open the camera (check permission / HTTPS). Please enter the details manually.",
+      "err"
+    );
+  }
+}
+
+scanBtn.addEventListener("click", openScanner);
+document.getElementById("scannerCancel").addEventListener("click", closeScanner);
+
+async function lookupBarcode(barcode) {
+  setScanStatus(`Barcode ${barcode} scanned. Looking up item…`, "info");
+  scanBtn.disabled = true;
+
+  try {
+    const res = await fetch("/get_item_details", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ barcode })
+    });
+
+    if (res.status === 401) {
+      alert("unauthorized,Please Log in");
+      window.location.href = "/login/seller";
+      return;
+    }
+
+    if (res.status === 404) {
+      setScanStatus("Item not found. Please enter the details manually.", "warn");
+      return;
+    }
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      setScanStatus(
+        data.message || "Something went wrong. Please enter the details manually.",
+        "err"
+      );
+      return;
+    }
+
+    await fillFromBarcodeDetails(data.details);
+    setScanStatus("Item found. Details filled in, please check and add price & stock.", "ok");
+  } catch (e) {
+    console.log("lookup error:", e);
+    setScanStatus("Network error. Please enter the details manually.", "err");
+  } finally {
+    scanBtn.disabled = false;
+  }
+}
+
+async function fillFromBarcodeDetails(d) {
+  if (d.product_name) {
+    document.getElementById("itemName").value = d.product_name.trim();
+  }
+
+  // Pack size: "500" + "g" -> setUnitFields("500 g")
+  if (d.product_quantity) {
+    setUnitFields(`${d.product_quantity} ${d.product_units || ""}`.trim());
+  }
+
+  hideNameDropdown();
+
+  if (d.image_url) await attachBarcodeImage(d.image_url);
+
+  // price & stock are never in the barcode database -> make the seller fill them
+  blinkInput(document.getElementById("itemPrice"));
+}
+
+async function attachBarcodeImage(url) {
+  const previewImg = document.getElementById("preview");
+  try {
+    const blob = await (await fetch(url)).blob();
+    const file = new File([blob], "product.jpg", { type: blob.type || "image/jpeg" });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById("photo").files = dt.files; // uploaded when Save is pressed
+    previewImg.src = URL.createObjectURL(blob);
+  } catch (e) {
+    // CORS blocked: only show the picture, seller can upload their own
+    console.log("could not attach image:", e);
+    previewImg.src = url;
+  }
+  previewImg.style.display = "block";
 }
