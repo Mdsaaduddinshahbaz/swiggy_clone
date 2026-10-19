@@ -1189,7 +1189,7 @@ async function openScanner() {
         await closeScanner();
         lookupBarcode(decodedText);
       },
-      () => {} // per-frame "no code found", ignore
+      () => { } // per-frame "no code found", ignore
     );
   } catch (err) {
     console.log("camera error:", err);
@@ -1303,11 +1303,22 @@ async function lookupBarcode(barcode) {
 function fillFromBarcodeDetails(d) {
   if (d.product_name) {
     document.getElementById("itemName").value = d.product_name.trim();
+    document.getElementById("itemDesc").value =
+      `${(d.product_name || "").trim()} ${d.product_quantity || ""} ${d.product_units || ""} pack`
+        .trim()
+        .replace(/\s+/g, " ");
   }
 
   // Pack size: "500" + "g" -> setUnitFields("500 g")
   if (d.product_quantity) {
-    setUnitFields(`${d.product_quantity} ${d.product_units || ""}`.trim());
+    let prod_quantity = d.product_units === "g"
+    ? d.product_quantity / 1000
+    : d.product_quantity;
+
+    let prod_units = d.product_units === "g"
+        ? "kg"
+        : d.product_units;
+    setUnitFields(`${prod_quantity} ${prod_units || ""}`.trim());
   }
 
   hideNameDropdown();
