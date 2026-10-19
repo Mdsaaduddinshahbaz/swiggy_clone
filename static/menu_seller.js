@@ -189,10 +189,7 @@ function openItemDrawer(item = null) {
   // ---- barcode scanner: only show "Scan barcode" when ADDING, reset photo/status ----
   scanWrap.style.display = item ? "none" : "block";
   setScanStatus("");
-  document.getElementById("photo").value = "";
-  const previewImg = document.getElementById("preview");
-  previewImg.style.display = "none";
-  previewImg.removeAttribute("src");
+  resetPhotoUi();
 
   const select = document.getElementById("itemSub");
   select.innerHTML = "";
@@ -1039,6 +1036,29 @@ scanStyle.textContent = `
   .scan-status.warn { display: block; background: #FCEFDE; color: #C97A1F; }
   .scan-status.err  { display: block; background: #FBEAE7; color: #B23B30; }
 
+  .photo-status {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    border-radius: 10px;
+  }
+  .photo-status.loading { display: flex; background: #EEF2F7; color: #34506E; }
+  .photo-status.failed  { display: flex; background: #FBEAE7; color: #B23B30; }
+  .photo-spinner {
+    width: 18px;
+    height: 18px;
+    border: 3px solid rgba(52, 80, 110, .25);
+    border-top-color: #34506E;
+    border-radius: 50%;
+    animation: photoSpin .8s linear infinite;
+    flex-shrink: 0;
+  }
+  .photo-status.failed .photo-spinner { display: none; }
+  @keyframes photoSpin { to { transform: rotate(360deg); } }
+
   .scanner-overlay {
     position: fixed;
     inset: 0;
@@ -1184,7 +1204,61 @@ async function openScanner() {
 scanBtn.addEventListener("click", openScanner);
 document.getElementById("scannerCancel").addEventListener("click", closeScanner);
 
+/* ---------- Image block: spinner while loading, message if it fails ---------- */
+const photoStatusEl = document.createElement("div");
+photoStatusEl.className = "photo-status";
+photoStatusEl.innerHTML = `<div class="photo-spinner"></div><span id="photoStatusText"></span>`;
+document.getElementById("preview").after(photoStatusEl);
+
+const photoStatusText = document.getElementById("photoStatusText");
+let imageToken = 0; // lets us ignore a slow image if the seller moved on
+
+function showImageLoading() {
+  photoStatusText.textContent = "Loading image…";
+  photoStatusEl.className = "photo-status loading";
+  // Save is disabled while the image loads so the photo is never silently lost
+  const saveBtn = document.getElementById("saveItemBtn");
+  saveBtn.disabled = true;
+}
+
+function showImageFailed() {
+  photoStatusText.textContent = "Failed to fetch the image. Please upload a photo manually.";
+  photoStatusEl.className = "photo-status failed";
+  document.getElementById("saveItemBtn").disabled = false;
+}
+
+function hideImageStatus() {
+  photoStatusEl.className = "photo-status";
+  document.getElementById("saveItemBtn").disabled = false;
+}
+
+function resetPhotoUi() {
+  imageToken++; // cancels any image still loading
+  hideImageStatus();
+  document.getElementById("photo").value = "";
+  const previewImg = document.getElementById("preview");
+  previewImg.style.display = "none";
+  previewImg.removeAttribute("src");
+}
+
+// Seller picks their own photo: stop the barcode image and show their choice
+document.getElementById("photo").addEventListener("change", e => {
+  imageToken++;
+  hideImageStatus();
+  const previewImg = document.getElementById("preview");
+  const f = e.target.files[0];
+  if (f) {
+    previewImg.src = URL.createObjectURL(f);
+    previewImg.style.display = "block";
+  } else {
+    previewImg.style.display = "none";
+    previewImg.removeAttribute("src");
+  }
+});
+
+/* ---------- Barcode lookup + autofill ---------- */
 async function lookupBarcode(barcode) {
+  resetPhotoUi();
   setScanStatus(`Barcode ${barcode} scanned. Looking up item…`, "info");
   scanBtn.disabled = true;
 
@@ -1215,7 +1289,8 @@ async function lookupBarcode(barcode) {
       return;
     }
 
-    await fillFromBarcodeDetails(data.details);
+    // Text fields are filled immediately; the image loads in the background
+    fillFromBarcodeDetails(data.details);
     setScanStatus("Item found. Details filled in, please check and add price & stock.", "ok");
   } catch (e) {
     console.log("lookup error:", e);
@@ -1225,7 +1300,7 @@ async function lookupBarcode(barcode) {
   }
 }
 
-async function fillFromBarcodeDetails(d) {
+function fillFromBarcodeDetails(d) {
   if (d.product_name) {
     document.getElementById("itemName").value = d.product_name.trim();
   }
@@ -1237,25 +1312,43 @@ async function fillFromBarcodeDetails(d) {
 
   hideNameDropdown();
 
-  if (d.image_url) await attachBarcodeImage(d.image_url);
-
   // price & stock are never in the barcode database -> make the seller fill them
   blinkInput(document.getElementById("itemPrice"));
+
+  // not awaited on purpose: the form is usable while the image loads
+  if (d.image_url) attachBarcodeImage(d.image_url);
 }
 
 async function attachBarcodeImage(url) {
-  const previewImg = document.getElementById("preview");
+  const myToken = ++imageToken;
+  showImageLoading();
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000); // give up after 10 s
+
   try {
-    const blob = await (await fetch(url)).blob();
-    const file = new File([blob], "product.jpg", { type: blob.type || "image/jpeg" });
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) throw new Error("image http " + resp.status);
+
+    const blob = await resp.blob();
+    if (!blob.type.startsWith("image/")) throw new Error("not an image");
+
+    if (myToken !== imageToken) return; // seller moved on, ignore
+
+    const file = new File([blob], "product.jpg", { type: blob.type });
     const dt = new DataTransfer();
     dt.items.add(file);
     document.getElementById("photo").files = dt.files; // uploaded when Save is pressed
+
+    const previewImg = document.getElementById("preview");
     previewImg.src = URL.createObjectURL(blob);
+    previewImg.style.display = "block";
+    hideImageStatus();
   } catch (e) {
-    // CORS blocked: only show the picture, seller can upload their own
-    console.log("could not attach image:", e);
-    previewImg.src = url;
+    console.log("could not load image:", e);
+    if (myToken !== imageToken) return;
+    showImageFailed();
+  } finally {
+    clearTimeout(timer);
   }
-  previewImg.style.display = "block";
 }
