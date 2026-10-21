@@ -1,7 +1,7 @@
-from database import fetch_profiles, get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery
+from database import fetch_profiles, get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
 from flask import Flask, request, render_template, redirect, url_for, jsonify, g, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
-from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock
+from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, get_cart_restaurant
 from flask_cors import CORS
 from flask_mail import Mail
 from dotenv import load_dotenv
@@ -67,6 +67,8 @@ brevo_api = os.getenv("brevo_api_email")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
+
+STORE_OFFLINE_MSG = "This store is currently offline. You can't add items right now."
 
 
 def login_required(f):
@@ -436,9 +438,13 @@ def list_item():
         res_id = data["res_id"]
     res = list_resturant_items(res_id, types)
     if (types == "seller"):
-        return ({"success": True, "res": res["item_name"], "categories": res["categories"]})
-    else:
-        return ({"success": True, "res": res["item_name"], "categories": res["categories"]})
+        return ({"success": True, "res": res["item_name"], "categories": res["categories"], "is_online": is_restaurant_online(res_id)})
+    return {
+        "success": True,
+        "res": res["item_name"],
+        "categories": res["categories"],
+        "is_online": is_restaurant_online(res_id)
+    }
 
 
 @app.post("/update_item_details")
@@ -541,15 +547,17 @@ def cartss(userid):
 @login_required
 def list_cart_items():
     try:
-        userid = g.user_id
-        res = get_cart(userid)
+        res = get_cart(g.user_id)
         if res and res.get("cart"):
             res_id = next(iter(res["cart"]))   # cart is single-restaurant
             res["cart"][res_id]["delivery"] = get_restaurant_delivery(res_id)
-        return ({"success": True, "results": res})
+            # delivery["is_online"] is always live (never served from the 10-min cache)
+        return {"success": True, "results": res}
     except Exception as e:
         print(e)
-        return ({"success": False})
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+
+
 ################# get item details from barcode #########################
 @app.post("/get_item_details")
 # @login_required
@@ -588,6 +596,16 @@ def updateCart():
         except (TypeError, ValueError):
             return jsonify({"success": False, "message": "qty must be an integer"}), 400
 
+        # Block increments while the store is offline; decrements/removals stay allowed
+        if qty > 0:
+            cart_res_id = get_cart_restaurant(g.user_id)
+            if cart_res_id and not is_restaurant_online(cart_res_id):
+                return jsonify({
+                    "success": False,
+                    "code": "STORE_OFFLINE",
+                    "message": STORE_OFFLINE_MSG
+                }), 503
+
         result = update_cart_qty(g.user_id, item_id, qty)
 
         if result["success"]:
@@ -613,6 +631,13 @@ def addToCart():
             return error
 
         userid = g.user_id
+
+        if not is_restaurant_online(data["resid"]):
+            return jsonify({
+                "success": False,
+                "code": "STORE_OFFLINE",
+                "message": STORE_OFFLINE_MSG
+            }), 503
 
         # TODO: re-enable server-side price/stock lookup instead of trusting the client.
         # response = get_resturantItem_price(data["resid"], data["item_id"])
@@ -681,7 +706,12 @@ def store_order():
         # store_orders returns a dict on validation failure, 404 for an empty cart,
         # False on unexpected failure, or a list of restaurant ids on success
         if isinstance(resids, dict) and not resids.get("success", True):
-            return jsonify({"success": False, "message": resids.get("message", "Unable to place order")}), 400
+            status = 503 if resids.get("code") == "STORE_OFFLINE" else 400
+            return jsonify({
+                "success": False,
+                "code": resids.get("code"),
+                "message": resids.get("message", "Unable to place order")
+            }), status
         if resids == 404:
             return ({"success": False})
         if resids is False:
@@ -842,6 +872,47 @@ def handle_user_join(data):
     except Exception as e:
         print(e)
         return ({"success": False})
+
+
+################# store online / offline #########################
+@app.post("/seller/set_online")
+@login_required
+def set_online():
+    if g.type != "seller":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.get_json(silent=True) or {}
+    online = data.get("is_online")
+    if not isinstance(online, bool):
+        return jsonify({"success": False, "message": "is_online must be a boolean"}), 400
+
+    if not set_restaurant_online(g.res_id, online):
+        return jsonify({"success": False, "message": "Restaurant not found"}), 404
+
+    # push to every user currently viewing this store / holding it in their cart
+    socketio.emit(
+        "store_status",
+        {"res_id": g.res_id, "is_online": online},
+        room=f"store:{g.res_id}"
+    )
+    return jsonify({"success": True, "is_online": online})
+
+
+@app.get("/store_status/<res_id>")
+@login_required
+def store_status(res_id):
+    return jsonify({"success": True, "is_online": is_restaurant_online(res_id)})
+
+
+@socketio.on("watch_store")
+@login_required
+def handle_watch_store(data):
+    try:
+        res_id = str((data or {}).get("res_id", "")).strip()
+        if res_id:
+            join_room(f"store:{res_id}")
+    except Exception as e:
+        print(e)
 
 
 @socketio.on("order_completed")

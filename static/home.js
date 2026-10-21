@@ -105,6 +105,163 @@ function navigateToMenu(resName, address, resId, userId) {
     goToPage("menu");
 }
 
+/* ============================================================
+   STORE ONLINE / OFFLINE — shared state + realtime
+
+   Source of truth is the server. The client keeps:
+   - storeStatus:   resId -> boolean, last known state
+   - a socket that joins "store:{resId}" rooms (server: watch_store) and
+     receives "store_status" pushes the moment a seller toggles
+   - a resync (on socket reconnect and when the tab becomes visible again),
+     because mobile browsers suspend sockets and pushes sent while
+     disconnected are lost
+   ============================================================ */
+
+const storeStatus = new Map();      // resId -> boolean
+const watchedStores = new Set();    // rooms we've asked to join
+let storeSocket = null;
+let socketHasConnectedOnce = false;
+let activeMenu = null;              // { resId, container, onChange } for the menu page currently mounted
+
+function getStoreSocket() {
+    if (storeSocket) return storeSocket;
+
+    // Reuse an existing app-wide socket if the shell already created one.
+    if (window.socket && typeof window.socket.on === "function") {
+        storeSocket = window.socket;
+    } else if (typeof io === "function") {
+        storeSocket = io();
+    } else {
+        console.warn("socket.io client not loaded — store status will only update on refresh");
+        return null;
+    }
+
+    storeSocket.on("connect", () => {
+        // Rooms are lost on reconnect, so re-join everything we were watching.
+        watchedStores.forEach(id => storeSocket.emit("watch_store", { res_id: id }));
+        if (socketHasConnectedOnce) resyncStoreStatuses();
+        socketHasConnectedOnce = true;
+    });
+
+    storeSocket.on("store_status", (payload) => {
+        if (!payload || !payload.res_id) return;
+        applyStoreStatus(String(payload.res_id), payload.is_online !== false, { live: true });
+    });
+
+    if (storeSocket.connected) socketHasConnectedOnce = true;
+    return storeSocket;
+}
+
+function watchStores(ids) {
+    const socket = getStoreSocket();
+    ids.forEach(id => {
+        id = String(id);
+        const isNew = !watchedStores.has(id);
+        watchedStores.add(id);
+        if (isNew && socket && socket.connected) {
+            socket.emit("watch_store", { res_id: id });
+        }
+    });
+}
+
+function patchCachedRestaurant(resId, online) {
+    try {
+        const key = getRestaurantCacheKey(currentUserId());
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return;
+        const cached = JSON.parse(raw);
+        if (cached[resId]) {
+            cached[resId].is_online = online;
+            sessionStorage.setItem(key, JSON.stringify(cached));
+        }
+    } catch (e) { /* cache is best-effort */ }
+}
+
+function setCardOnline(card, online) {
+    card.classList.toggle("is-offline", !online);
+    const badge = card.querySelector(".store-status-badge");
+    if (badge) {
+        badge.classList.toggle("badge-open", online);
+        badge.classList.toggle("badge-closed", !online);
+        badge.textContent = online ? "Open Now" : "Currently Offline";
+    }
+}
+
+// Single entry point for every status change (socket push, resync, or a
+// 503 STORE_OFFLINE from the API). Updates home cards, the session cache,
+// and the menu page if it's showing this store.
+function applyStoreStatus(resId, online, opts = {}) {
+    resId = String(resId);
+    storeStatus.set(resId, online);
+    patchCachedRestaurant(resId, online);
+
+    const card = document.getElementById(resId);
+    if (card && card.classList.contains("store-card")) setCardOnline(card, online);
+
+    if (activeMenu && activeMenu.resId === resId && document.body.contains(activeMenu.container)) {
+        activeMenu.onChange(online, opts);
+    }
+
+    // Let other pages (e.g. the cart) react without knowing about the socket.
+    document.dispatchEvent(new CustomEvent("store:status", {
+        detail: { resId, online, live: !!opts.live }
+    }));
+}
+
+async function refreshRestaurantList() {
+    const display_resturants = document.getElementById("resturants_container");
+    const no_results_container = document.getElementById("no-results-container");
+    if (!display_resturants || !no_results_container) return;
+
+    let loc = null;
+    try { loc = JSON.parse(localStorage.getItem("userLocation")); } catch (e) { /* ignore */ }
+    if (!loc) return;
+
+    const dist = document.getElementById("distance_options")?.value || 5;
+    const res = await fetch("/list_resturants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latt: loc.latt, long: loc.long, dist })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success) return;
+
+    renderRestaurants(data.results, { display_resturants, no_results_container });
+    sessionStorage.setItem(getRestaurantCacheKey(currentUserId()), JSON.stringify(data.results));
+    if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
+}
+
+// Catch up on anything missed while the socket was down / tab was hidden.
+async function resyncStoreStatuses() {
+    // The cart page listens for this and reloads itself from the server.
+    document.dispatchEvent(new CustomEvent("store:resync"));
+    try {
+        if (activeMenu && document.body.contains(activeMenu.container)) {
+            const res = await fetch(`/store_status/${encodeURIComponent(activeMenu.resId)}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.success) applyStoreStatus(activeMenu.resId, data.is_online !== false, { live: true });
+        } else if (document.getElementById("resturants_container")) {
+            await refreshRestaurantList();
+        }
+    } catch (e) {
+        console.warn("store status resync failed", e);
+    }
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) resyncStoreStatuses();
+});
+
+async function readJsonSafe(response) {
+    try { return await response.json(); } catch (e) { return null; }
+}
+
+function isOfflineResponse(response, data) {
+    return response.status === 503 && !!data && data.code === "STORE_OFFLINE";
+}
+
 // Cache of already-fetched preview items, keyed by res_id. renderRestaurants()
 // re-runs on every cache-hit → fresh-fetch cycle and on every distance-filter
 // change, which would otherwise wipe already-loaded product rows back to a
@@ -132,7 +289,7 @@ function productThumbsMarkup(items) {
 // restaurant's items cached from an earlier render) and get their real
 // products filled in by loadPreviewItems() right after, via a single
 // batched /preview_items call (see database.py's get_preview_items). Rating,
-// "open now", and delivery-time stay as presentational placeholders since
+// and delivery-time stay as presentational placeholders since
 // /list_resturants doesn't return them — same as before.
 function renderRestaurants(results, containers) {
     const { display_resturants, no_results_container } = containers;
@@ -175,17 +332,23 @@ function renderRestaurants(results, containers) {
 
         let displayEta = `${lower}-${upper}`;
 
-        console.log("ETA", eta)
-        console.log(detail.delivery_available? true:false)
+        // Live status wins over a possibly stale list/cache value.
+        const online = storeStatus.has(id) ? storeStatus.get(id) : detail.is_online !== false;
+        storeStatus.set(id, online);
+
+        // delivery_available can arrive as a boolean or a string depending on
+        // how the restaurant was created — normalise before comparing.
+        const hasDelivery = String(detail.delivery_available).toLowerCase() === "true";
+
         return `
-        <div class="store-card" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}" style="--i:${index}">
+        <div class="store-card${online ? "" : " is-offline"}" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}" style="--i:${index}">
             <div class="store-head">
                 <div>
                     <h3 class="store-name resturant_name">${escapeHtml(detail.res_name)}</h3>
                     <div class="store-badges">
                         <span class="badge-verified"><i class="fa-solid fa-circle-check"></i> Verified Partner</span>
-                        <span class="badge-open">Open Now</span>
-                        ${detail.delivery_available ==="true" ? `
+                        <span class="store-status-badge ${online ? "badge-open" : "badge-closed"}">${online ? "Open Now" : "Currently Offline"}</span>
+                        ${hasDelivery ? `
                             <span class="badge-delivery">
                                 <i class="fa-solid fa-truck"></i>
                                 Delivery within ${escapeHtml(detail.delivery_radius)} km
@@ -226,6 +389,9 @@ function renderRestaurants(results, containers) {
         </div>`;
     }).join("");
     display_resturants.innerHTML = html;
+
+    // Join the realtime rooms so these cards flip the moment a seller toggles.
+    watchStores(Object.keys(results));
 
     // Only fetch for restaurants we don't already have cached items for —
     // this is what stops a re-render from re-triggering the skeleton state.
@@ -537,6 +703,8 @@ async function initHomePage() {
         if (data.success) {
             if (loading) loading.style.display = "none";
             if (Note) Note.style.display = "block";
+            // Fresh server data is newer than anything cached client-side.
+            Object.entries(data.results).forEach(([id, detail]) => storeStatus.set(id, detail.is_online !== false));
             renderRestaurants(data.results, renderContainers);
             sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.results));
         } else if (!cachedRestaurants) {
@@ -560,6 +728,8 @@ async function initHomePage() {
                 const res_id = card.getAttribute("id");
                 // Was a full page navigation to /menu/... — now routes inside
                 // the SPA so the header/map/session state never gets torn down.
+                // Offline stores are still browsable; the menu page shows the
+                // offline banner and disables ordering.
                 navigateToMenu(name, addresss, res_id, userId);
             }
         });
@@ -858,7 +1028,9 @@ async function initHomePage() {
 const pendingMenuUpdates = new Map();
 const inFlightMenuControllers = new Map();
 
-function scheduleMenuCartUpdate(itemId, resId, userId, delta, onSuccess, onFailure) {
+// onOffline is optional: called instead of onFailure when the server
+// answers 503 STORE_OFFLINE, so the caller can revert and flip the UI.
+function scheduleMenuCartUpdate(itemId, resId, userId, delta, onSuccess, onFailure, onOffline) {
 
     let entry = pendingMenuUpdates.get(itemId);
 
@@ -897,13 +1069,19 @@ function scheduleMenuCartUpdate(itemId, resId, userId, delta, onSuccess, onFailu
                 signal: controller.signal
             });
 
-            if (!response.ok) throw new Error(`update_cart failed: ${response.status}`);
-            const data = await response.json();
+            const data = await readJsonSafe(response);
 
-            if (data.success) {
+            if (isOfflineResponse(response, data)) {
+                if (onOffline) onOffline(); else onFailure(data.message);
+                return;
+            }
+
+            if (!response.ok && !data) throw new Error(`update_cart failed: ${response.status}`);
+
+            if (data && data.success) {
                 onSuccess(data);
             } else {
-                onFailure(data.message || "Failed updating cart");
+                onFailure((data && data.message) || "Failed updating cart");
             }
 
         } catch (error) {
@@ -1008,12 +1186,11 @@ async function initMenuPage() {
             window.location.href = "/login/user";
             return;
         }
-
         if (!response.ok) throw new Error("Failed to load cart");
 
         cartData = await response.json();
         console.log(cartData);
-        
+
         if (cartData?.results && cartData.results.total > 0) {
             footer.classList.add("show");
             totalAmount.textContent = cartData.results.total;
@@ -1110,8 +1287,98 @@ async function initMenuPage() {
     let activeSubcategoryId = "all";
     let sortMode = "default";
     let stockOnly = false;
+    let pendingCartItem = null;
 
     const wishlist = new Set();
+
+    // Keep menuItems in step with what the user has in their cart, so a
+    // re-render (filter, search, offline flip) never shows stale quantities.
+    function setLocalQty(id, qty) {
+        const match = menuItems.find(i => i.id === String(id));
+        if (match) match.qty = qty;
+    }
+
+    /* ---------- store online / offline state for this menu ---------- */
+
+    let storeOnline = menuData.is_online !== false;
+    storeStatus.set(String(resId), storeOnline);
+
+    // Remove any banner left from a previous visit, then create a fresh one
+    // directly above the item grid (no template change required).
+    document.getElementById("storeOfflineBanner")?.remove();
+    const banner = document.createElement("div");
+    banner.id = "storeOfflineBanner";
+    banner.className = "store-banner";
+    banner.hidden = true;
+    banner.setAttribute("role", "status");
+    banner.setAttribute("aria-live", "polite");
+    menuContainer.parentNode.insertBefore(banner, menuContainer);
+
+    let bannerTimer = null;
+
+    function showBanner(mode) {
+        clearTimeout(bannerTimer);
+
+        if (!mode) {
+            banner.hidden = true;
+            banner.className = "store-banner";
+            banner.innerHTML = "";
+            return;
+        }
+
+        banner.hidden = false;
+
+        if (mode === "offline") {
+            banner.className = "store-banner is-offline";
+            banner.innerHTML = `
+                <div class="store-banner-icon"><i class="fa-solid fa-store-slash"></i></div>
+                <div class="store-banner-text">
+                    <strong>${escapeHtml(decodedRestaurant)} is currently offline</strong>
+                    <span>Ordering is paused. Items already in your cart are saved.</span>
+                </div>`;
+        } else {
+            banner.className = "store-banner is-online";
+            banner.innerHTML = `
+                <div class="store-banner-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="store-banner-text">
+                    <strong>${escapeHtml(decodedRestaurant)} is back online</strong>
+                    <span>You can add items again.</span>
+                </div>`;
+            bannerTimer = setTimeout(() => showBanner(null), 5000);
+        }
+    }
+
+    function closeReplaceDialog() {
+        replaceContainer.classList.remove("show");
+        overlay.classList.remove("show");
+        pendingCartItem = null;
+    }
+
+    // Called by applyStoreStatus() for socket pushes, resyncs, and 503s.
+    function setStoreOnline(online, opts = {}) {
+        if (online === storeOnline) return;
+        storeOnline = online;
+
+        if (online) {
+            showBanner("online");
+            if (opts.live) showToast(`${decodedRestaurant} is back online`);
+        } else {
+            showBanner("offline");
+            closeReplaceDialog();
+            if (opts.live) showToast(`${decodedRestaurant} just went offline`);
+        }
+
+        renderMenu();
+    }
+
+    activeMenu = {
+        resId: String(resId),
+        container: menuContainer,
+        onChange: setStoreOnline
+    };
+    watchStores([resId]);
+
+    if (!storeOnline) showBanner("offline");
 
     function findCategory(categoryId) {
         const id = normalizeId(categoryId);
@@ -1266,17 +1533,24 @@ async function initMenuPage() {
                     </button>
                 `;
             } else if (item.qty === 0) {
-                controls = `
+                controls = storeOnline
+                    ? `
                     <button class="add-btn" data-item-id="${escapeHtml(item.id)}" type="button">
                         ADD
                     </button>
+                `
+                    : `
+                    <button class="add-btn is-store-offline" type="button" disabled>
+                        CLOSED
+                    </button>
                 `;
             } else {
+                // Offline: the user can still reduce / remove, just not add more.
                 controls = `
                     <div class="quantity-control">
                         <button class="qty-btn reduce" type="button">-</button>
                         <span class="item_qty">${escapeHtml(item.qty)}</span>
-                        <button class="qty-btn increase" type="button">+</button>
+                        <button class="qty-btn increase${storeOnline ? "" : " is-store-offline"}" type="button"${storeOnline ? "" : ' disabled aria-disabled="true"'}>+</button>
                     </div>
                 `;
             }
@@ -1291,7 +1565,7 @@ async function initMenuPage() {
 
             return `
                 <div
-                    class="menu-item"
+                    class="menu-item${storeOnline ? "" : " store-offline"}"
                     id="${escapeHtml(item.id)}"
                     data-item-id="${escapeHtml(item.id)}"
                     data-cat-id="${escapeHtml(item.catId)}"
@@ -1411,8 +1685,6 @@ async function initMenuPage() {
         }
     });
 
-    let pendingCartItem = null;
-
     menuContainer.addEventListener("click", async event => {
 
         const addButton = event.target.closest(".add-btn");
@@ -1428,13 +1700,16 @@ async function initMenuPage() {
         const available = parseInt(item.getAttribute("available"));
 
         if (!Number.isNaN(available) && available <= 0) {
-            alert("This item is currently out of stock");
+            showToast("This item is currently out of stock");
+            return;
+        }
+
+        if (!storeOnline) {
+            showToast(`${decodedRestaurant} is currently offline`);
             return;
         }
 
         try {
-            console.log("added item");
-
             const response = await fetch("/add_to_cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1456,11 +1731,19 @@ async function initMenuPage() {
                 return;
             }
 
-            if (!response.ok) throw new Error("add_to_cart failed");
+            const data = await readJsonSafe(response);
 
-            const data = await response.json();
+            // Store went offline between page load and this click.
+            if (isOfflineResponse(response, data)) {
+                applyStoreStatus(resId, false, { live: true });
+                return;
+            }
 
-            if (data.success) {
+            if (!response.ok && !data) throw new Error("add_to_cart failed");
+
+            if (data && data.success) {
+
+                setLocalQty(itemId, 1);
 
                 addButton.outerHTML = `
                     <div class="quantity-control">
@@ -1473,7 +1756,7 @@ async function initMenuPage() {
                 footer.classList.add("show");
                 totalAmount.textContent = data.Total ?? data.total ?? 0;
 
-            } else {
+            } else if (data && /different store/i.test(data.message || "")) {
 
                 pendingCartItem = {
                     resid: resId,
@@ -1489,11 +1772,14 @@ async function initMenuPage() {
 
                 replaceContainer.classList.add("show");
                 overlay.classList.add("show");
+
+            } else {
+                showToast((data && data.message) || "Couldn't add this item. Please try again.");
             }
 
         } catch (error) {
             console.error("Add cart error:", error);
-            alert("Something went wrong adding this item.");
+            showToast("Something went wrong adding this item.");
         }
     });
 
@@ -1515,15 +1801,23 @@ async function initMenuPage() {
                 return;
             }
 
-            const data = await response.json();
+            const data = await readJsonSafe(response);
 
-            if (data.success) {
+            if (isOfflineResponse(response, data)) {
+                closeReplaceDialog();
+                applyStoreStatus(resId, false, { live: true });
+                return;
+            }
+
+            if (data && data.success) {
 
                 footer.classList.add("show");
                 totalAmount.textContent = data.Total ?? data.total ?? 0;
 
                 replaceContainer.classList.remove("show");
                 overlay.classList.remove("show");
+
+                setLocalQty(pendingCartItem.item_id, 1);
 
                 const item = document.getElementById(pendingCartItem.item_id);
 
@@ -1544,21 +1838,19 @@ async function initMenuPage() {
                 }
 
             } else {
-                alert(data.message || "Failed to replace cart");
+                showToast((data && data.message) || "Failed to replace cart");
             }
 
         } catch (error) {
             console.error("Replace cart error:", error);
-            alert("Something went wrong.");
+            showToast("Something went wrong.");
         } finally {
             pendingCartItem = null;
         }
     });
 
     noBtn.addEventListener("click", () => {
-        replaceContainer.classList.remove("show");
-        overlay.classList.remove("show");
-        pendingCartItem = null;
+        closeReplaceDialog();
     });
 
     menuContainer.addEventListener("click", event => {
@@ -1575,15 +1867,21 @@ async function initMenuPage() {
 
         if (event.target.classList.contains("increase")) {
 
+            if (!storeOnline) {
+                showToast(`${decodedRestaurant} is currently offline`);
+                return;
+            }
+
             const qtyEl = item.querySelector(".item_qty");
             const previousQty = Number(qtyEl.textContent);
 
             if (previousQty + 1 > available) {
-                alert(`Only ${available} in stock`);
+                showToast(`Only ${available} in stock`);
                 return;
             }
 
             qtyEl.textContent = previousQty + 1;
+            setLocalQty(itemId, previousQty + 1);
 
             scheduleMenuCartUpdate(itemId, resId, userId, 1,
                 (data) => {
@@ -1594,8 +1892,16 @@ async function initMenuPage() {
                     }
                 },
                 (errorMessage) => {
-                    qtyEl.textContent = previousQty;
-                    alert(errorMessage);
+                    setLocalQty(itemId, previousQty);
+                    renderMenu();
+                    showToast(errorMessage);
+                },
+                () => {
+                    // Server says the store is offline: undo the optimistic +1,
+                    // then flip the whole page into its offline state.
+                    setLocalQty(itemId, previousQty);
+                    applyStoreStatus(resId, false, { live: true });
+                    renderMenu();
                 }
             );
 
@@ -1606,6 +1912,7 @@ async function initMenuPage() {
             const newQty = Math.max(0, previousQty - 1);
 
             qtyEl.textContent = newQty;
+            setLocalQty(itemId, newQty);
 
             scheduleMenuCartUpdate(itemId, resId, userId, -1,
                 (data) => {
@@ -1621,20 +1928,17 @@ async function initMenuPage() {
 
                     if (data.removed) {
 
-                        const control = item.querySelector(".quantity-control");
+                        setLocalQty(itemId, 0);
 
-                        if (control) {
-                            control.outerHTML = `
-                                <button class="add-btn" data-item-id="${escapeHtml(itemId)}" type="button">
-                                    ADD
-                                </button>
-                            `;
-                        }
+                        // Re-render so the control becomes ADD (or CLOSED
+                        // when the store is offline) rather than hard-coding ADD.
+                        renderMenu();
                     }
                 },
                 (errorMessage) => {
-                    qtyEl.textContent = previousQty;
-                    alert(errorMessage);
+                    setLocalQty(itemId, previousQty);
+                    renderMenu();
+                    showToast(errorMessage);
                 }
             );
         }

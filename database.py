@@ -15,6 +15,8 @@ from redis_db import (
     get_cached_delivery,
     set_cached_delivery,
     invalidate_restaurant_delivery,
+    get_cached_online,
+    set_cached_online,
 )
 
 load_dotenv(override=True)
@@ -54,7 +56,7 @@ def add_resturants(name, shop_type, address, phone, owner_id, long, latt, delive
     with client.start_session() as session:
         with session.start_transaction():
 
-            result = restaurants_name.insert_one({"name": name, "type": shop_type, "address": address, "phone_no": phone, "ownerId": owner_id, "location": {"type": "Point", "coordinates": [long, latt]}, "file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000", "delivery_available": delivery_available, "delivery_radius": delivery_radius}, session=session)
+            result = restaurants_name.insert_one({"name": name, "type": shop_type, "address": address, "phone_no": phone, "ownerId": owner_id, "location": {"type": "Point", "coordinates": [long, latt]}, "file_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000", "delivery_available": delivery_available, "delivery_radius": delivery_radius, "is_online": True}, session=session)
 
             owners.update_one(
                 {"_id": ObjectId(owner_id)},
@@ -181,22 +183,60 @@ def list_resturants(long, latt, dist: int = 5):
     res_names = {}
     for r in restaurants:
         print(r.get("delivery_available"))
-        res_names[str(r["_id"])] = {"res_name": r["name"], "address": r["address"], "file_url": r["file_url"], "type": r.get("type", "restaurant"), "distance_km": f"{r['distanceMeters'] / 1000:.1f}", "delivery_available": r.get("delivery_available"), "delivery_radius": r.get("delivery_radius", 0)}
+        res_names[str(r["_id"])] = {"res_name": r["name"], "address": r["address"], "file_url": r["file_url"], "type": r.get("type", "restaurant"), "distance_km": f"{r['distanceMeters'] / 1000:.1f}", "delivery_available": r.get("delivery_available"), "delivery_radius": r.get("delivery_radius", 0), "is_online": _to_bool(r.get("is_online", True))}
     return res_names
 
 
 # =========================================================
-# Restaurant delivery details (cached in Redis)
+# Restaurant online status (Redis key of its own, Mongo is source of truth)
 # =========================================================
 
 def _to_bool(v):
     return str(v).lower() in ("true", "1")
 
 
+def is_restaurant_online(res_id):
+    """Redis first, Mongo on miss. Missing field = online (legacy docs)."""
+    cached = get_cached_online(res_id)
+    if cached is not None:
+        return cached
+    try:
+        doc = restaurants_name.find_one({"_id": ObjectId(res_id)}, {"is_online": 1})
+    except Exception:
+        return False
+    if not doc:
+        return False
+    online = _to_bool(doc.get("is_online", True))
+    set_cached_online(res_id, online)
+    return online
+
+
+def set_restaurant_online(res_id, online: bool):
+    """Mongo first (source of truth), then Redis."""
+    try:
+        result = restaurants_name.update_one(
+            {"_id": ObjectId(res_id)},
+            {"$set": {"is_online": online}}
+        )
+    except Exception:
+        return False
+    if result.matched_count == 0:
+        return False
+    set_cached_online(res_id, online)
+    invalidate_restaurant_delivery(res_id)
+    return True
+
+
+# =========================================================
+# Restaurant delivery details (cached in Redis)
+# =========================================================
+
 def get_restaurant_delivery(res_id):
     cached = get_cached_delivery(res_id)
     if cached:
-        return cached
+        data = dict(cached)
+        data["is_online"] = is_restaurant_online(res_id)   # always live
+        return data
 
     try:
         doc = restaurants_name.find_one(
@@ -220,8 +260,8 @@ def get_restaurant_delivery(res_id):
         "long": coords[0],
         "latt": coords[1],
     }
-    set_cached_delivery(res_id, data)
-    return data
+    set_cached_delivery(res_id, data)          # no is_online in the cache
+    return {**data, "is_online": is_restaurant_online(res_id)}
 
 
 def _haversine_km(lat1, lon1, lat2, lon2):
@@ -512,6 +552,15 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
 
     if not items or not items.get("cart"):
         return 404
+
+    # ---- store must be online (authoritative check; client checks are UX only) ----
+    for rid in items["cart"].keys():
+        if not is_restaurant_online(rid):
+            return {
+                "success": False,
+                "code": "STORE_OFFLINE",
+                "message": f"{items['cart'][rid]['name']} is currently offline. Your order wasn't placed."
+            }
 
     # ---- delivery validation (server-side; the client check is UX only) ----
     delivery_address = None

@@ -263,6 +263,11 @@ def get_cart(uid):
     }
 
 
+def get_cart_restaurant(uid):
+    """Restaurant id the user's cart currently belongs to (or None)."""
+    return r.hget(f"cart:{str(uid)}:meta", "restaurant")
+
+
 def delete_cart(uid, session=None):
     uid = str(uid)
     r.delete(f"cart:{uid}:meta")
@@ -301,6 +306,26 @@ def set_cached_delivery(res_id, data, ttl=DELIVERY_TTL):
 
 def invalidate_restaurant_delivery(res_id):
     r.delete(f"res:{res_id}:delivery")
+
+
+# =========================================================
+# Restaurant online status (own key so toggles take effect instantly,
+# independent of the 10-min delivery cache)
+# =========================================================
+
+ONLINE_TTL = 3600  # safety net only; toggles write through immediately
+
+
+def get_cached_online(res_id):
+    """Returns True/False, or None on cache miss."""
+    val = r.get(f"res:{res_id}:online")
+    if val is None:
+        return None
+    return val == "1"
+
+
+def set_cached_online(res_id, online, ttl=ONLINE_TTL):
+    r.set(f"res:{res_id}:online", "1" if online else "0", ex=ttl)
 
 
 # =========================================================

@@ -1,5 +1,3 @@
-
-
 {% extends "base.html" %}
 
 {% block title %}
@@ -7,6 +5,53 @@ Seller Dashboard
 {% endblock %}
 
 {% block content %}
+<!-- Store online/offline toggle styles (move into your seller stylesheet if you prefer) -->
+<style>
+  .store-toggle{display:inline-flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;border:1px solid var(--border,#E1DED2);border-radius:999px;background:var(--surface,#FFFFFB);font-size:13px;font-weight:600;color:var(--text,#1F2A37);white-space:nowrap;transition:background .2s ease,border-color .2s ease}
+  .store-toggle-dot{width:8px;height:8px;flex:0 0 auto;border-radius:50%;background:#98A2B3;transition:background .2s ease}
+
+  .store-toggle[data-state="online"]{border-color:#ABEFC6;background:#ECFDF3;color:#054F31}
+  .store-toggle[data-state="online"] .store-toggle-dot{background:var(--green,#079455);animation:storeDotPulse 2s ease-out infinite}
+  .store-toggle[data-state="offline"]{border-color:#FECDCA;background:#FEF3F2;color:#7A271A}
+  .store-toggle[data-state="offline"] .store-toggle-dot{background:var(--danger,#D92D20)}
+  .store-toggle[data-state="error"] .store-toggle-dot{background:var(--amber,#F79009)}
+
+  @keyframes storeDotPulse{
+    0%{box-shadow:0 0 0 0 rgba(7,148,85,.45)}
+    70%{box-shadow:0 0 0 7px rgba(7,148,85,0)}
+    100%{box-shadow:0 0 0 0 rgba(7,148,85,0)}
+  }
+
+  .store-toggle .switch{position:relative;flex:0 0 auto;width:40px;height:22px;padding:0;border:0;border-radius:999px;background:#D0D5DD;cursor:pointer;transition:background .2s ease}
+  .store-toggle .switch-thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.25);transition:transform .2s ease}
+  .store-toggle .switch[aria-checked="true"]{background:var(--green,#079455)}
+  .store-toggle .switch[aria-checked="true"] .switch-thumb{transform:translateX(18px)}
+  .store-toggle .switch:disabled{opacity:.6;cursor:not-allowed}
+  .store-toggle.is-busy .switch{cursor:progress}
+  .store-toggle .switch:focus-visible,.store-toggle-retry:focus-visible{outline:2px solid var(--blue,#2C4A6E);outline-offset:2px}
+
+  .store-toggle-retry{padding:2px 8px;border:1px solid currentColor;border-radius:999px;background:transparent;color:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .store-toggle-retry[hidden]{display:none}
+
+  @media (max-width:480px){
+    .store-toggle{position:absolute;right:10px;padding:6px 8px;gap:8px}
+    /* .store-toggle-label{display:none} */
+  }
+ @media (max-width:340px){
+    .store-toggle{position:static;top:0;right:0;margin:8px}
+    /* .store-toggle-label{display:none} */
+  }
+  .sd-toast{position:fixed;left:50%;bottom:24px;z-index:1000;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:10px;background:#1D2939;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(16,24,40,.25);transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease}
+  .sd-toast.show{opacity:1;transform:translate(-50%,0)}
+  .sd-toast[data-kind="success"]{background:#067647}
+  .sd-toast[data-kind="warn"]{background:#B54708}
+  .sd-toast[data-kind="error"]{background:#B42318}
+
+  @media (prefers-reduced-motion:reduce){
+    .store-toggle-dot,.store-toggle .switch-thumb,.sd-toast{animation:none;transition:none}
+  }
+</style>
+
 <!-- ===== MAIN ===== -->
 <main class="main">
   <div class="overlay" id="overlayContainer"></div>
@@ -20,8 +65,18 @@ Seller Dashboard
       <div class="greeting" id="greeting">Good morning, Ramesh 👋</div>
       </div>
       <div class="date" id="dateLabel"></div>
+      <!-- Store online / offline -->
+      <div class="store-toggle" id="storeToggle" data-state="loading">
+        <span class="store-toggle-dot" aria-hidden="true"></span>
+        <span class="store-toggle-label" id="storeToggleLabel">Checking…</span>
+        <button type="button" class="store-toggle-retry" id="storeToggleRetry" hidden>Retry</button>
+        <button type="button" class="switch" id="storeToggleSwitch" role="switch" aria-checked="false" aria-label="Store online status" disabled>
+          <span class="switch-thumb"></span>
+        </button>
+      </div>
     </div>
     <div class="topbar-right">
+      
       <button class="icon-btn" aria-label="Notifications">
         <i data-lucide="bell" width="18" height="18"></i>
         <span class="notif-dot"></span>

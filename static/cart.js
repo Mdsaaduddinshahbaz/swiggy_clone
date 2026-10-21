@@ -34,6 +34,20 @@ function safeStorageRemove(storage, key) {
     try { storage.removeItem(key); } catch (e) { /* ignore */ }
 }
 
+// Parses a response body without throwing (503/400 bodies carry the message we want).
+async function cartJson(response) {
+    try { return await response.json(); } catch (e) { return null; }
+}
+
+// Prefer the app's toast (defined in home.js); fall back to alert if it isn't there.
+function notify(message) {
+    if (typeof showToast === "function" && document.getElementById("toast")) {
+        showToast(message);
+    } else {
+        alert(message);
+    }
+}
+
 function goToPage(page) {
     // spa_router.js declares renderPage() at top level, so it is global.
     // Calling it directly is the same thing the nav links do on click.
@@ -92,7 +106,9 @@ function normalizePhone(phone) {
 // Debounced, serialized cart updates
 // ---------------------------------------------------------------
 
-function scheduleCartUpdate(itemId, resId, userId, delta, onSuccess, onFailure) {
+// onOffline is optional: called instead of onFailure when the server answers
+// 503 STORE_OFFLINE (increments are blocked while the store is offline).
+function scheduleCartUpdate(itemId, resId, userId, delta, onSuccess, onFailure, onOffline) {
     let entry = pendingUpdates.get(itemId);
 
     if (entry) {
@@ -129,13 +145,19 @@ function scheduleCartUpdate(itemId, resId, userId, delta, onSuccess, onFailure) 
                     })
                 });
 
-                if (!res.ok) throw new Error(`update_cart failed: ${res.status}`);
-                const data = await res.json();
+                const data = await cartJson(res);
 
-                if (data.success) {
+                if (res.status === 503 && data && data.code === "STORE_OFFLINE") {
+                    if (onOffline) onOffline(); else onFailure(data.message);
+                    return;
+                }
+
+                if (!res.ok && !data) throw new Error(`update_cart failed: ${res.status}`);
+
+                if (data && data.success) {
                     onSuccess(data);
                 } else {
-                    onFailure(data.message || "Failed updating cart");
+                    onFailure((data && data.message) || "Failed updating cart");
                 }
             } catch (err) {
                 console.error("cart update failed", err);
@@ -218,7 +240,7 @@ async function initCartPage() {
             "<res_id>": {
                 name: "New kirana",
                 items: { "<item_id>": { name, price, qty, available_qty } },
-                delivery: { delivery_available, delivery_radius, long, latt }
+                delivery: { delivery_available, delivery_radius, long, latt, is_online }
             }
         }
     */
@@ -254,6 +276,118 @@ async function initCartPage() {
 
     function persistCart() {
         safeStorageSet(sessionStorage, CART_CACHE_KEY, JSON.stringify(restaurants));
+    }
+
+    // ---------------------------------------------------------------
+    // Store online / offline
+    //
+    // The server sends the live state in cart[res_id].delivery.is_online
+    // (never from a stale cache). After that it's kept fresh by:
+    //   - "store:status" events (dispatched by home.js's socket handler)
+    //   - "store:resync"  events (socket reconnect / tab visible again)
+    //   - a 503 STORE_OFFLINE from /update_cart or /store_orders
+    // Increments and Place Order are blocked while offline; reducing and
+    // removing items stays allowed so the user can clean up their cart.
+    // ---------------------------------------------------------------
+
+    let cartBanner = null;
+    let bannerTimer = null;
+    let backOnlineUntil = 0;   // timestamp: show the green "back online" banner until then
+
+    function getStoreId() {
+        return Object.keys(restaurants)[0] || null;   // cart is single-restaurant
+    }
+
+    function getStoreName() {
+        const id = getStoreId();
+        return (id && restaurants[id]?.name) || "This store";
+    }
+
+    // Unknown (no delivery info) counts as online; the server enforces it anyway.
+    function isStoreOnline() {
+        const d = getDeliveryInfo();
+        return !d || d.is_online !== false;
+    }
+
+    function ensureBanner() {
+        if (cartBanner && document.body.contains(cartBanner)) return cartBanner;
+        document.getElementById("cartStoreBanner")?.remove();
+
+        cartBanner = document.createElement("div");
+        cartBanner.id = "cartStoreBanner";
+        cartBanner.className = "store-banner";
+        cartBanner.hidden = true;
+        cartBanner.setAttribute("role", "status");
+        cartBanner.setAttribute("aria-live", "polite");
+        cartContainer.parentNode.insertBefore(cartBanner, cartContainer);
+        return cartBanner;
+    }
+
+    function renderStoreBanner() {
+        if (!cartContainer) return;
+        const banner = ensureBanner();
+        clearTimeout(bannerTimer);
+
+        const hide = () => {
+            banner.hidden = true;
+            banner.className = "store-banner";
+            banner.innerHTML = "";
+        };
+
+        if (isCartEmpty(restaurants)) { hide(); return; }
+
+        const name = escapeHtml(getStoreName());
+
+        if (!isStoreOnline()) {
+            banner.hidden = false;
+            banner.className = "store-banner is-offline";
+            banner.innerHTML = `
+                <div class="store-banner-icon"><i class="fa-solid fa-store-slash"></i></div>
+                <div class="store-banner-text">
+                    <strong>${name} is currently offline</strong>
+                    <span>You can't place this order right now. Your items are saved — come back when they're open, or remove items below.</span>
+                </div>`;
+        } else if (Date.now() < backOnlineUntil) {
+            banner.hidden = false;
+            banner.className = "store-banner is-online";
+            banner.innerHTML = `
+                <div class="store-banner-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="store-banner-text">
+                    <strong>${name} is back online</strong>
+                    <span>You can place your order now.</span>
+                </div>`;
+            bannerTimer = setTimeout(renderStoreBanner, backOnlineUntil - Date.now() + 50);
+        } else {
+            hide();
+        }
+    }
+
+    // Single place that applies a status change to the cart page.
+    function applyOnlineState(online, live) {
+        const id = getStoreId();
+        if (!id) return;
+
+        const restaurant = restaurants[id];
+        if (!restaurant.delivery) restaurant.delivery = {};
+
+        const was = restaurant.delivery.is_online !== false;
+        restaurant.delivery.is_online = online;
+        persistCart();
+
+        if (was === online) return;
+
+        if (online) {
+            backOnlineUntil = Date.now() + 5000;
+            if (live) notify(`${getStoreName()} is back online`);
+        } else {
+            backOnlineUntil = 0;
+            // Don't leave a checkout sheet open over an order that can't go through.
+            closePickupSheet();
+            if (!box?.classList.contains("show")) overlay?.classList.remove("show");
+            if (live) notify(`${getStoreName()} just went offline`);
+        }
+
+        renderCart(restaurants);
     }
 
     // ---------------------------------------------------------------
@@ -328,7 +462,14 @@ async function initCartPage() {
             deliveryWarning.textContent = check.message;
             deliveryWarning.classList.toggle("show", !check.ok);
         }
-        if (placeorder) placeorder.disabled = !check.ok;
+
+        const online = isStoreOnline();
+        if (placeorder) {
+            // Remember the button's original markup so we can restore it.
+            if (placeorder.dataset.origHtml === undefined) placeorder.dataset.origHtml = placeorder.innerHTML;
+            placeorder.innerHTML = online ? placeorder.dataset.origHtml : "Store is offline";
+            placeorder.disabled = !check.ok || !online;
+        }
     }
 
     // ---------------------------------------------------------------
@@ -353,6 +494,7 @@ async function initCartPage() {
 
             if (totalPrice) totalPrice.innerText = 0;
             if (toPay) toPay.innerText = 0;
+            renderStoreBanner();
             return 0;
         }
 
@@ -360,6 +502,7 @@ async function initCartPage() {
         if (cr) cr.style.display = "";
         if (no_order_container) no_order_container.classList.remove("show");
 
+        const storeOnline = isStoreOnline();
         let total = 0;
 
         const html = Object.entries(cart).map(([res_id, r]) => {
@@ -372,6 +515,7 @@ async function initCartPage() {
                 total += price * qty;
 
                 const atMax = detail.available_qty != null && qty >= detail.available_qty;
+                const disableIncrease = atMax || !storeOnline;
 
                 return `
                 <div class="cart-item" id="${escapeHtml(item_id)}" data-res-id="${escapeHtml(res_id)}">
@@ -386,7 +530,7 @@ async function initCartPage() {
                     <div class="quantity-control">
                         <button type="button" class="qty-btn reduce">-</button>
                         <span class="item_qty">${escapeHtml(qty)}</span>
-                        <button type="button" class="qty-btn increase" ${atMax ? "disabled" : ""}>+</button>
+                        <button type="button" class="qty-btn increase${storeOnline ? "" : " is-store-offline"}" ${disableIncrease ? "disabled" : ""}>+</button>
                     </div>
 
                     <span class="unit-price">${escapeHtml(price)}</span>
@@ -407,6 +551,7 @@ async function initCartPage() {
         cart_items_container.innerHTML = html;
         if (totalPrice) totalPrice.innerText = total;
         if (toPay) toPay.innerText = total;
+        renderStoreBanner();
         updateOrderTypeUI();
         return total;
     }
@@ -433,9 +578,25 @@ async function initCartPage() {
             if (signal.aborted) return;
 
             if (data.success) {
+                const hadCart = !isCartEmpty(restaurants);
+                const wasOnline = isStoreOnline();
+
                 restaurants = data.results?.cart || {};
                 persistCart();
+
+                // Notice status changes we missed (e.g. while the tab was in the background).
+                const nowOnline = isStoreOnline();
+                if (hadCart && wasOnline && !nowOnline) {
+                    notify(`${getStoreName()} just went offline`);
+                } else if (!wasOnline && nowOnline && !isCartEmpty(restaurants)) {
+                    backOnlineUntil = Date.now() + 5000;
+                }
+
                 renderCart(restaurants);
+
+                // Join the store's realtime room so we hear about status changes instantly.
+                const storeId = getStoreId();
+                if (storeId && typeof watchStores === "function") watchStores([storeId]);
             } else if (isCartEmpty(restaurants)) {
                 renderCart({});
             }
@@ -452,6 +613,11 @@ async function initCartPage() {
 
         const { res: restaurant, item } = found;
         resId = found.resId;
+
+        if (delta > 0 && !isStoreOnline()) {
+            notify(`${restaurant.name || "This store"} is currently offline`);
+            return;
+        }
 
         if (delta > 0 && item.available_qty != null && item.qty + delta > item.available_qty) {
             alert(`Only ${item.available_qty} in stock`);
@@ -488,6 +654,14 @@ async function initCartPage() {
                 // server instead of trying to undo a single click.
                 await loadCart();
                 alert(msg || "Something went wrong updating your cart, please try again.");
+            },
+            async () => {
+                if (signal.aborted) return;
+                // Server refused the increment because the store is offline.
+                // Resync: this undoes the optimistic +1 and flips the page to
+                // its offline state (banner, disabled controls).
+                await loadCart();
+                notify(`${getStoreName()} is currently offline. Your cart is saved.`);
             }
         );
     }
@@ -531,6 +705,15 @@ async function initCartPage() {
         safeStorageSet(localStorage, ORDER_TYPE_KEY, preferredOrderType);
         updateOrderTypeUI();
     });
+
+    // Live store status. These events are dispatched by home.js (socket push,
+    // reconnect, tab becoming visible); removed automatically when this init is torn down.
+    on(document, "store:status", (e) => {
+        const detail = e.detail || {};
+        if (String(detail.resId) !== String(getStoreId())) return;
+        applyOnlineState(detail.online !== false, !!detail.live);
+    });
+    on(document, "store:resync", () => { loadCart(); });
 
     await loadCart();
     if (signal.aborted) return;
@@ -876,7 +1059,19 @@ async function initCartPage() {
                 return;
             }
 
-            const orderData = await orderRes.json();
+            const orderData = await cartJson(orderRes);
+            if (!orderData) throw new Error(`store_orders failed: ${orderRes.status}`);
+
+            if (orderRes.status === 503 && orderData.code === "STORE_OFFLINE") {
+                // The store went offline between the page load and this click.
+                // No alert: close the sheet and show the offline state in the page itself.
+                closePickupSheet();
+                if (!box?.classList.contains("show")) overlay?.classList.remove("show");
+                applyOnlineState(false, false);
+                renderCart(restaurants);
+                notify(orderData.message || `${getStoreName()} is currently offline. Your order wasn't placed.`);
+                return;
+            }
 
             if (orderData.success) {
                 closePickupSheet();
@@ -904,6 +1099,11 @@ async function initCartPage() {
             return;
         }
 
+        if (!isStoreOnline()) {
+            notify(`${getStoreName()} is currently offline`);
+            return;
+        }
+
         if (getOrderType() === "delivery") {
             const check = checkDelivery();
             if (!check.ok) {
@@ -920,6 +1120,13 @@ async function initCartPage() {
     });
 
     on(confirmPickupBtn, "click", async () => {
+        if (!isStoreOnline()) {
+            closePickupSheet();
+            overlay?.classList.remove("show");
+            notify(`${getStoreName()} is currently offline`);
+            return;
+        }
+
         const pickupTime = pickupTimeInput.value; // "HH:MM" 24hr, or "" if unset
 
         if (!pickupTime) {
