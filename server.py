@@ -1319,12 +1319,19 @@ def returnstats():
 def render_analytics_template(res_id):
     try:
         print("seller_anlytics")
-        return render_template("analytics.html")
+        return render_template("seller.html")
     except Exception as e:
         print(e)
         return ({"success": False})
 
-
+@app.get("/seller/<res_id>")
+def render_analyticss_template(res_id):
+    try:
+        print("seller_anlytics")
+        return render_template("seller.html")
+    except Exception as e:
+        print(e)
+        return ({"success": False})
 @app.post("/seller/analytics")
 @login_required
 def return_seller_stats():

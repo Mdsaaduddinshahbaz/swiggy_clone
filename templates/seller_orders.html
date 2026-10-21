@@ -17,18 +17,20 @@ Orders
         </button>
         <h1>Your Orders</h1>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <button id="scanQrBtn" type="button" style="
-                background: #E8491D;
-                color: #fff;
-                border: none;
-                border-radius: 8px;
-                padding: 8px 12px;
-                font-weight: 700;
-                font-size: 13px;
-                cursor: pointer;
-                white-space: nowrap;
-            ">📷 Scan QR</button>
+        <button id="scanQrBtn" type="button" style="
+            background: #E8491D;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            position: absolute;
+            right: 10px;
+            white-space: nowrap;
+        ">📷 Scan QR</button>
+        <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
             <select id="filterDropdown">
                 <option value="placed">Pending</option>
                 <option value="all">All Orders</option>

@@ -1,116 +1,489 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Seller Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='seller.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}KiranaHub Seller Portal{% endblock %}</title>
+
+  <!-- Fonts (merged from inventory page) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&family=Anton&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='seller.css') }}">
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
 </head>
+
 <body>
+  {# Which view opens first. Pass page='dashboard' | 'inventory' | 'orders' from Flask. #}
+  {% set page = page|default('dashboard') %}
 
-<!-- Rail (sidebar) -->
-<aside class="rail">
-  <div class="rail-head">
-    <span class="rail-mark">⌘</span>
-    <div class="rail-name">
-      <span class="rail-title">Seller Panel</span>
-      <span class="rail-sub" id="resNameLabel">—</span>
+  <!-- ================= NAV SIDEBAR (was sidebar.html) ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <button id="hideCategoryBtn">+</button>
+      <div class="brand-icon">
+        <i data-lucide="store" width="16" height="16" style="color:#fff"></i>
+      </div>
+      <div>
+        <div class="brand-name">KiranaHub</div>
+        <div class="brand-sub">Seller Portal</div>
+      </div>
     </div>
-  </div>
 
-  <nav class="rail-nav">
-    <button class="stub" data-nav="orders" onclick="goToOrders()">
-      <span class="stub-hole"></span>
-      <span class="stub-icon">📦</span>
-      <span class="stub-label">Orders</span>
-    </button>
-    <button class="stub" data-nav="menu" onclick="goToMenu()">
-      <span class="stub-hole"></span>
-      <span class="stub-icon">🍔</span>
-      <span class="stub-label">Menu</span>
-    </button>
-    <button class="stub" data-nav="analytics" onclick="goToAnalytics()">
-      <span class="stub-hole"></span>
-      <span class="stub-icon">📊</span>
-      <span class="stub-label">Analytics</span>
-    </button>
-  </nav>
+    <nav class="nav">
+      <div class="nav-section">Main</div>
+      <button class="nav-item {% if page == 'dashboard' %}active{% endif %}" id="DashboardBtn" data-view="dashboard"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
+      <button class="nav-item {% if page == 'orders' %}active{% endif %}" id="OrdersBtn" data-view="orders"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge" id="active_orders">6</span></button>
+      <button class="nav-item {% if page == 'inventory' %}active{% endif %}" id="InventoryBtn" data-view="inventory"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
+      <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
 
-  <div class="rail-foot">
-    <span class="rail-foot-label">Kitchen status</span>
-    <span class="live-pill"><span class="live-dot"></span>Online</span>
-  </div>
-</aside>
+      <div class="nav-section" style="margin-top:12px;">Reports</div>
+      <button class="nav-item"><i data-lucide="bar-chart-2" width="16" height="16"></i> Sales Report</button>
+      <button class="nav-item"><i data-lucide="trending-up" width="16" height="16"></i> Analytics</button>
+      <button class="nav-item"><i data-lucide="receipt" width="16" height="16"></i> Payouts</button>
 
-<!-- Main -->
-<main class="main">
+      <div class="nav-section" style="margin-top:12px;">Store</div>
+      <button class="nav-item"><i data-lucide="tag" width="16" height="16"></i> Offers & Coupons</button>
+      <button class="nav-item"><i data-lucide="settings" width="16" height="16"></i> Settings</button>
+      <button class="nav-item" id="Logout"><i data-lucide="log-out" width="16" height="16"></i> Logout</button>
+    </nav>
 
-  <header class="board-header">
-    <div>
-      <p class="eyebrow">Today's board</p>
-      <h1>Dashboard</h1>
+    <div class="sidebar-footer">
+      <div class="avatar">RS</div>
+      <div>
+        <div class="seller-name">Ramesh Stores</div>
+        <div class="seller-id">SLR-002841</div>
+      </div>
     </div>
-    <div class="header-right">
-      <span class="live-pill live-pill--lg"><span class="live-dot"></span>Online</span>
-    </div>
-  </header>
+  </aside>
 
-  <!-- Ticket rail of stats -->
-  <section class="tickets" aria-label="Order statistics">
-    <div class="ticket" data-tone="all">
-      <p class="ticket-label">Total orders</p>
-      <h2 class="ticket-num" id="totalOrders">0</h2>
-      <p class="ticket-tag">all time</p>
-    </div>
-    <div class="ticket" data-tone="pending">
-      <p class="ticket-label">Pending</p>
-      <h2 class="ticket-num" id="pendingOrders">0</h2>
-      <p class="ticket-tag">on the fire</p>
-    </div>
-    <div class="ticket" data-tone="completed">
-      <p class="ticket-label">Completed</p>
-      <h2 class="ticket-num" id="completedOrders">0</h2>
-      <p class="ticket-tag">plated & sent</p>
-    </div>
-    <div class="ticket" data-tone="canceled">
-      <p class="ticket-label">Canceled</p>
-      <h2 class="ticket-num" id="canceledOrders">0</h2>
-      <p class="ticket-tag">sent back</p>
-    </div>
-  </section>
+  <main class="main-content" style="width: 100%;">
 
-  <!-- Stations -->
-  <section class="stations" aria-label="Quick actions">
-    <p class="section-label">Stations</p>
-    <div class="station-grid">
-      <button class="station" onclick="goToOrders()">
-        <span class="station-icon">📦</span>
-        <span class="station-title">View orders</span>
-        <span class="station-desc">Manage incoming orders</span>
-        <span class="station-arrow">→</span>
+    <!-- Shared overlay (was duplicated in dashboard + orders) -->
+    <div class="overlay" id="overlayContainer"></div>
+
+    <!-- ================= VIEW 1: DASHBOARD ================= -->
+    <div class="view {% if page == 'dashboard' %}active{% endif %}" id="view-dashboard">
+      <div class="main">
+
+        <!-- Top bar -->
+        <div class="topbar">
+          <div class="topbar-left">
+            <div style="display: flex;">
+              <button id="menuToggleDashboard" class="menu-toggle">☰</button>
+              <div class="greeting" id="greeting">Good morning, Ramesh 👋</div>
+            </div>
+            <div class="date" id="dateLabel"></div>
+
+            <!-- Store online / offline -->
+            <div class="store-toggle" id="storeToggle" data-state="loading">
+              <span class="store-toggle-dot" aria-hidden="true"></span>
+              <span class="store-toggle-label" id="storeToggleLabel">Checking…</span>
+              <button type="button" class="store-toggle-retry" id="storeToggleRetry" hidden>Retry</button>
+              <button type="button" class="switch" id="storeToggleSwitch" role="switch" aria-checked="false" aria-label="Store online status" disabled>
+                <span class="switch-thumb"></span>
+              </button>
+            </div>
+          </div>
+          <div class="topbar-right">
+            <button class="icon-btn" aria-label="Notifications">
+              <i data-lucide="bell" width="18" height="18"></i>
+              <span class="notif-dot"></span>
+            </button>
+            <button class="btn-outline">
+              <i data-lucide="download" width="14" height="14"></i> Export report
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI row -->
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:#EBF0F6;"><i data-lucide="indian-rupee" width="18" height="18" style="color:var(--blue)"></i></div>
+              <div class="kpi-change up"><i data-lucide="trending-up" width="12" height="12"></i> +18.4%</div>
+            </div>
+            <div>
+              <div class="kpi-value" id="kpiRevenue">₹84,320</div>
+              <div class="kpi-label">Revenue this month</div>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:#E6F2EC;"><i data-lucide="shopping-bag" width="18" height="18" style="color:var(--green)"></i></div>
+              <div class="kpi-change up"><i data-lucide="trending-up" width="12" height="12"></i> +9.1%</div>
+            </div>
+            <div>
+              <div class="kpi-value" id="kpiOrders">1,248</div>
+              <div class="kpi-label">Orders this month</div>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:#FEF3E2;"><i data-lucide="clock" width="18" height="18" style="color:var(--amber)"></i></div>
+              <div class="kpi-change down"><i data-lucide="trending-down" width="12" height="12"></i> <div id="pendingOrders">6</div> pending</div>
+            </div>
+            <div>
+              <div class="kpi-value" id="kpiToday">6</div>
+              <div class="kpi-label">New orders today</div>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:#FBEAE7;"><i data-lucide="alert-triangle" width="18" height="18" style="color:var(--danger)"></i></div>
+              <div class="kpi-change down" style="color:var(--danger)">Needs action</div>
+            </div>
+            <div>
+              <div class="kpi-value" id="kpiStock">8</div>
+              <div class="kpi-label">Low / out-of-stock items</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 1: Chart + Quick Actions -->
+        <div class="row">
+          <div class="col-lg widget">
+            <div class="widget-head">
+              <span class="widget-title">Sales overview</span>
+              <div class="chart-tabs">
+                <button class="chart-tab" onclick="switchChart('7d',this)">7 days</button>
+                <button class="chart-tab active" onclick="switchChart('30d',this)">30 days</button>
+                <button class="chart-tab" onclick="switchChart('90d',this)">3 months</button>
+              </div>
+            </div>
+            <canvas id="salesChart"></canvas>
+          </div>
+
+          <div class="col-sm" style="display:flex;flex-direction:column;gap:20px;">
+            <!-- Quick actions -->
+            <div class="widget" style="padding:18px;">
+              <div class="widget-head"><span class="widget-title">Quick actions</span></div>
+              <div class="actions-grid">
+                <!-- id renamed: addItemBtn -> quickAddItemBtn (inventory page owns addItemBtn) -->
+                <button class="action-btn" id="quickAddItemBtn">
+                  <span class="action-icon"><i data-lucide="plus-circle" width="18" height="18"></i></span>
+                  <span class="action-label">Add item</span>
+                  <span class="action-desc">New product to catalogue</span>
+                </button>
+                <button class="action-btn" id="updateStockBtn">
+                  <span class="action-icon"><i data-lucide="package-check" width="18" height="18"></i></span>
+                  <span class="action-label">Update stock</span>
+                  <span class="action-desc">Restock low items</span>
+                </button>
+                <button class="action-btn" id="createOfferBtn">
+                  <span class="action-icon"><i data-lucide="tag" width="18" height="18"></i></span>
+                  <span class="action-label">Create offer</span>
+                  <span class="action-desc">Discounts & coupons</span>
+                </button>
+                <button class="action-btn">
+                  <span class="action-icon"><i data-lucide="download" width="18" height="18"></i></span>
+                  <span class="action-label">Export orders</span>
+                  <span class="action-desc">CSV / Excel</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Today summary -->
+            <div class="widget" style="padding:18px;">
+              <div class="widget-head"><span class="widget-title">Today</span></div>
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;color:var(--muted);">Revenue</span>
+                  <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="todayRevenue">₹3,840</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;color:var(--muted);">Orders placed</span>
+                  <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="kpiTodayBtm">6</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;color:var(--muted);">Items sold</span>
+                  <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="kpiTotalSold">34</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;color:var(--muted);">Avg order value</span>
+                  <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;" id="todayAvg">₹640</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Recent Orders + Top Products -->
+        <div class="row">
+          <div class="col-lg widget" id="RecentOrdersWidget">
+            <div class="widget-head">
+              <span class="widget-title">Recent orders</span>
+              <button class="widget-link" id="ordersRedirectBtn" data-view="orders">View all →</button>
+            </div>
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+
+          <div class="col-sm" style="display:flex;flex-direction:column;gap:20px;">
+            <div class="widget" id="TopProducts">
+              <div class="widget-head">
+                <span class="widget-title">Top products</span>
+                <button class="widget-link">See all →</button>
+              </div>
+              <div id="topProducts"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Low stock + Activity -->
+        <div class="row">
+          <div class="col-sm widget">
+            <div class="widget-head">
+              <span class="widget-title">Stock alerts</span>
+              <button class="widget-link" id="inventoryRedirectBtn" data-view="inventory">Go to inventory →</button>
+            </div>
+            <div id="stockAlerts"></div>
+          </div>
+
+          <div class="col-lg widget">
+            <div class="widget-head">
+              <span class="widget-title">Recent activity</span>
+            </div>
+            <div id="activityFeed"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= VIEW 2: INVENTORY ================= -->
+    <div class="view {% if page == 'inventory' %}active{% endif %}" id="view-inventory">
+      <div class="app">
+        <div id="sidebarOverlay" class="sidebar-overlay hidden"></div>
+
+        <!-- Catalogue sidebar (class renamed: sidebar -> catalogue-sidebar to avoid clashing with the nav sidebar) -->
+        <aside class="catalogue-sidebar">
+
+          <div class="sidebar-header">
+            <!-- id renamed: hideCategoryBtn -> hideCatalogueBtn (nav sidebar owns hideCategoryBtn) -->
+            <button id="hideCatalogueBtn">+</button>
+            <h2>Catalogue</h2>
+            <button id="addCategoryBtn">+</button>
+          </div>
+
+          <button class="all-items-btn active" id="allItemsBtn">All items</button>
+
+          <div id="categoryTree" class="tree"></div>
+        </aside>
+
+        <div class="main">
+
+          <section class="hero">
+            <button id="menuToggleInventory" class="menu-toggle">☰</button>
+            <h1 id="homeBtn">🏠︎</h1>
+            <div>
+              <span class="breadcrumb" id="breadcrumb">Every category</span>
+              <h1 id="headerTitle">All items</h1>
+            </div>
+
+            <button id="addItemBtn" class="primary-btn">+ Add item</button>
+          </section>
+
+          <section class="stats">
+            <div class="stat">
+              <span>Total items</span>
+              <h2 id="totalItems">0</h2>
+            </div>
+            <div class="stat">
+              <span>Listed</span>
+              <h2 class="green" id="listedItems">0</h2>
+            </div>
+            <div class="stat">
+              <span>Low stock</span>
+              <h2 class="amber" id="lowItems">0</h2>
+            </div>
+            <div class="stat">
+              <span>Out of stock</span>
+              <h2 class="red" id="outItems">0</h2>
+            </div>
+          </section>
+
+          <section class="toolbar">
+            <select id="stockFilter">
+              <option value="all">All stock levels</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+            </select>
+
+            <input type="text" id="searchInput" placeholder="Search name or SKU" />
+          </section>
+
+          <section id="itemsGrid" class="grid"></section>
+        </div>
+      </div>
+
+      <!-- Add / Edit item drawer -->
+      <div id="itemDrawer" class="drawer-overlay hidden">
+        <div class="drawer">
+          <div class="drawer-header">
+            <h2 id="drawerTitle">Add Item</h2>
+            <button id="closeDrawer">✕</button>
+          </div>
+
+          <label>
+            Category
+            <select id="itemSub"></select>
+          </label>
+
+          <span>Item Name</span>
+          <input id="itemName" placeholder="Item name">
+          <span>Description</span>
+          <textarea id="itemDesc" placeholder="Description"></textarea>
+          <span>Pack size</span>
+          <div class="pack-size">
+            <input id="itemUnitValue" type="number" min="0.01" step="any" placeholder="Enter quantity">
+            <span>Units</span>
+            <select id="itemUnit">
+              <option value="kg" selected>kg</option>
+              <option value="g">g</option>
+              <option value="L">L</option>
+              <option value="ml">ml</option>
+              <option value="piece">Piece</option>
+              <option value="pack">Pack</option>
+              <option value="dozen">Dozen</option>
+            </select>
+          </div>
+          <span>Item Price</span>
+          <input id="itemPrice" type="number" placeholder="Price">
+          <span>Item Stock</span>
+          <input id="itemStock" type="number" placeholder="Stock">
+
+          <div class="input-group">
+            <label>Restaurant Photo (Optional)</label>
+            <input type="file" id="photo" accept="image/*">
+            <img id="preview" style="display:none;width:100%;max-height:200px;object-fit:cover;border-radius:15px;margin-top:10px;">
+          </div>
+
+          <span>Low Stock Alert at</span>
+          <input id="itemLow" type="number" placeholder="Low stock at" value="10">
+
+          <label>
+            Listed for customers
+            <input id="itemListed" type="checkbox" checked>
+          </label>
+
+          <button id="saveItemBtn" class="primary-btn">Save</button>
+        </div>
+      </div>
+
+      <!-- New category drawer -->
+      <div id="categoryDrawer" class="drawer-overlay hidden">
+        <div class="drawer">
+          <div class="drawer-header">
+            <h2>New Category</h2>
+            <button id="closeCategoryDrawer">✕</button>
+          </div>
+
+          <input id="catName" placeholder="Category name">
+
+          <textarea id="subNames" placeholder="
+Rice
+Atta
+Pulses
+"></textarea>
+
+          <button id="saveCategoryBtn" class="primary-btn">Create Category</button>
+        </div>
+      </div>
+
+      <!-- Subcategory drawer -->
+      <div id="subcategoryDrawer" class="drawer-overlay">
+        <div class="drawer">
+          <h2 id="subDrawerTitle">Add subcategory</h2>
+
+          <input id="subcatName" type="text" placeholder="Subcategory name" />
+
+          <div class="drawer-actions">
+            <button id="cancelSubBtn">Cancel</button>
+            <button id="saveSubBtn">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= VIEW 3: ORDERS ================= -->
+    <div class="view {% if page == 'orders' %}active{% endif %}" id="view-orders">
+      <div class="orders-container">
+        <div class="header">
+          <div style="display: flex;">
+            <button id="menuToggleOrders" class="menu-toggle">☰</button>
+            <h1>Your Orders</h1>
+          </div>
+          <button id="scanQrBtn" type="button" style="
+              background: #E8491D;
+              color: #fff;
+              border: none;
+              border-radius: 8px;
+              padding: 8px 12px;
+              font-weight: 700;
+              font-size: 13px;
+              cursor: pointer;
+              position: absolute;
+              right: 10px;
+              white-space: nowrap;
+          ">📷 Scan QR</button>
+          <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+            <select id="filterDropdown">
+              <option value="placed">Pending</option>
+              <option value="all">All Orders</option>
+              <option value="completed">Completed</option>
+              <option value="canceled">Canceled</option>
+            </select>
+          </div>
+        </div>
+        <p id="noOrdersMessage" style="display: none;"></p>
+        <div id="orders-list"></div>
+      </div>
+      <div style="margin-bottom: 40px;"></div>
+    </div>
+
+    <!-- ================= FLOATING BOTTOM NAV (single copy) ================= -->
+    <div class="floating-nav">
+      <button class="nav-btn {% if page == 'dashboard' %}active{% endif %}" id="DashboardsBtn" data-view="dashboard">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Dashboard</span>
       </button>
 
-      <button class="station" onclick="goToMenu()">
-        <span class="station-icon">🍔</span>
-        <span class="station-title">Manage menu</span>
-        <span class="station-desc">Edit your items</span>
-        <span class="station-arrow">→</span>
+      <button class="nav-btn {% if page == 'inventory' %}active{% endif %}" id="InventorysBtn" data-view="inventory">
+        <i data-lucide="package"></i>
+        <span>Inventory</span>
       </button>
 
-      <button class="station" onclick="goToAnalytics()">
-        <span class="station-icon">📊</span>
-        <span class="station-title">Analytics</span>
-        <span class="station-desc">Track performance</span>
-        <span class="station-arrow">→</span>
+      <button class="nav-btn {% if page == 'orders' %}active{% endif %}" id="OrderrBtn" data-view="orders">
+        <i data-lucide="shopping-bag"></i>
+        <span>Orders</span>
       </button>
     </div>
-  </section>
+  </main>
 
-</main>
-
-<script src="{{ url_for('static', filename='seller.js') }}"></script>
+  <!-- ================= SCRIPTS ================= -->
+  <script>
+    // Jinja value that seller.js needs
+    const CurrentUsername = "{{ username }}";
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='seller.js') }}"></script>
 </body>
+
 </html>
