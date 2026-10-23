@@ -1248,7 +1248,7 @@ def sellerTemplate(name, seller_id):
     try:
         username = g.username
         print(username)
-        return render_template("seller_dashboard.html", page="dashboard", username=username)
+        return render_template("seller.html", page="dashboard", username=username)
     except Exception as e:
         print(e)
         return ({"success": False})
