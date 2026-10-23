@@ -34,6 +34,14 @@
   --sidebar-txt: #C8C5BC;
   --sidebar-act: #FFFFFB;
   --sidebar-w: 230px;
+
+  /* ---- FONTS: declared once, used everywhere via var() ---- */
+  --font-body: 'Inter', sans-serif;             /* default text           */
+  --font-heading: "Times New Roman", serif;            /* titles, KPI numbers    */
+  --font-mono: 'JetBrains Mono', monospace;     /* ids, prices, counts    */
+  --font-greeting: 'fangsong', serif;           /* "Good morning, ..." line */
+  --font-ticket-title: 'Anton', sans-serif;     /* orders screen headline */
+  --font-ticket-body: 'DM Sans', sans-serif;    /* orders screen text     */
 }
 
 /* The orders screen has its own warm "kitchen ticket" palette. Several of its
@@ -58,16 +66,13 @@
   --red-bg: #FBE7E1;
   --amber-bg: #FFF0D6;
 
-  --font-display: 'Anton', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
 
   --radius: 14px;
   --shadow-card: 0 2px 0 var(--line), 0 10px 24px -18px rgba(36, 28, 26, 0.45);
 
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-body);
+  font-family: var(--font-ticket-body);
   min-height: 100vh;
 }
 
@@ -98,8 +103,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  /* font-family: 'Inter', sans-serif; */
-  font-family: 'fangsong';
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   display: flex;
   min-height: 100vh;
@@ -195,7 +199,7 @@ body {
   flex-shrink: 0;
 }
 
-.brand-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: #fff; }
+.brand-name { font-family: var(--font-heading); font-size: 18px; font-weight: 700; color: #fff; }
 .brand-sub { font-size: 10px; color: var(--sidebar-txt); letter-spacing: .06em; text-transform: uppercase; margin-top: 1px; }
 
 .nav { flex: 1; padding: 14px 0; overflow-y: auto; }
@@ -247,11 +251,11 @@ body {
   background: var(--blue);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  font-family: 'Fraunces', serif; font-size: 14px; font-weight: 600; color: #fff;
+  font-family: var(--font-heading); font-size: 14px; font-weight: 600; color: #fff;
 }
 
 .seller-name { font-size: 13px; font-weight: 600; color: #fff; }
-.seller-id { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--sidebar-txt); }
+.seller-id { font-family: var(--font-mono); font-size: 10px; color: var(--sidebar-txt); }
 
 /* ----- nav-sidebar dark overlay (mobile) ----- */
 .overlay {
@@ -290,7 +294,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 24px 0 0; margin-bottom: 28px; gap: 16px; flex-wrap: wrap;
 }
-.topbar-left .greeting { font-family: 'fangsong'; font-size: 28px; font-weight: 700; }
+.topbar-left .greeting { font-family: var(--font-greeting); font-size: 28px; font-weight: 700; }
 .topbar-left .date { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 
@@ -321,7 +325,7 @@ body {
 .kpi-change { font-size: 11.5px; font-weight: 600; display: flex; align-items: center; gap: 3px; }
 .kpi-change.up { color: var(--green); }
 .kpi-change.down { color: var(--danger); }
-.kpi-value { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 700; line-height: 1; }
+.kpi-value { font-family: var(--font-heading); font-size: 28px; font-weight: 700; line-height: 1; }
 .kpi-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
 /* ----- layout columns ----- */
@@ -332,7 +336,7 @@ body {
 /* ----- widget ----- */
 .widget { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
 .widget-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
-.widget-title { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; }
+.widget-title { font-family: var(--font-heading); font-size: 17px; font-weight: 600; }
 .widget-link { font-size: 12.5px; color: var(--blue); font-weight: 600; background: none; border: none; cursor: pointer; }
 
 /* ----- chart ----- */
@@ -354,10 +358,10 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .orders-table tr:last-child td { border-bottom: none; }
 .orders-table tr:hover td { background: #F9F7F1; }
 /* scoped: the orders view has its own .order-id */
-.orders-table .order-id { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
+.orders-table .order-id { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .order-name { font-weight: 600; font-size: 13.5px; }
 .order-items { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.order-price { font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; }
+.order-price { font-family: var(--font-heading); font-size: 15px; font-weight: 600; }
 .status-pill {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px;
   font-size: 11.5px; font-weight: 600;
@@ -371,7 +375,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 /* ----- top products ----- */
 .product-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .product-row:last-child { border-bottom: none; }
-.prod-rank { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); width: 18px; text-align: right; flex-shrink: 0; }
+.prod-rank { font-family: var(--font-mono); font-size: 11px; color: var(--muted); width: 18px; text-align: right; flex-shrink: 0; }
 .prod-icon { width: 36px; height: 36px; border-radius: 8px; background: #EEE; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
 .prod-info { flex: 1; min-width: 0; }
 .prod-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -379,15 +383,15 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .prod-bar-wrap { flex: 1; min-width: 0; }
 .prod-bar-track { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin-bottom: 3px; }
 .prod-bar-fill { height: 100%; border-radius: 2px; background: var(--blue); }
-.prod-sold { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-align: right; }
-.prod-revenue { font-family: 'Fraunces', serif; font-size: 13.5px; font-weight: 600; text-align: right; white-space: nowrap; }
+.prod-sold { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: right; }
+.prod-revenue { font-family: var(--font-heading); font-size: 13.5px; font-weight: 600; text-align: right; white-space: nowrap; }
 
 /* ----- low stock ----- */
 .stock-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .stock-item:last-child { border-bottom: none; }
 .stock-name { font-weight: 600; font-size: 13px; }
 .stock-cat { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
-.stock-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 20px; }
+.stock-count { font-family: var(--font-mono); font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 20px; }
 .stock-count.out { background: var(--danger-lt); color: var(--danger); }
 .stock-count.low { background: var(--amber-lt); color: var(--amber); }
 
@@ -495,7 +499,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   align-items: center;
 }
 
-.sidebar-header h2 { margin: 0; font-family: Fraunces; font-size: 20px; }
+.sidebar-header h2 { margin: 0; font-family: var(--font-heading); font-size: 20px; }
 
 .sidebar-header button {
   border: none; background: none; font-size: 26px; color: var(--blue); cursor: pointer;
@@ -531,7 +535,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   display: flex; justify-content: space-between; align-items: flex-start;
 }
 .breadcrumb { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-.hero h1 { margin: 6px 0 0; font-size: 34px; font-family: Fraunces; }
+.hero h1 { margin: 6px 0 0; font-size: 34px; font-family: 'Fraunces', serif; }
 
 #homeBtn {
   position: absolute;
@@ -549,7 +553,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .stats { display: flex; gap: 28px; padding: 24px 32px; border-bottom: 1px solid var(--line); }
 .stat { padding-right: 28px; border-right: 1px solid var(--line); }
 .stat span { display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
-.stat h2 { margin: 0; font-size: 30px; font-family: Fraunces; }
+.stat h2 { margin: 0; font-size: 30px; font-family: 'Fraunces', serif; }
 .green { color: var(--green); }
 .amber { color: var(--amber); }
 .red { color: var(--danger); }
@@ -575,10 +579,10 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   background: #FFFFFB; border: 1px solid var(--line); border-radius: 10px; padding: 18px;
   min-width: 0;
 }
-.card h3 { margin: 12px 0 5px; font-family: Fraunces; overflow-wrap: break-word; }
+.card h3 { margin: 12px 0 5px; font-family: 'Fraunces', serif; overflow-wrap: break-word; }
 .card p { color: #6E6F65; font-size: 13px; }
-.card-price { color: var(--blue); font-size: 20px; font-family: Fraunces; word-break: break-word; }
-.card-stock { margin-top: 15px; font-family: "JetBrains Mono"; font-size: 12px; color: var(--muted); }
+.card-price { color: var(--blue); font-size: 20px; font-family: 'Fraunces', serif; word-break: break-word; }
+.card-stock { margin-top: 15px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .card button { padding: 8px 12px; }
 
 /* ----- drawers ----- */
@@ -655,7 +659,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
     height: 100vh;
     background: var(--paper);
     border-right: 1px solid var(--line);
-    border-bottom: none;
+    border-bottom: 1px solid var(--line);
     z-index: 100;
     transition: left .25s ease;
   }
@@ -702,7 +706,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 }
 
 .header h1 {
-  font-family: var(--font-display);
+  font-family: var(--font-ticket-title);
   font-weight: 400;
   text-transform: uppercase;
   font-size: clamp(24px, 4.5vw, 32px);
@@ -714,7 +718,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .header select {
   appearance: none;
   -webkit-appearance: none;
-  font-family: var(--font-body);
+  font-family: var(--font-ticket-body);
   font-weight: 700;
   font-size: 13px;
   color: var(--ink);
@@ -807,7 +811,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 
 .order-status {
   display: inline-block;
-  font-family: var(--font-body);
+  font-family: var(--font-ticket-body);
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
@@ -863,7 +867,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   padding: 11px 0 !important;
   border-radius: 9px !important;
   border: none !important;
-  font-family: var(--font-body);
+  font-family: var(--font-ticket-body);
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.03em;
@@ -918,7 +922,7 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 }
 
 @media (max-width: 310px) {
-  #scanQrBtn { position: static !important; }
+  #scanQrBtn { position: static; }
 }
 
 /* =====================================================================
