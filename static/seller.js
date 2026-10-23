@@ -73,6 +73,8 @@ function showView(name, refresh = true) {
     if (navOverlay.classList.contains("show")) closeNavSidebar();
     window.scrollTo(0, 0);
 
+    if (name === "orders") markOrdersSeen();
+
     if (name === "dashboard") {
         // the chart can't be measured while its view is hidden, so redraw now
         if (statsData) drawChart(getChartSlice(currentPeriod));
@@ -127,6 +129,7 @@ document.getElementById("Logout").addEventListener("click", async () => {
 let statsData = null;
 let currentPeriod = '30d';
 let total_sold = 0;
+let newOrdersList = []; // pending orders newer than the last Orders visit (shown in the bell sheet)
 
 const canvas = document.getElementById('salesChart');
 const ctx = canvas.getContext('2d');
@@ -144,6 +147,18 @@ async function loadDashboard() {
 
         statsData = data.stats;
         console.log(statsData);
+
+        // New orders = pending orders created after the Orders view was last opened
+        const lastAccessedOrders = localStorage.getItem("lastAccessedOrders");
+        const newOrders = (statsData.recent_orders || []).filter(order =>
+            order.status === "placed" &&
+            order.created_at &&
+            (!lastAccessedOrders ||
+                parseServerDate(order.created_at) > new Date(lastAccessedOrders))
+        );
+        console.log(`${newOrders.length} new orders`);
+        newOrdersList = newOrders;
+        setNotifDot(newOrders.length > 0);
 
         total_sold = 0; // reset so reloading doesn't double count
         data.stats.inventory.forEach(item => {
@@ -311,6 +326,14 @@ function switchChart(period, btn) {
 window.addEventListener('resize', () => { if (statsData) drawChart(getChartSlice(currentPeriod)); });
 
 /* ===== Time formatting ===== */
+// Server timestamps have no timezone and are UTC -> parse them as UTC
+function parseServerDate(iso) {
+    if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(iso)) {
+        iso += "Z";
+    }
+    return new Date(iso);
+}
+
 function timeAgo(iso) {
     if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(iso)) {
         iso += "Z";
@@ -2025,6 +2048,8 @@ socket.on("connect", () => {
 
 socket.on("new_order", () => {
     console.log("New order received → reloading...");
+    if (!document.getElementById("view-orders").classList.contains("active")) setNotifDot(true);
+    if (notifSheetOpen()) loadDashboard().then(() => { if (notifSheetOpen()) renderNotifSheet(); });
     loadOrders();
 });
 
@@ -2048,12 +2073,171 @@ socket.on("seller_order_cancelled", (data) => {
     updateActiveCount();
 });
 
+// Red dot on the dashboard bell: visible only while there are unseen new orders
+function setNotifDot(show) {
+    const dot = document.getElementById("notifDot");
+    if (dot) dot.hidden = !show;
+}
+
+// Remember when the seller last looked at the Orders view
+function markOrdersSeen() {
+    localStorage.setItem("lastAccessedOrders", new Date().toISOString());
+    setNotifDot(false);
+}
+
+/* =====================================================================
+   Notifications bottom sheet (opens from the bell)
+   Lists the new orders: token no, items, customer, amount, "2 hr ago".
+   Built once on first open (same approach as the QR scanner UI).
+===================================================================== */
+function notifSheetOpen() {
+    const el = document.getElementById("notifSheet");
+    return !!el && el.classList.contains("show");
+}
+
+function ensureNotifSheet() {
+    let sheet = document.getElementById("notifSheet");
+    if (sheet) return sheet;
+
+    const style = document.createElement("style");
+    style.id = "notifSheetStyle";
+    style.textContent = `
+        #notifBackdrop {
+            position: fixed; inset: 0;
+            background: rgba(32, 35, 31, .45);
+            z-index: 2000;
+            opacity: 0; pointer-events: none;
+            transition: opacity .25s ease;
+        }
+        #notifBackdrop.show { opacity: 1; pointer-events: auto; }
+
+        #notifSheet {
+            position: fixed; left: 0; right: 0; bottom: 0;
+            margin: 0 auto;
+            width: 100%; max-width: 480px; max-height: 80vh;
+            display: flex; flex-direction: column;
+            background: var(--card, #FFFFFB);
+            color: var(--ink, #20231F);
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -14px 40px -18px rgba(0, 0, 0, .45);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            transform: translateY(100%);
+            transition: transform .32s cubic-bezier(.22, .8, .3, 1);
+            z-index: 2001;
+        }
+        #notifSheet.show { transform: translateY(0); }
+
+        #notifSheet .nt-handle { width: 40px; height: 4px; border-radius: 999px; background: var(--line, #E1DED2); margin: 10px auto 4px; flex-shrink: 0; }
+        #notifSheet .nt-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 12px; flex-shrink: 0; }
+        #notifSheet .nt-title { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        #notifSheet .nt-count { display: none; min-width: 22px; padding: 2px 8px; border-radius: 999px; background: var(--danger, #B23B30); color: #fff; font-size: 12px; font-weight: 600; text-align: center; }
+        #notifSheet .nt-close { width: 34px; height: 34px; border: none; border-radius: 50%; background: rgba(0, 0, 0, .06); color: inherit; font-size: 16px; cursor: pointer; }
+
+        #notifSheet .nt-list { overflow-y: auto; padding: 0 20px; flex: 1; min-height: 0; }
+        #notifSheet .nt-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line, #E1DED2); }
+        #notifSheet .nt-token { flex-shrink: 0; min-width: 58px; padding: 8px 10px; border-radius: 10px; background: var(--blue-lt, #EBF0F6); color: var(--blue, #2C4A6E); text-align: center; font-family: var(--font-mono, 'JetBrains Mono', monospace); font-weight: 700; font-size: 15px; line-height: 1.1; }
+        #notifSheet .nt-token small { display: block; margin-bottom: 2px; font-family: inherit; font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+        #notifSheet .nt-body { flex: 1; min-width: 0; }
+        #notifSheet .nt-items { font-size: 13.5px; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+        #notifSheet .nt-meta { margin-top: 3px; font-size: 12px; color: var(--muted, #87897F); }
+        #notifSheet .nt-side { flex-shrink: 0; text-align: right; }
+        #notifSheet .nt-amt { font-weight: 700; font-size: 14px; }
+        #notifSheet .nt-time { margin-top: 3px; font-size: 11.5px; color: var(--muted, #87897F); white-space: nowrap; }
+        #notifSheet .nt-empty { padding: 36px 0 30px; text-align: center; font-size: 14px; color: var(--muted, #87897F); }
+
+        #notifSheet .nt-foot { padding: 12px 20px 18px; flex-shrink: 0; border-top: 1px solid var(--line, #E1DED2); }
+        #notifSheet .nt-primary { width: 100%; border: none; border-radius: 12px; padding: 13px 0; background: var(--blue, #2C4A6E); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+    `;
+    document.head.appendChild(style);
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "notifBackdrop";
+
+    sheet = document.createElement("div");
+    sheet.id = "notifSheet";
+    sheet.setAttribute("role", "dialog");
+    sheet.setAttribute("aria-label", "New orders");
+    sheet.innerHTML = `
+        <div class="nt-handle"></div>
+        <div class="nt-head">
+            <div class="nt-title">New orders <span class="nt-count" id="ntCount"></span></div>
+            <button type="button" class="nt-close" aria-label="Close">✕</button>
+        </div>
+        <div class="nt-list" id="ntList"></div>
+        <div class="nt-foot"><button type="button" class="nt-primary" id="ntViewAll">View all orders</button></div>
+    `;
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+
+    backdrop.addEventListener("click", closeNotifSheet);
+    sheet.querySelector(".nt-close").addEventListener("click", closeNotifSheet);
+    sheet.querySelector("#ntViewAll").addEventListener("click", () => {
+        closeNotifSheet();
+        showView("orders"); // opening Orders also marks everything as seen
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && notifSheetOpen()) closeNotifSheet(); });
+
+    return sheet;
+}
+
+function renderNotifSheet() {
+    const list = document.getElementById("ntList");
+    const count = document.getElementById("ntCount");
+    if (!list || !count) return;
+
+    // newest first
+    const orders = [...newOrdersList].sort(
+        (a, b) => parseServerDate(b.created_at) - parseServerDate(a.created_at)
+    );
+
+    count.textContent = orders.length;
+    count.style.display = orders.length ? "inline-block" : "none";
+
+    if (!orders.length) {
+        list.innerHTML = `<div class="nt-empty">No new orders — you're all caught up.</div>`;
+        return;
+    }
+
+    list.innerHTML = orders.map(o => `
+        <div class="nt-item">
+            <div class="nt-token"><small>Token</small>${escapeSellerHtml(o.tokenNo)}</div>
+            <div class="nt-body">
+                <div class="nt-items">${escapeSellerHtml(o.items_summary || "—")}</div>
+                <div class="nt-meta">Customer #${escapeSellerHtml(String(o.customer_id).slice(-6))}</div>
+            </div>
+            <div class="nt-side">
+                <div class="nt-amt">₹${Number(o.total_amount || 0).toLocaleString('en-IN')}</div>
+                <div class="nt-time">${timeAgo(o.created_at)}</div>
+            </div>
+        </div>`).join("");
+}
+
+function openNotifSheet() {
+    ensureNotifSheet();
+    renderNotifSheet();
+    document.getElementById("notifBackdrop").classList.add("show");
+    document.getElementById("notifSheet").classList.add("show");
+    document.body.style.overflow = "hidden";
+    // pick up orders that arrived since the dashboard last loaded
+    loadDashboard().then(() => { if (notifSheetOpen()) renderNotifSheet(); });
+}
+
+function closeNotifSheet() {
+    const sheet = document.getElementById("notifSheet");
+    const backdrop = document.getElementById("notifBackdrop");
+    if (sheet) sheet.classList.remove("show");
+    if (backdrop) backdrop.classList.remove("show");
+    document.body.style.overflow = "";
+}
+
 async function loadOrders() {
     const res = await fetch(`/seller/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ "res_id": resId })
     });
+    console.log("loadOrders response:", res.status, res.statusText);
     if (res.status == 401) {
         alert("unauthorized,Please Log in");
         window.location.href = "/login/seller";
@@ -2123,6 +2307,8 @@ async function loadOrders() {
     });
     updateActiveCount();
     applyFilter();
+    // orders just loaded while the Orders view is open -> they have been seen
+    if (document.getElementById("view-orders").classList.contains("active")) markOrdersSeen();
 }
 
 // ---------------------------------------------------------------
@@ -2691,6 +2877,10 @@ document.getElementById("updateStockBtn").addEventListener("click", () => {
     document.getElementById("stockFilter").value = "low";
     render();
 });
+
+// Bell -> new-orders bottom sheet
+const bellBtn = document.querySelector('.icon-btn[aria-label="Notifications"]');
+if (bellBtn) bellBtn.addEventListener("click", openNotifSheet);
 
 // Inventory "home" icon -> dashboard
 document.getElementById("homeBtn").addEventListener("click", () => showView("dashboard"));

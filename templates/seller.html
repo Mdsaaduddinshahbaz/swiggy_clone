@@ -38,9 +38,13 @@
 
     <nav class="nav">
       <div class="nav-section">Main</div>
-      <button class="nav-item {% if page == 'dashboard' %}active{% endif %}" id="DashboardBtn" data-view="dashboard"><i data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
-      <button class="nav-item {% if page == 'orders' %}active{% endif %}" id="OrdersBtn" data-view="orders"><i data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge" id="active_orders">6</span></button>
-      <button class="nav-item {% if page == 'inventory' %}active{% endif %}" id="InventoryBtn" data-view="inventory"><i data-lucide="package" width="16" height="16"></i> Inventory</button>
+      <button class="nav-item {% if page == 'dashboard' %}active{% endif %}" id="DashboardBtn" data-view="dashboard"><i
+          data-lucide="layout-dashboard" width="16" height="16"></i> Dashboard</button>
+      <button class="nav-item {% if page == 'orders' %}active{% endif %}" id="OrdersBtn" data-view="orders"><i
+          data-lucide="shopping-bag" width="16" height="16"></i> Orders <span class="nav-badge"
+          id="active_orders">6</span></button>
+      <button class="nav-item {% if page == 'inventory' %}active{% endif %}" id="InventoryBtn" data-view="inventory"><i
+          data-lucide="package" width="16" height="16"></i> Inventory</button>
       <button class="nav-item" id="CustomersBtn"><i data-lucide="users" width="16" height="16"></i> Customers</button>
 
       <div class="nav-section" style="margin-top:12px;">Reports</div>
@@ -86,7 +90,8 @@
               <span class="store-toggle-dot" aria-hidden="true"></span>
               <span class="store-toggle-label" id="storeToggleLabel">Checking…</span>
               <button type="button" class="store-toggle-retry" id="storeToggleRetry" hidden>Retry</button>
-              <button type="button" class="switch" id="storeToggleSwitch" role="switch" aria-checked="false" aria-label="Store online status" disabled>
+              <button type="button" class="switch" id="storeToggleSwitch" role="switch" aria-checked="false"
+                aria-label="Store online status" disabled>
                 <span class="switch-thumb"></span>
               </button>
             </div>
@@ -94,7 +99,7 @@
           <div class="topbar-right">
             <button class="icon-btn" aria-label="Notifications">
               <i data-lucide="bell" width="18" height="18"></i>
-              <span class="notif-dot"></span>
+              <span class="notif-dot" id="notifDot" hidden></span>
             </button>
             <button class="btn-outline">
               <i data-lucide="download" width="14" height="14"></i> Export report
@@ -106,7 +111,8 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="kpi-top">
-              <div class="kpi-icon" style="background:#EBF0F6;"><i data-lucide="indian-rupee" width="18" height="18" style="color:var(--blue)"></i></div>
+              <div class="kpi-icon" style="background:#EBF0F6;"><i data-lucide="indian-rupee" width="18" height="18"
+                  style="color:var(--blue)"></i></div>
               <div class="kpi-change up"><i data-lucide="trending-up" width="12" height="12"></i> +18.4%</div>
             </div>
             <div>
@@ -116,7 +122,8 @@
           </div>
           <div class="kpi">
             <div class="kpi-top">
-              <div class="kpi-icon" style="background:#E6F2EC;"><i data-lucide="shopping-bag" width="18" height="18" style="color:var(--green)"></i></div>
+              <div class="kpi-icon" style="background:#E6F2EC;"><i data-lucide="shopping-bag" width="18" height="18"
+                  style="color:var(--green)"></i></div>
               <div class="kpi-change up"><i data-lucide="trending-up" width="12" height="12"></i> +9.1%</div>
             </div>
             <div>
@@ -126,8 +133,11 @@
           </div>
           <div class="kpi">
             <div class="kpi-top">
-              <div class="kpi-icon" style="background:#FEF3E2;"><i data-lucide="clock" width="18" height="18" style="color:var(--amber)"></i></div>
-              <div class="kpi-change down"><i data-lucide="trending-down" width="12" height="12"></i> <div id="pendingOrders">6</div> pending</div>
+              <div class="kpi-icon" style="background:#FEF3E2;"><i data-lucide="clock" width="18" height="18"
+                  style="color:var(--amber)"></i></div>
+              <div class="kpi-change down"><i data-lucide="trending-down" width="12" height="12"></i>
+                <div id="pendingOrders">6</div> pending
+              </div>
             </div>
             <div>
               <div class="kpi-value" id="kpiToday">6</div>
@@ -136,7 +146,8 @@
           </div>
           <div class="kpi">
             <div class="kpi-top">
-              <div class="kpi-icon" style="background:#FBEAE7;"><i data-lucide="alert-triangle" width="18" height="18" style="color:var(--danger)"></i></div>
+              <div class="kpi-icon" style="background:#FBEAE7;"><i data-lucide="alert-triangle" width="18" height="18"
+                  style="color:var(--danger)"></i></div>
               <div class="kpi-change down" style="color:var(--danger)">Needs action</div>
             </div>
             <div>
@@ -195,19 +206,23 @@
               <div style="display:flex;flex-direction:column;gap:14px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                   <span style="font-size:13px;color:var(--muted);">Revenue</span>
-                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;" id="todayRevenue">₹3,840</span>
+                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;"
+                    id="todayRevenue">₹3,840</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                   <span style="font-size:13px;color:var(--muted);">Orders placed</span>
-                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;" id="kpiTodayBtm">6</span>
+                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;"
+                    id="kpiTodayBtm">6</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                   <span style="font-size:13px;color:var(--muted);">Items sold</span>
-                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;" id="kpiTotalSold">34</span>
+                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;"
+                    id="kpiTotalSold">34</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                   <span style="font-size:13px;color:var(--muted);">Avg order value</span>
-                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;" id="todayAvg">₹640</span>
+                  <span style="font-family:var(--font-heading);font-size:18px;font-weight:600;"
+                    id="todayAvg">₹640</span>
                 </div>
               </div>
             </div>
@@ -372,7 +387,8 @@
           <div class="input-group">
             <label>Restaurant Photo (Optional)</label>
             <input type="file" id="photo" accept="image/*">
-            <img id="preview" style="display:none;width:100%;max-height:200px;object-fit:cover;border-radius:15px;margin-top:10px;">
+            <img id="preview"
+              style="display:none;width:100%;max-height:200px;object-fit:cover;border-radius:15px;margin-top:10px;">
           </div>
 
           <span>Low Stock Alert at</span>
