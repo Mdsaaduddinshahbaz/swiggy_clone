@@ -1288,6 +1288,7 @@ async function initMenuPage() {
     let sortMode = "default";
     let stockOnly = false;
     let pendingCartItem = null;
+    const addingItems = new Set(); // items with an add_to_cart request in flight
 
     const wishlist = new Set();
 
@@ -1296,6 +1297,29 @@ async function initMenuPage() {
     function setLocalQty(id, qty) {
         const match = menuItems.find(i => i.id === String(id));
         if (match) match.qty = qty;
+    }
+
+    // Swap only one item's control (ADD <-> quantity stepper) in place,
+    // instead of re-rendering the whole menu. qty <= 0 shows ADD.
+    function setItemControls(itemId, qty) {
+        const el = menuContainer.querySelector(
+            `.menu-item[data-item-id="${CSS.escape(String(itemId))}"] .item-controls`
+        );
+        if (!el) return;
+
+        if (qty > 0) {
+            el.innerHTML = `
+                <div class="quantity-control">
+                    <button class="qty-btn reduce" type="button">-</button>
+                    <span class="item_qty">${escapeHtml(qty)}</span>
+                    <button class="qty-btn increase${storeOnline ? "" : " is-store-offline"}" type="button"${storeOnline ? "" : ' disabled aria-disabled="true"'}>+</button>
+                </div>
+            `;
+        } else {
+            el.innerHTML = storeOnline
+                ? `<button class="add-btn" data-item-id="${escapeHtml(itemId)}" type="button">ADD</button>`
+                : `<button class="add-btn is-store-offline" type="button" disabled>CLOSED</button>`;
+        }
     }
 
     /* ---------- store online / offline state for this menu ---------- */
@@ -1685,6 +1709,8 @@ async function initMenuPage() {
         }
     });
 
+    // ADD button — optimistic: flips to quantity 1 immediately, reverts to
+    // ADD if the server rejects it.
     menuContainer.addEventListener("click", async event => {
 
         const addButton = event.target.closest(".add-btn");
@@ -1708,6 +1734,22 @@ async function initMenuPage() {
             showToast(`${decodedRestaurant} is currently offline`);
             return;
         }
+
+        // Ignore taps while a previous add / debounced -1 for this item is
+        // still settling, otherwise the requests can land out of order.
+        if (addingItems.has(itemId)) return;
+        if (pendingMenuUpdates.has(itemId) || inFlightMenuControllers.has(itemId)) return;
+
+        addingItems.add(itemId);
+
+        // Optimistic: show quantity 1 immediately
+        setLocalQty(itemId, 1);
+        setItemControls(itemId, 1);
+
+        const revert = () => {
+            setLocalQty(itemId, 0);
+            setItemControls(itemId, 0); // back to ADD
+        };
 
         try {
             const response = await fetch("/add_to_cart", {
@@ -1735,6 +1777,7 @@ async function initMenuPage() {
 
             // Store went offline between page load and this click.
             if (isOfflineResponse(response, data)) {
+                revert();
                 applyStoreStatus(resId, false, { live: true });
                 return;
             }
@@ -1743,20 +1786,12 @@ async function initMenuPage() {
 
             if (data && data.success) {
 
-                setLocalQty(itemId, 1);
-
-                addButton.outerHTML = `
-                    <div class="quantity-control">
-                        <button class="qty-btn reduce" type="button">-</button>
-                        <span class="item_qty">1</span>
-                        <button class="qty-btn increase" type="button">+</button>
-                    </div>
-                `;
-
                 footer.classList.add("show");
                 totalAmount.textContent = data.Total ?? data.total ?? 0;
 
             } else if (data && /different store/i.test(data.message || "")) {
+
+                revert();
 
                 pendingCartItem = {
                     resid: resId,
@@ -1774,25 +1809,46 @@ async function initMenuPage() {
                 overlay.classList.add("show");
 
             } else {
+                revert();
                 showToast((data && data.message) || "Couldn't add this item. Please try again.");
             }
 
         } catch (error) {
             console.error("Add cart error:", error);
+            revert();
             showToast("Something went wrong adding this item.");
+        } finally {
+            addingItems.delete(itemId);
         }
     });
 
+    // "Replace cart" confirmation — also optimistic.
     yesBtn.addEventListener("click", async () => {
 
         if (!pendingCartItem) return;
+
+        const cartItem = pendingCartItem;
+        const itemId = cartItem.item_id;
+
+        if (addingItems.has(itemId)) return;
+        addingItems.add(itemId);
+
+        // Optimistic: close dialog and show 1 right away
+        closeReplaceDialog();           // also clears pendingCartItem
+        setLocalQty(itemId, 1);
+        setItemControls(itemId, 1);
+
+        const revert = () => {
+            setLocalQty(itemId, 0);
+            setItemControls(itemId, 0); // back to ADD
+        };
 
         try {
 
             const response = await fetch("/add_to_cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...pendingCartItem, replace: true })
+                body: JSON.stringify({ ...cartItem, replace: true })
             });
 
             if (response.status === 401) {
@@ -1804,7 +1860,7 @@ async function initMenuPage() {
             const data = await readJsonSafe(response);
 
             if (isOfflineResponse(response, data)) {
-                closeReplaceDialog();
+                revert();
                 applyStoreStatus(resId, false, { live: true });
                 return;
             }
@@ -1814,38 +1870,17 @@ async function initMenuPage() {
                 footer.classList.add("show");
                 totalAmount.textContent = data.Total ?? data.total ?? 0;
 
-                replaceContainer.classList.remove("show");
-                overlay.classList.remove("show");
-
-                setLocalQty(pendingCartItem.item_id, 1);
-
-                const item = document.getElementById(pendingCartItem.item_id);
-
-                if (item) {
-
-                    const addButton = item.querySelector(".add-btn");
-
-                    if (addButton) {
-
-                        addButton.outerHTML = `
-                            <div class="quantity-control">
-                                <button class="qty-btn reduce" type="button">-</button>
-                                <span class="item_qty">1</span>
-                                <button class="qty-btn increase" type="button">+</button>
-                            </div>
-                        `;
-                    }
-                }
-
             } else {
+                revert();
                 showToast((data && data.message) || "Failed to replace cart");
             }
 
         } catch (error) {
             console.error("Replace cart error:", error);
+            revert();
             showToast("Something went wrong.");
         } finally {
-            pendingCartItem = null;
+            addingItems.delete(itemId);
         }
     });
 
@@ -1859,6 +1894,9 @@ async function initMenuPage() {
         if (!item) return;
 
         const itemId = item.dataset.itemId;
+
+        if (addingItems.has(itemId)) return; // wait for the initial add to settle
+
         const availableRaw = item.getAttribute("available");
 
         const available = availableRaw !== null && availableRaw !== ""
@@ -1893,15 +1931,15 @@ async function initMenuPage() {
                 },
                 (errorMessage) => {
                     setLocalQty(itemId, previousQty);
-                    renderMenu();
+                    setItemControls(itemId, previousQty);
                     showToast(errorMessage);
                 },
                 () => {
                     // Server says the store is offline: undo the optimistic +1,
                     // then flip the whole page into its offline state.
                     setLocalQty(itemId, previousQty);
+                    setItemControls(itemId, previousQty);
                     applyStoreStatus(resId, false, { live: true });
-                    renderMenu();
                 }
             );
 
@@ -1911,8 +1949,13 @@ async function initMenuPage() {
             const previousQty = Number(qtyEl.textContent);
             const newQty = Math.max(0, previousQty - 1);
 
-            qtyEl.textContent = newQty;
             setLocalQty(itemId, newQty);
+
+            if (newQty === 0) {
+                setItemControls(itemId, 0); // shows ADD instead of "0"
+            } else {
+                qtyEl.textContent = newQty;
+            }
 
             scheduleMenuCartUpdate(itemId, resId, userId, -1,
                 (data) => {
@@ -1929,15 +1972,12 @@ async function initMenuPage() {
                     if (data.removed) {
 
                         setLocalQty(itemId, 0);
-
-                        // Re-render so the control becomes ADD (or CLOSED
-                        // when the store is offline) rather than hard-coding ADD.
-                        renderMenu();
+                        setItemControls(itemId, 0); // ADD (or CLOSED if offline)
                     }
                 },
                 (errorMessage) => {
                     setLocalQty(itemId, previousQty);
-                    renderMenu();
+                    setItemControls(itemId, previousQty);
                     showToast(errorMessage);
                 }
             );

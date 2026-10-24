@@ -724,7 +724,7 @@ select:focus-visible,
 }
 
 .add-btn:active {
-    transform: translateY(1px) translateX(-50%) scale(0.99);
+    transform: translateY(1px) scale(0.99);
 }
 
 .add-btn:disabled {
