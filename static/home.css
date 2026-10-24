@@ -259,9 +259,27 @@ body:not([data-page="home"]) .pill-tabs { display: none; }
 .product-thumb { flex-shrink: 0; width: 128px; background: var(--surface); border: 1px solid var(--card-cream-line); border-radius: var(--radius-sm); overflow: hidden; position: relative; }
 .product-thumb img { width: 100%; height: 84px; object-fit: cover; display: block; }
 .product-thumb .p-name { font-size: 11.5px; font-weight: 600; color: var(--ink); padding: 7px 8px 0; line-height: 1.25; height: 28px; overflow: hidden; }
-.product-thumb .p-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 8px; }
-.product-thumb .p-price { font-size: 11.5px; font-weight: 700; color: var(--ink); }
-.product-thumb .p-add { font-size: 10.5px; font-weight: 800; color: var(--green); background: var(--green-soft); border: 1px solid var(--green); border-radius: 999px; padding: 3px 9px; }
+.product-thumb .p-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 8px 8px; }
+.product-thumb .p-price { font-size: 11.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+
+/* ---- Add button + quantity stepper inside the preview strip ---- */
+.product-thumb .p-control { display: flex; align-items: center; flex-shrink: 0; }
+.product-thumb .p-add { font-size: 10.5px; font-weight: 800; line-height: 1.1; color: var(--green); background: var(--green-soft); border: 1px solid var(--green); border-radius: 999px; padding: 3px 9px; cursor: pointer; transition: background 0.12s ease, color 0.12s ease, transform 0.1s ease; }
+.product-thumb .p-add:hover { background: var(--green); color: var(--white); }
+.product-thumb .p-add:active { transform: scale(0.95); }
+
+.product-thumb .p-qty { display: inline-flex; align-items: center; gap: 5px; background: var(--green); border-radius: 999px; padding: 2px 3px; }
+.product-thumb .p-qty button { width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%; background: rgba(255,255,255,0.22); color: var(--white); font-size: 13px; font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.product-thumb .p-qty button:hover { background: rgba(255,255,255,0.38); }
+.product-thumb .p-qty-num { min-width: 10px; text-align: center; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--white); }
+
+/* ---- "See more" tile (last item in the strip, opens the menu) ---- */
+.product-thumb.see-more-thumb { width: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; background: var(--surface); border: 1.5px dashed var(--accent); color: var(--accent-dark); font-family: inherit; cursor: pointer; transition: background 0.15s ease, transform 0.12s ease; }
+.product-thumb.see-more-thumb:hover { background: var(--accent-soft); }
+.product-thumb.see-more-thumb:active { transform: scale(0.97); }
+.see-more-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 13px; transition: transform 0.15s ease; }
+.see-more-thumb:hover .see-more-icon { transform: translateX(2px); }
+.see-more-text { font-size: 11.5px; font-weight: 800; letter-spacing: 0.02em; }
 
 .product-thumb.skeleton-thumb { padding-bottom: 8px; }
 .product-thumb.empty-thumb { display: flex; align-items: center; justify-content: center; text-align: center; padding: 14px 10px; color: var(--ink-faint); font-size: 11px; height: 84px; }
@@ -340,6 +358,12 @@ body:not([data-page="home"]) .pill-tabs { display: none; }
 
 .store-card.is-offline .p-add {
     display: none;
+}
+
+/* Offline: items already in the cart can still be reduced, just not increased */
+.store-card.is-offline .p-plus {
+    opacity: 0.4;
+    pointer-events: none;
 }
 
 /* ---------- Menu: offline / back-online banner ---------- */
@@ -480,4 +504,7 @@ body:not([data-page="home"]) .pill-tabs { display: none; }
     .store-card { padding: 13px 13px 12px; }
     .store-name { font-size: 15.5px; }
     .product-thumb { width: 112px; }
+    .product-thumb.see-more-thumb { width: 88px; }
+    .product-thumb .p-qty { gap: 3px; }
+    .product-thumb .p-qty button { width: 18px; height: 18px; }
 }

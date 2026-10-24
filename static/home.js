@@ -244,6 +244,7 @@ async function resyncStoreStatuses() {
             if (data.success) applyStoreStatus(activeMenu.resId, data.is_online !== false, { live: true });
         } else if (document.getElementById("resturants_container")) {
             await refreshRestaurantList();
+            refreshHomeCart();
         }
     } catch (e) {
         console.warn("store status resync failed", e);
@@ -269,20 +270,265 @@ function isOfflineResponse(response, data) {
 // only ever shows the skeleton once, the first time it's seen.
 const previewItemsCache = new Map();
 
+/* ============================================================
+   HOME CARD "ADD" BUTTONS + "SEE MORE" TILE
+
+   The preview strip on each store card is fully interactive:
+   - "Add" calls /add_to_cart (optimistic: flips to a - qty + stepper
+     immediately, reverts if the server says no)
+   - the stepper uses the same debounced /update_cart as the menu page
+   - the last tile ("See more") has no handler of its own: it sits inside
+     the .store-card, so the card click opens that store's menu page
+   homeCartQty mirrors the server cart: itemId -> qty.
+   ============================================================ */
+
+const homeCartQty = new Map();      // itemId -> qty currently in the user's cart
+const homeAdding = new Set();       // itemIds with an add_to_cart request in flight
+let homeCartRefresh = null;
+
+function thumbControlMarkup(qty) {
+    if (qty > 0) {
+        return `
+            <div class="p-qty">
+                <button class="p-minus" type="button" aria-label="Remove one">-</button>
+                <span class="p-qty-num">${escapeHtml(qty)}</span>
+                <button class="p-plus" type="button" aria-label="Add one">+</button>
+            </div>`;
+    }
+    return `<button class="p-add" type="button">Add</button>`;
+}
+
+// Update one item everywhere it's shown on the home page.
+function setHomeQty(itemId, qty) {
+    itemId = String(itemId);
+    if (qty > 0) homeCartQty.set(itemId, qty); else homeCartQty.delete(itemId);
+    document
+        .querySelectorAll(`.product-thumb[data-item-id="${CSS.escape(itemId)}"] .p-control`)
+        .forEach(el => { el.innerHTML = thumbControlMarkup(qty); });
+}
+
+function syncAllThumbControls() {
+    document.querySelectorAll(".product-thumb[data-item-id]").forEach(thumb => {
+        const ctl = thumb.querySelector(".p-control");
+        if (ctl) ctl.innerHTML = thumbControlMarkup(homeCartQty.get(thumb.dataset.itemId) || 0);
+    });
+}
+
+// Pull the real cart from the server so the strip shows correct quantities.
+// Skipped while a local change is still settling (unless force), so an
+// in-flight optimistic update never gets overwritten by a stale response.
+function refreshHomeCart(force = false) {
+    if (homeCartRefresh) return homeCartRefresh;
+    homeCartRefresh = (async () => {
+        try {
+            const res = await fetch("/get_cart_items", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userid: currentUserId() })
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+
+            if (!force && (homeAdding.size > 0 || pendingMenuUpdates.size > 0)) return;
+
+            homeCartQty.clear();
+            const cart = data?.results?.cart || {};
+            Object.values(cart).forEach(entry => {
+                Object.entries(entry?.items || {}).forEach(([id, it]) => {
+                    const q = Number(it?.qty || 0);
+                    if (q > 0) homeCartQty.set(String(id), q);
+                });
+            });
+            syncAllThumbControls();
+        } catch (e) {
+            console.warn("home cart refresh failed", e);
+        } finally {
+            homeCartRefresh = null;
+        }
+    })();
+    return homeCartRefresh;
+}
+
+async function postAddToCart(payload) {
+    const response = await fetch("/add_to_cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+    const data = await readJsonSafe(response);
+    return { response, data };
+}
+
+function thumbContext(thumb) {
+    const storeEl = thumb && thumb.closest(".store-products");
+    const card = thumb && thumb.closest(".store-card");
+    if (!storeEl || !card) return null;
+    return {
+        itemId: thumb.dataset.itemId,
+        resId: storeEl.dataset.resId,
+        resName: card.querySelector(".resturant_name")?.textContent || "",
+        userId: currentUserId()
+    };
+}
+
+async function homeAddToCart(thumb) {
+    const ctx = thumbContext(thumb);
+    if (!ctx) return;
+    const { itemId, resId, resName, userId } = ctx;
+
+    if (storeStatus.get(resId) === false) {
+        showToast(`${resName} is currently offline`);
+        return;
+    }
+
+    // Ignore taps while a previous add / debounced update for this item is settling.
+    if (homeAdding.has(itemId)) return;
+    if (pendingMenuUpdates.has(itemId) || inFlightMenuControllers.has(itemId)) return;
+
+    const stock = parseInt(thumb.dataset.stock);
+    if (!Number.isNaN(stock) && stock <= 0) {
+        showToast("This item is currently out of stock");
+        return;
+    }
+
+    const payload = {
+        resid: resId,
+        userid: userId,
+        item: thumb.dataset.name,
+        ress_name: resName,
+        qty: 1,
+        item_id: itemId,
+        price: parseInt(thumb.dataset.price)
+    };
+
+    homeAdding.add(itemId);
+    setHomeQty(itemId, 1);              // optimistic
+
+    // Returns true if the response was fully handled here (caller should stop).
+    const handledAuthOrOffline = (response, data) => {
+        if (response.status === 401) {
+            alert("Unauthorized user. Please log in");
+            window.location.href = "/login/user";
+            return true;
+        }
+        if (isOfflineResponse(response, data)) {
+            setHomeQty(itemId, 0);
+            applyStoreStatus(resId, false, { live: true });
+            return true;
+        }
+        return false;
+    };
+
+    try {
+        let { response, data } = await postAddToCart({ ...payload, replace: false });
+        if (handledAuthOrOffline(response, data)) return;
+
+        // Cart already holds items from another store: ask before replacing.
+        if (data && !data.success && /different store/i.test(data.message || "")) {
+            setHomeQty(itemId, 0);
+            const confirmed = window.confirm(
+                data.message || "Your cart has items from another store. Replace them with this item?"
+            );
+            if (!confirmed) return;
+
+            setHomeQty(itemId, 1);      // optimistic again
+            ({ response, data } = await postAddToCart({ ...payload, replace: true }));
+            if (handledAuthOrOffline(response, data)) return;
+
+            if (data && data.success) {
+                // The cart now holds only this item — wipe the other stores' steppers.
+                homeCartQty.clear();
+                homeCartQty.set(itemId, 1);
+                syncAllThumbControls();
+                return;
+            }
+        }
+
+        if (!response.ok && !data) throw new Error("add_to_cart failed");
+
+        if (!(data && data.success)) {
+            setHomeQty(itemId, 0);
+            showToast((data && data.message) || "Couldn't add this item. Please try again.");
+        }
+    } catch (error) {
+        console.error("Home add cart error:", error);
+        setHomeQty(itemId, 0);
+        showToast("Something went wrong adding this item.");
+    } finally {
+        homeAdding.delete(itemId);
+    }
+}
+
+function homeChangeQty(thumb, delta) {
+    const ctx = thumbContext(thumb);
+    if (!ctx) return;
+    const { itemId, resId, resName, userId } = ctx;
+
+    if (homeAdding.has(itemId)) return; // wait for the initial add to settle
+
+    const previousQty = homeCartQty.get(itemId) || 0;
+
+    if (delta > 0) {
+        if (storeStatus.get(resId) === false) {
+            showToast(`${resName} is currently offline`);
+            return;
+        }
+        const stock = parseInt(thumb.dataset.stock);
+        if (!Number.isNaN(stock) && previousQty + 1 > stock) {
+            showToast(`Only ${stock} in stock`);
+            return;
+        }
+    } else if (previousQty <= 0) {
+        return;
+    }
+
+    setHomeQty(itemId, Math.max(0, previousQty + delta)); // optimistic
+
+    scheduleMenuCartUpdate(itemId, resId, userId, delta,
+        (data) => {
+            if (data.removed) setHomeQty(itemId, 0);
+        },
+        (errorMessage) => {
+            showToast(errorMessage);
+            refreshHomeCart(true);      // snap back to whatever the server really has
+        },
+        () => {
+            applyStoreStatus(resId, false, { live: true });
+            refreshHomeCart(true);
+        }
+    );
+}
+
 function productThumbsMarkup(items) {
     if (!items || items.length === 0) {
         return `<div class="product-thumb empty-thumb"><p>No items listed yet</p></div>`;
     }
-    return items.map(item => `
-        <div class="product-thumb" data-item-id="${escapeHtml(item.id)}">
+
+    const thumbs = items.map(item => {
+        const qty = homeCartQty.get(String(item.id)) || 0;
+        return `
+        <div class="product-thumb"
+             data-item-id="${escapeHtml(item.id)}"
+             data-name="${escapeHtml(item.name)}"
+             data-price="${escapeHtml(item.price)}"
+             data-stock="${escapeHtml(item.item_qty ?? "")}">
             <img src="${escapeHtml(item.file_url)}" alt="${escapeHtml(item.name)}">
             <p class="p-name">${escapeHtml(item.name)}</p>
             <div class="p-row">
                 <span class="p-price">₹${escapeHtml(item.price)}</span>
-                <span class="p-add">Add</span>
+                <div class="p-control">${thumbControlMarkup(qty)}</div>
             </div>
-        </div>
-    `).join("");
+        </div>`;
+    }).join("");
+
+    // Last tile: opens the full menu (the card's click handler does the navigation).
+    const seeMore = `
+        <button class="product-thumb see-more-thumb" type="button">
+            <span class="see-more-icon"><i class="fa-solid fa-arrow-right"></i></span>
+            <span class="see-more-text">See more</span>
+        </button>`;
+
+    return thumbs + seeMore;
 }
 
 // Store cards start with skeleton item-thumbs (unless we already have that
@@ -613,6 +859,54 @@ async function initHomePage() {
         }
     });
 
+    // Bound up-front (not after the network calls below) so the Add buttons
+    // on cached cards work immediately.
+    addListenerOnce(display_resturants, "click", function (e) {
+        // --- preview strip: Add / - / + ---
+        const addBtn = e.target.closest(".p-add");
+        if (addBtn) {
+            e.stopPropagation();
+            homeAddToCart(addBtn.closest(".product-thumb"));
+            return;
+        }
+        const plusBtn = e.target.closest(".p-plus");
+        if (plusBtn) {
+            e.stopPropagation();
+            homeChangeQty(plusBtn.closest(".product-thumb"), 1);
+            return;
+        }
+        const minusBtn = e.target.closest(".p-minus");
+        if (minusBtn) {
+            e.stopPropagation();
+            homeChangeQty(minusBtn.closest(".product-thumb"), -1);
+            return;
+        }
+
+        const favBtn = e.target.closest(".store-fav");
+        if (favBtn) {
+            e.stopPropagation();
+            const isNowFavorite = toggleFavoriteId(userId, favBtn.dataset.favId);
+            favBtn.classList.toggle("active", isNowFavorite);
+            showToast(isNowFavorite ? "Added to favorites" : "Removed from favorites");
+            return;
+        }
+
+        // Anything else on the card — including the "See more" tile — opens the menu.
+        const card = e.target.closest(".store-card");
+        if (card) {
+            const name = card.querySelector(".resturant_name").textContent;
+            const addresss = card.querySelector(".area").textContent;
+            const res_id = card.getAttribute("id");
+            // Routes inside the SPA so the header/map/session state never gets
+            // torn down. Offline stores are still browsable; the menu page
+            // shows the offline banner and disables ordering.
+            navigateToMenu(name, addresss, res_id, userId);
+        }
+    });
+
+    // Real cart quantities for the preview strip (re-synced on every Home mount).
+    refreshHomeCart();
+
     try {
         const fetchlocation = JSON.parse(localStorage.getItem("userLocation"));
         if (fetchlocation === null) {
@@ -711,28 +1005,6 @@ async function initHomePage() {
             alert("error loading resturants");
         }
 
-        addListenerOnce(display_resturants, "click", function (e) {
-            const favBtn = e.target.closest(".store-fav");
-            if (favBtn) {
-                e.stopPropagation();
-                const isNowFavorite = toggleFavoriteId(userId, favBtn.dataset.favId);
-                favBtn.classList.toggle("active", isNowFavorite);
-                showToast(isNowFavorite ? "Added to favorites" : "Removed from favorites");
-                return;
-            }
-
-            const card = e.target.closest(".store-card");
-            if (card) {
-                const name = card.querySelector(".resturant_name").textContent;
-                const addresss = card.querySelector(".area").textContent;
-                const res_id = card.getAttribute("id");
-                // Was a full page navigation to /menu/... — now routes inside
-                // the SPA so the header/map/session state never gets torn down.
-                // Offline stores are still browsable; the menu page shows the
-                // offline banner and disables ordering.
-                navigateToMenu(name, addresss, res_id, userId);
-            }
-        });
         addListenerOnce(cartBtn, "click", () => { window.location.href = `/user/${userId}/#cart`; });
         addListenerOnce(orderBtn, "click", () => { window.location.href = `/orders/${userId}`; });
 
