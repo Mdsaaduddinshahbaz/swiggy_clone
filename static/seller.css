@@ -1,15 +1,15 @@
 /* =====================================================================
-   seller.css — merged from:
-     seller_dashboard.css + menu_seller.css + seller_orders.css
-     + the <style> block that was inside seller.html
+   seller.css
 
    Sections
      1. Variables, reset, body
      2. Shared: view switching, floating nav, nav sidebar, overlay, menu toggle
+     2b. Phone nav: drawer on Dashboard/Orders, ICON RAIL on Inventory (<= 720px)
      3. Dashboard view   (#view-dashboard)
-     4. Inventory view   (#view-inventory)
+     4. Inventory view   (#view-inventory)  (catalogue = column on desktop, drawer on phone)
      5. Orders view      (#view-orders)
      6. Store toggle + toast (dashboard)
+     7. Edit order items (button + bottom sheet)
 
    Fonts: loaded by the <link> in seller.html (no @import needed).
 ===================================================================== */
@@ -34,14 +34,15 @@
   --sidebar-txt: #C8C5BC;
   --sidebar-act: #FFFFFB;
   --sidebar-w: 230px;
+  --rail-w: 64px;               /* width of the icon-only nav rail */
 
   /* ---- FONTS: declared once, used everywhere via var() ---- */
-  --font-body: 'Inter', sans-serif;             /* default text           */
-  --font-heading: "Times New Roman", serif;            /* titles, KPI numbers    */
-  --font-mono: 'JetBrains Mono', monospace;     /* ids, prices, counts    */
-  --font-greeting: 'fangsong', serif;           /* "Good morning, ..." line */
-  --font-ticket-title: 'Anton', sans-serif;     /* orders screen headline */
-  --font-ticket-body: 'DM Sans', sans-serif;    /* orders screen text     */
+  --font-body: 'Inter', sans-serif;
+  --font-heading: "Times New Roman", serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-greeting: 'fangsong', serif;
+  --font-ticket-title: 'Anton', sans-serif;
+  --font-ticket-body: 'DM Sans', sans-serif;
 }
 
 /* The orders screen has its own warm "kitchen ticket" palette. Several of its
@@ -66,7 +67,6 @@
   --red-bg: #FBE7E1;
   --amber-bg: #FFF0D6;
 
-
   --radius: 14px;
   --shadow-card: 0 2px 0 var(--line), 0 10px 24px -18px rgba(36, 28, 26, 0.45);
 
@@ -84,9 +84,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* margin/padding reset — applied to the dashboard, orders, nav sidebar,
-   floating nav and the QR scanner, but NOT the inventory view (it was designed
-   without it). :where() keeps specificity at zero so every class rule still wins. */
+/* margin/padding reset — NOT applied to the inventory view (designed without it).
+   :where() keeps specificity at zero so every class rule still wins. */
 :where(
   .sidebar, .sidebar *,
   #view-dashboard, #view-dashboard *,
@@ -175,11 +174,13 @@ body {
   height: 100vh;
   position: sticky;
   top: 0;
+  overflow-x: hidden;
 }
 
-.sidebar.show {
-  display: block;
+.sidebar.show {                 /* phone: nav drawer opened with the ☰ button (JS only toggles .show) */
+  display: flex;
   position: fixed;
+  top: 0; left: 0; bottom: 0;
   z-index: 232;
 }
 
@@ -202,10 +203,11 @@ body {
 .brand-name { font-family: var(--font-heading); font-size: 18px; font-weight: 700; color: #fff; }
 .brand-sub { font-size: 10px; color: var(--sidebar-txt); letter-spacing: .06em; text-transform: uppercase; margin-top: 1px; }
 
-.nav { flex: 1; padding: 14px 0; overflow-y: auto; }
+.nav { flex: 1; padding: 14px 0; overflow-y: auto; overflow-x: hidden; }
 .nav-section { padding: 10px 22px 4px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgba(200, 197, 188, .45); }
 
 .nav-item {
+  position: relative;
   display: flex; align-items: center; gap: 10px;
   padding: 9px 18px;
   cursor: pointer;
@@ -281,8 +283,93 @@ body {
 }
 
 @media (max-width: 720px) {
-  .sidebar { display: none; }
+  .sidebar { display: none; }   /* phone: hidden, opens as a drawer from ☰ (rail on Inventory, see 2b) */
   .menu-toggle { display: block; }
+}
+
+/* =====================================================================
+   2b. PHONE NAV  (<= 720px)
+
+   Dashboard / Orders : nav sidebar hidden, opens as a drawer from the ☰ button.
+   Inventory          : nav sidebar becomes a slim ICON RAIL that is always
+                        visible, so every page is one tap away. The catalogue
+                        drawer (section 4) slides out from beside it.
+   Desktop (> 720px)  : unchanged, full sidebar on every page.
+   Uses :has(), so no JS is needed to switch between the two modes.
+===================================================================== */
+@media (min-width: 721px) {
+  #hideCategoryBtn { display: none; }      /* the × only exists for the phone drawer */
+}
+
+@media (max-width: 720px) {
+  body:has(#view-inventory.active) .sidebar {
+    display: flex;
+    width: var(--rail-w);
+    z-index: 110;                 /* above the catalogue drawer + its overlay */
+  }
+
+  body:has(#view-inventory.active) #hideCategoryBtn { display: none; }
+
+  /* brand: logo only */
+  body:has(#view-inventory.active) .sidebar .brand {
+    padding: 18px 0;
+    justify-content: center;
+  }
+  body:has(#view-inventory.active) .sidebar .brand > div:last-child { display: none; }
+
+  /* section titles -> thin dividers */
+  body:has(#view-inventory.active) .sidebar .nav { padding: 10px 0; }
+  body:has(#view-inventory.active) .sidebar .nav-section {
+    height: 1px;
+    padding: 0;
+    margin-left: 14px;
+    margin-right: 14px;
+    margin-bottom: 8px;
+    font-size: 0;
+    overflow: hidden;
+    background: rgba(255, 255, 255, .08);
+  }
+  body:has(#view-inventory.active) .sidebar .nav-section:first-child { display: none; }
+
+  /* nav items: icon only (font-size 0 hides the label text) */
+  body:has(#view-inventory.active) .sidebar .nav-item {
+    font-size: 0;
+    gap: 0;
+    justify-content: center;
+    padding: 11px 0;
+    margin: 2px 8px;
+    width: calc(100% - 16px);
+  }
+  body:has(#view-inventory.active) .sidebar .nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* active marker on the left edge */
+  body:has(#view-inventory.active) .sidebar .nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: -8px; top: 8px; bottom: 8px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: #6FCF97;
+  }
+
+  /* order count becomes a small corner bubble */
+  body:has(#view-inventory.active) .sidebar .nav-badge {
+    position: absolute;
+    top: 2px; right: 2px;
+    margin: 0;
+    padding: 1px 5px;
+    font-size: 9px;
+  }
+
+  /* footer: avatar only */
+  body:has(#view-inventory.active) .sidebar .sidebar-footer {
+    padding: 14px 0;
+    justify-content: center;
+  }
+  body:has(#view-inventory.active) .sidebar .sidebar-footer > div:last-child { display: none; }
 }
 
 /* =====================================================================
@@ -475,14 +562,19 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 
 /* =====================================================================
    4. INVENTORY  (#view-inventory)
-   The category tree sidebar is now .catalogue-sidebar (was .sidebar).
+
+   The category tree is .catalogue-sidebar.
+   Desktop : a normal column beside the items (always visible).
+   Phone   : (<= 720px) a slide-out drawer, opened with the ☰ button in the
+             header and closed with its × / the dark overlay. It slides out
+             from beside the icon rail (section 2b).
 ===================================================================== */
 .app {
   display: flex;
   min-height: 100vh;
 }
 
-/* ----- catalogue sidebar ----- */
+/* ----- catalogue sidebar (desktop: normal column; phone: see media query below) ----- */
 .catalogue-sidebar {
   width: 270px;
   border-right: 1px solid var(--line);
@@ -506,6 +598,9 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 }
 
 #hideCatalogueBtn { transform: rotate(45deg); }
+@media (min-width: 721px) {
+  #hideCatalogueBtn { display: none; }   /* nothing to close on desktop */
+}
 
 .all-items-btn {
   border: none; background: transparent; text-align: left;
@@ -537,12 +632,11 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .breadcrumb { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .hero h1 { margin: 6px 0 0; font-size: 34px; font-family: 'Fraunces', serif; }
 
-#homeBtn {
-  position: absolute;
-  align-self: flex-end;
-  margin: 0;
-  cursor: pointer;
-}
+/* the nav rail / floating nav now handle "back to dashboard" */
+#homeBtn { display: none; }
+
+/* ☰ opens the catalogue drawer (phone only, see the <= 720px block below) */
+#view-inventory .menu-toggle { display: none; margin-right: 0; margin-top: 4px; }
 
 .primary-btn {
   border: none; background: var(--blue); color: white;
@@ -585,12 +679,12 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .card-stock { margin-top: 15px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .card button { padding: 8px 12px; }
 
-/* ----- drawers ----- */
+/* ----- drawers (add/edit item, category, subcategory) ----- */
 .drawer-overlay {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, .35);
   display: flex; justify-content: flex-end;
-  z-index: 100;
+  z-index: 120;                        /* above the nav rail (110) */
 }
 
 #subcategoryDrawer { display: none; }
@@ -616,10 +710,6 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 #cancelSubBtn { background: transparent; border-radius: 10px; color: red; }
 #saveSubBtn { background: transparent; border-radius: 10px; color: green; }
 
-/* ----- inventory hamburger: opens the catalogue sidebar, so only
-        needed once that sidebar goes off-canvas (<= 650px) ----- */
-#view-inventory .menu-toggle { display: none; margin-right: 0; }
-
 /* ----- inventory responsive ----- */
 @media (min-width: 769px) and (max-width: 1024px) {
   .catalogue-sidebar { width: 240px; }
@@ -630,12 +720,40 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   .stat { border-right: none; width: calc(50% - 20px); }
 }
 
+/* phone: catalogue becomes a drawer that slides out from beside the icon rail */
+@media (max-width: 720px) {
+  .catalogue-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: var(--rail-w);
+    width: 270px;
+    height: 100vh;
+    z-index: 100;                      /* below the rail (110), above the overlay (50) */
+    transform: translateX(-100%);      /* tucked away behind the rail */
+    visibility: hidden;
+    transition: transform .25s ease, visibility 0s linear .25s;
+  }
+  .catalogue-sidebar.open {
+    transform: translateX(0);
+    visibility: visible;
+    box-shadow: 18px 0 40px -22px rgba(0, 0, 0, .35);
+    transition: transform .25s ease, visibility 0s;
+  }
+
+  #view-inventory .menu-toggle { display: block; }
+
+  .hero { justify-content: flex-start; gap: 14px; }
+  .hero > div { flex: 1; min-width: 0; }
+}
+
 @media (max-width: 650px) {
   .app { flex-direction: column; }
 
   #view-inventory .main { width: 100%; }
 
   .hero { padding: 20px; flex-direction: column; align-items: stretch; gap: 16px; }
+  .hero > div { flex: none; }
   .hero h1 { font-size: 28px; }
   .primary-btn { width: 100%; }
 
@@ -647,23 +765,6 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 
   .grid { padding: 20px; grid-template-columns: 1fr; }
   .drawer { width: 100%; }
-
-  #view-inventory .menu-toggle { display: block; }
-
-  /* catalogue sidebar slides in from the left */
-  .catalogue-sidebar {
-    position: fixed;
-    top: 0;
-    left: -280px;
-    width: 270px;
-    height: 100vh;
-    background: var(--paper);
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    z-index: 100;
-    transition: left .25s ease;
-  }
-  .catalogue-sidebar.open { left: 0; }
 }
 
 @media (max-width: 480px) {
@@ -895,106 +996,6 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 .statusBtn:disabled { cursor: not-allowed; }
 .statusBtn:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
 
-/* =====================================================================
-   7. EDIT ORDER ITEMS  (orders view button + bottom sheet)
-   The sheet sits outside #view-orders, so colours are hard-coded.
-===================================================================== */
-.editOrderBtn {
-  display: block;
-  width: 100%;
-  margin-top: 14px;
-  padding: 10px 0;
-  border-radius: 9px;
-  border: 1.5px solid var(--flame);
-  background: var(--white);
-  color: var(--flame-dark);
-  font-family: var(--font-ticket-body);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background .12s ease, color .12s ease;
-}
-.editOrderBtn:hover { background: var(--flame); color: var(--white); }
-
-.edited-tag {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--amber-bg);
-  color: #915A00;
-  font-family: var(--font-ticket-body);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
-
-.ed-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(36, 28, 26, .5);
-  z-index: 2500;
-  opacity: 0; pointer-events: none;
-  transition: opacity .25s ease;
-}
-.ed-backdrop.show { opacity: 1; pointer-events: auto; }
-
-.ed-sheet {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  margin: 0 auto;
-  width: 100%; max-width: 480px; max-height: 88vh;
-  display: flex; flex-direction: column;
-  background: #FFFDF9; color: #241C1A;
-  font-family: 'DM Sans', sans-serif;
-  border-radius: 20px 20px 0 0;
-  box-shadow: 0 -14px 40px -18px rgba(36, 28, 26, .6);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  transform: translateY(100%);
-  transition: transform .32s cubic-bezier(.22, .8, .3, 1);
-  z-index: 2501;
-}
-.ed-sheet.show { transform: translateY(0); }
-
-.ed-handle { width: 40px; height: 4px; border-radius: 999px; background: #E7D8C3; margin: 10px auto 4px; flex-shrink: 0; }
-.ed-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 20px 6px; flex-shrink: 0; }
-.ed-title { font-size: 17px; font-weight: 700; }
-.ed-sub { margin-top: 2px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b5f58; overflow-wrap: anywhere; }
-.ed-close { width: 34px; height: 34px; flex-shrink: 0; border: none; border-radius: 50%; background: rgba(0, 0, 0, .06); color: inherit; font-size: 16px; cursor: pointer; }
-.ed-note { margin: 4px 20px 8px; padding: 9px 12px; border-radius: 10px; background: #FFF0D6; color: #915A00; font-size: 12.5px; line-height: 1.4; flex-shrink: 0; }
-
-.ed-list { overflow-y: auto; padding: 0 20px; flex: 1; min-height: 0; }
-.ed-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px dashed #E7D8C3; }
-.ed-info { flex: 1; min-width: 0; }
-.ed-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.ed-price { margin-top: 2px; font-size: 12px; color: #6b5f58; }
-.ed-row.removed .ed-name { text-decoration: line-through; color: #6b5f58; }
-
-.ed-step { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.ed-step button {
-  width: 32px; height: 32px; border-radius: 8px;
-  border: 1px solid #E7D8C3; background: #fff; color: #241C1A;
-  font-size: 18px; line-height: 1; cursor: pointer;
-}
-.ed-step button:disabled { opacity: .35; cursor: not-allowed; }
-.ed-step span { min-width: 28px; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; }
-
-.ed-del, .ed-undo {
-  flex-shrink: 0; height: 32px; padding: 0 10px; border-radius: 8px;
-  border: 1px solid #E7D8C3; background: #fff; cursor: pointer; font-size: 13px;
-}
-.ed-del { color: #C23A15; }
-.ed-undo { color: #1F8A4C; font-weight: 700; }
-
-.ed-foot { padding: 12px 20px 18px; border-top: 1px solid #E7D8C3; flex-shrink: 0; }
-.ed-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; padding-bottom: 8px; }
-.ed-total span:last-child { font-family: 'JetBrains Mono', monospace; }
-.ed-error { min-height: 0; margin-bottom: 6px; font-size: 12.5px; color: #C23A15; }
-.ed-error:empty { display: none; }
-.ed-save, .ed-cancel { width: 100%; border: none; border-radius: 12px; padding: 13px 0; font-weight: 700; font-size: 15px; cursor: pointer; }
-.ed-save { background: #1F8A4C; color: #fff; }
-.ed-save:disabled { opacity: .5; cursor: not-allowed; }
-.ed-cancel { margin-top: 8px; background: transparent; color: #6b5f58; border: 1px solid #E7D8C3; }
 /* ----- orders responsive ----- */
 @media (max-width: 700px) {
   #view-orders .order-id { overflow-wrap: anywhere; }
@@ -1101,3 +1102,104 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
 @media (prefers-reduced-motion: reduce) {
   .store-toggle-dot, .store-toggle .switch-thumb, .sd-toast { animation: none; transition: none; }
 }
+
+/* =====================================================================
+   7. EDIT ORDER ITEMS  (orders view button + bottom sheet)
+   The sheet sits outside #view-orders, so its colours are hard-coded.
+===================================================================== */
+.editOrderBtn {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 0;
+  border-radius: 9px;
+  border: 1.5px solid var(--flame);
+  background: var(--white);
+  color: var(--flame-dark);
+  font-family: var(--font-ticket-body);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.editOrderBtn:hover { background: var(--flame); color: var(--white); }
+
+.edited-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--amber-bg);
+  color: #915A00;
+  font-family: var(--font-ticket-body);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.ed-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(36, 28, 26, .5);
+  z-index: 2500;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s ease;
+}
+.ed-backdrop.show { opacity: 1; pointer-events: auto; }
+
+.ed-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  margin: 0 auto;
+  width: 100%; max-width: 480px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  background: #FFFDF9; color: #241C1A;
+  font-family: 'DM Sans', sans-serif;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -14px 40px -18px rgba(36, 28, 26, .6);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.22, .8, .3, 1);
+  z-index: 2501;
+}
+.ed-sheet.show { transform: translateY(0); }
+
+.ed-handle { width: 40px; height: 4px; border-radius: 999px; background: #E7D8C3; margin: 10px auto 4px; flex-shrink: 0; }
+.ed-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 20px 6px; flex-shrink: 0; }
+.ed-title { font-size: 17px; font-weight: 700; }
+.ed-sub { margin-top: 2px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b5f58; overflow-wrap: anywhere; }
+.ed-close { width: 34px; height: 34px; flex-shrink: 0; border: none; border-radius: 50%; background: rgba(0, 0, 0, .06); color: inherit; font-size: 16px; cursor: pointer; }
+.ed-note { margin: 4px 20px 8px; padding: 9px 12px; border-radius: 10px; background: #FFF0D6; color: #915A00; font-size: 12.5px; line-height: 1.4; flex-shrink: 0; }
+
+.ed-list { overflow-y: auto; padding: 0 20px; flex: 1; min-height: 0; }
+.ed-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px dashed #E7D8C3; }
+.ed-info { flex: 1; min-width: 0; }
+.ed-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.ed-price { margin-top: 2px; font-size: 12px; color: #6b5f58; }
+.ed-row.removed .ed-name { text-decoration: line-through; color: #6b5f58; }
+
+.ed-step { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ed-step button {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid #E7D8C3; background: #fff; color: #241C1A;
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.ed-step button:disabled { opacity: .35; cursor: not-allowed; }
+.ed-step span { min-width: 28px; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; }
+
+.ed-del, .ed-undo {
+  flex-shrink: 0; height: 32px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid #E7D8C3; background: #fff; cursor: pointer; font-size: 13px;
+}
+.ed-del { color: #C23A15; }
+.ed-undo { color: #1F8A4C; font-weight: 700; }
+
+.ed-foot { padding: 12px 20px 18px; border-top: 1px solid #E7D8C3; flex-shrink: 0; }
+.ed-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; padding-bottom: 8px; }
+.ed-total span:last-child { font-family: 'JetBrains Mono', monospace; }
+.ed-error { min-height: 0; margin-bottom: 6px; font-size: 12.5px; color: #C23A15; }
+.ed-error:empty { display: none; }
+.ed-save, .ed-cancel { width: 100%; border: none; border-radius: 12px; padding: 13px 0; font-weight: 700; font-size: 15px; cursor: pointer; }
+.ed-save { background: #1F8A4C; color: #fff; }
+.ed-save:disabled { opacity: .5; cursor: not-allowed; }
+.ed-cancel { margin-top: 8px; background: transparent; color: #6b5f58; border: 1px solid #E7D8C3; }

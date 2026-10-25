@@ -7,7 +7,7 @@
      2. Navigation (views, nav sidebar, catalogue sidebar, logout)
      3. Dashboard
      4. Inventory (catalogue, items, barcode scanner)
-     5. Orders (order cards, QR scanner)
+     5. Orders (order cards, edit items, QR scanner)
      6. Boot (wiring that crosses sections)
 ===================================================================== */
 
@@ -37,18 +37,19 @@ function escapeSellerHtml(str) {
 ===================================================================== */
 const VIEWS = ["dashboard", "inventory", "orders"];
 
-/* ----- Nav sidebar (Dashboard / Orders / Inventory ...) ----- */
+/* ----- Nav sidebar (Dashboard / Orders / Inventory ...) -----
+   Phone: opens as a drawer from the ☰ button. Visibility is controlled by
+   CSS only (.show class), never by inline styles, so the icon rail on the
+   Inventory page can't get stuck hidden. */
 const navSidebar = document.querySelector("aside.sidebar");
 const navOverlay = document.getElementById("overlayContainer");
 
 function openNavSidebar() {
     navSidebar.classList.add("show");
-    navSidebar.style.display = "block";
     navOverlay.classList.add("show");
 }
 
 function closeNavSidebar() {
-    navSidebar.style.display = "none";
     navSidebar.classList.remove("show");
     navOverlay.classList.remove("show");
 }
@@ -61,6 +62,9 @@ navOverlay.addEventListener("click", closeNavSidebar);
 /* ----- View switching (replaces the old page redirects) ----- */
 function showView(name, refresh = true) {
     if (!VIEWS.includes(name)) return;
+
+    // leaving Inventory: tuck the catalogue drawer away
+    if (name !== "inventory") closeCatalogueSidebar();
 
     document.querySelectorAll(".view").forEach(v =>
         v.classList.toggle("active", v.id === "view-" + name));
@@ -1004,7 +1008,8 @@ function renderTree() {
                     state.activeSub = sub.id;
                     state.activeCat = null;
                     render();
-                    if (window.innerWidth <= 768) {
+                    // phone: the catalogue is a drawer, close it after picking
+                    if (window.innerWidth <= 720) {
                         closeCatalogueSidebar();
                     }
                 };
@@ -1327,7 +1332,8 @@ document.getElementById("allItemsBtn").onclick = () => {
     state.activeSub = null;
     state.activeCat = null;
     render();
-    if (window.innerWidth <= 768) {
+    // phone: the catalogue is a drawer, close it after picking
+    if (window.innerWidth <= 720) {
         closeCatalogueSidebar();
     }
 };
@@ -1350,7 +1356,8 @@ document.getElementById("sidebarOverlay").onclick = closeCatalogueSidebar;
 
 render();
 
-// Catalogue (category tree) sidebar — separate from the nav sidebar
+// Catalogue (category tree) sidebar — separate from the nav sidebar.
+// Phone only: it is a slide-out drawer there; on desktop it's always visible.
 function openCatalogueSidebar() {
     state.sidebarOpen = true;
     document.querySelector(".catalogue-sidebar").classList.add("open");
@@ -2278,13 +2285,13 @@ async function loadOrders() {
                         ${escapeSellerHtml(order.status)}
                     </span>
                 </div>
-                                <div class="token-no">Token No: ${escapeSellerHtml(order.token_no)}${order.edited ? '<span class="edited-tag">Edited</span>' : ''}</div>
+                <div class="token-no">Token No: ${escapeSellerHtml(order.token_no)}${order.edited ? '<span class="edited-tag">Edited</span>' : ''}</div>
                 <div class="order-date">${escapeSellerHtml(order.time)}</div>
                 <div class="order-date">Pickup Time: ${escapeSellerHtml(order.pickup_time)}</div>
                 ${restaurantsHTML}
 
                 <div class="total">Total: ₹${total}</div>
-                 <button class="editOrderBtn" data-order-id="${escapeSellerHtml(order.order_id)}">✎ Edit items</button>
+                <button class="editOrderBtn" data-order-id="${escapeSellerHtml(order.order_id)}">✎ Edit items</button>
                 <button class="completeBtn statusBtn" style="
                     background: green;
                     color: white;
@@ -2367,6 +2374,7 @@ document.addEventListener("click", async (e) => {
         user_id: card.getAttribute("user_id")
     }, isComplete ? "completed" : "canceled");
 });
+
 /* =====================================================================
    EDIT ORDER ITEMS
    Seller can reduce / remove items he doesn't have, then Save ->
@@ -2518,6 +2526,7 @@ document.addEventListener("click", (e) => {
     const btn = e.target.closest(".editOrderBtn");
     if (btn) openEditOrder(btn.dataset.orderId);
 });
+
 // ===============================================================
 // QR SCANNER  (full-screen in-app camera, square scan frame in the centre)
 // Renamed from scanner/openScanner/closeScanner/stopCamera so it can't
@@ -3033,7 +3042,7 @@ document.getElementById("updateStockBtn").addEventListener("click", () => {
 const bellBtn = document.querySelector('.icon-btn[aria-label="Notifications"]');
 if (bellBtn) bellBtn.addEventListener("click", openNotifSheet);
 
-// Inventory "home" icon -> dashboard
+// Inventory "home" icon -> dashboard (button is hidden by CSS; kept so nothing breaks)
 document.getElementById("homeBtn").addEventListener("click", () => showView("dashboard"));
 
 // Initial data for all three views
