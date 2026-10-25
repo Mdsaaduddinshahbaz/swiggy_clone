@@ -231,6 +231,13 @@ async function initCartPage() {
     const no_order_container = document.getElementById("No_orders_container");
     const cartContainer = document.querySelector(".cart-container");
 
+    const deliveryTimeCard = document.getElementById("deliveryTimeCard");
+    const deliveryNowEta = document.getElementById("deliveryNowEta");
+    const slotPicker = document.getElementById("slotPicker");
+    const slotDayTabs = document.getElementById("slotDayTabs");
+    const slotGrid = document.getElementById("slotGrid");
+    const slotError = document.getElementById("slotError");
+
     const CART_CACHE_KEY = `cachedCart_${userId}`;
     const SELECTED_ADDR_KEY = `selectedAddress_${userId}`;
     const ORDER_TYPE_KEY = `orderType_${userId}`;
@@ -251,6 +258,9 @@ async function initCartPage() {
     let selectedAddressId = null;
     let selectedAddress = null;
     let preferredOrderType = safeStorageGet(localStorage, ORDER_TYPE_KEY) === "delivery" ? "delivery" : "pickup";
+    let deliveryMode = "now";     // "now" | "scheduled"
+    let slotDay = "today";        // "today" | "tomorrow"
+    let selectedSlot = null;      // { date: "YYYY-MM-DD", time: "HH:MM", label }
 
     // ---------------------------------------------------------------
     // Cart helpers
@@ -456,6 +466,7 @@ async function initCartPage() {
         if (pickupRadio) pickupRadio.checked = type === "pickup";
 
         if (addressCard) addressCard.style.display = type === "delivery" ? "" : "none";
+        updateDeliveryTimeUI();
 
         const check = checkDelivery();
         if (deliveryWarning) {
@@ -495,6 +506,7 @@ async function initCartPage() {
             if (totalPrice) totalPrice.innerText = 0;
             if (toPay) toPay.innerText = 0;
             renderStoreBanner();
+            renderStoreHeader();
             return 0;
         }
 
@@ -552,8 +564,110 @@ async function initCartPage() {
         if (totalPrice) totalPrice.innerText = total;
         if (toPay) toPay.innerText = total;
         renderStoreBanner();
+        renderStoreHeader();
         updateOrderTypeUI();
         return total;
+    }
+
+    // ---------------------------------------------------------------
+    // Store header (real store name instead of a placeholder)
+    // ---------------------------------------------------------------
+
+    function renderStoreHeader() {
+        const nameEl = document.getElementById("cartStoreName");
+        const initialEl = document.getElementById("cartStoreInitial");
+        const name = isCartEmpty(restaurants) ? "" : getStoreName();
+        if (nameEl) nameEl.textContent = name || "Your order";
+        if (initialEl) initialEl.textContent = (name || "O").trim().charAt(0).toUpperCase();
+    }
+
+    // ---------------------------------------------------------------
+    // Delivery time: deliver now (with a real ETA) or pick a slot
+    // ---------------------------------------------------------------
+
+    // Straight-line distance from the shop to the selected address, or null.
+    function deliveryDistanceKm() {
+        const d = getDeliveryInfo();
+        if (!d || !selectedAddress || !selectedAddress.coordinates) return null;
+        if (d.long == null || d.latt == null) return null;
+        return haversineKm(
+            Number(selectedAddress.coordinates.latt), Number(selectedAddress.coordinates.long),
+            Number(d.latt), Number(d.long)
+        );
+    }
+
+    function showSlotError(message) {
+        if (!slotError) return;
+        slotError.textContent = message || "";
+        slotError.classList.toggle("show", !!message);
+    }
+
+    function renderSlotPicker() {
+        if (!slotPicker || !slotGrid || !window.KiranaUtils) return;
+
+        const scheduled = deliveryMode === "scheduled";
+        slotPicker.style.display = scheduled ? "" : "none";
+        if (!scheduled) return;
+
+        const lists = KiranaUtils.buildSlots(new Date());
+
+        // Late in the evening there are no slots left today: jump to tomorrow.
+        if (slotDay === "today" && lists.today.length === 0) slotDay = "tomorrow";
+
+        slotDayTabs?.querySelectorAll(".slot-day-tab").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.day === slotDay);
+            if (btn.dataset.day === "today") btn.disabled = lists.today.length === 0;
+        });
+
+        // Forget a pick whose time has passed in the meantime.
+        const all = lists.today.concat(lists.tomorrow);
+        if (selectedSlot && !all.some((s) => s.date === selectedSlot.date && s.time === selectedSlot.time)) {
+            selectedSlot = null;
+        }
+
+        const slots = lists[slotDay] || [];
+        slotGrid.innerHTML = slots.length
+            ? slots.map((s) => {
+                const sel = selectedSlot && selectedSlot.date === s.date && selectedSlot.time === s.time;
+                return `<button type="button" class="slot-chip${sel ? " selected" : ""}"
+                            data-date="${escapeHtml(s.date)}" data-time="${escapeHtml(s.time)}"
+                            data-label="${escapeHtml(s.label)}">${escapeHtml(s.label)}</button>`;
+            }).join("")
+            : `<p class="slot-empty">No slots available.</p>`;
+    }
+
+    function updateDeliveryTimeUI() {
+        if (!deliveryTimeCard) return;
+
+        const show = getOrderType() === "delivery" && !!window.KiranaUtils;
+        deliveryTimeCard.style.display = show ? "" : "none";
+        if (!show) {
+            showSlotError("");
+            return;
+        }
+
+        const km = deliveryDistanceKm();
+        if (deliveryNowEta) {
+            deliveryNowEta.textContent = km == null ? "" : `(about ${KiranaUtils.etaRange(km).label} mins)`;
+        }
+
+        deliveryTimeCard.querySelectorAll('input[name="deliveryMode"]').forEach((r) => {
+            r.checked = r.value === deliveryMode;
+        });
+        renderSlotPicker();
+    }
+
+    // Returns { ok, message }
+    function validateDeliverySlot() {
+        if (getOrderType() !== "delivery" || deliveryMode !== "scheduled") return { ok: true, message: "" };
+        if (!selectedSlot) return { ok: false, message: "Please pick a delivery slot." };
+
+        if (!window.KiranaUtils || !KiranaUtils.isSlotAvailable(selectedSlot, new Date())) {
+            selectedSlot = null;
+            renderSlotPicker();
+            return { ok: false, message: "That slot is no longer available. Please pick another one." };
+        }
+        return { ok: true, message: "" };
     }
 
     // Load the cart from the server (source of truth)
@@ -704,6 +818,31 @@ async function initCartPage() {
         preferredOrderType = e.target.value === "delivery" ? "delivery" : "pickup";
         safeStorageSet(localStorage, ORDER_TYPE_KEY, preferredOrderType);
         updateOrderTypeUI();
+    });
+
+    on(deliveryTimeCard, "change", (e) => {
+        if (e.target.name !== "deliveryMode") return;
+        deliveryMode = e.target.value === "scheduled" ? "scheduled" : "now";
+        showSlotError("");
+        renderSlotPicker();
+    });
+
+    on(deliveryTimeCard, "click", (e) => {
+        const dayBtn = e.target.closest(".slot-day-tab");
+        if (dayBtn) {
+            if (!dayBtn.disabled) {
+                slotDay = dayBtn.dataset.day === "tomorrow" ? "tomorrow" : "today";
+                renderSlotPicker();
+            }
+            return;
+        }
+
+        const chip = e.target.closest(".slot-chip");
+        if (chip) {
+            selectedSlot = { date: chip.dataset.date, time: chip.dataset.time, label: chip.dataset.label };
+            showSlotError("");
+            renderSlotPicker();
+        }
     });
 
     // Live store status. These events are dispatched by home.js (socket push,
@@ -1041,7 +1180,13 @@ async function initCartPage() {
             pickup_time: type === "pickup" ? pickupTime : null,
             order_type: type
         };
-        if (type === "delivery") body.address_id = selectedAddress?._id;
+        if (type === "delivery") {
+            body.address_id = selectedAddress?._id;
+            body.delivery_mode = deliveryMode;
+            body.delivery_date = deliveryMode === "scheduled" ? (selectedSlot?.date ?? null) : null;
+            body.delivery_time = deliveryMode === "scheduled" ? (selectedSlot?.time ?? null) : null;
+            body.delivery_slot = deliveryMode === "scheduled" ? (selectedSlot?.label ?? null) : null;
+        }
 
         if (placeorder) placeorder.disabled = true;
         if (confirmPickupBtn) confirmPickupBtn.disabled = true;
@@ -1110,7 +1255,13 @@ async function initCartPage() {
                 alert(check.message);
                 return;
             }
-            submitOrder(null); // delivery has no pickup-time step
+            const slotCheck = validateDeliverySlot();
+            if (!slotCheck.ok) {
+                showSlotError(slotCheck.message);
+                deliveryTimeCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+            }
+            submitOrder(null); // delivery uses a slot (or "now"), not the pickup-time sheet
             return;
         }
 

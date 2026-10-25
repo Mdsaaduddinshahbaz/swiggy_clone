@@ -508,3 +508,205 @@ body:not([data-page="home"]) .pill-tabs { display: none; }
     .product-thumb .p-qty { gap: 3px; }
     .product-thumb .p-qty button { width: 18px; height: 18px; }
 }
+
+/* ============================================================
+   extras.css — load AFTER home.css
+   Covers: cart store header, header help button, delivery slots,
+   and the Help & Support sheet.
+   Uses the CSS variables already defined in home.css.
+   ============================================================ */
+
+/* ---------- Cart header: store initial instead of a stock photo ---------- */
+.res-mini-header .res-initial {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm, 10px);
+    background: var(--accent-soft, #E9E4FB);
+    color: var(--accent-dark, #4527D6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display, serif);
+    font-weight: 700;
+    font-size: 18px;
+}
+
+/* ---------- Header: help button next to the avatar ---------- */
+.header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.help-btn {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18); background: var(--surface-2);
+    padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.help-btn i { font-size: 15px; color: var(--ink-soft); transition: color 0.15s ease; }
+.help-btn:hover i { color: var(--accent); }
+
+/* ---------- Delivery time slots (cart) ---------- */
+.slot-picker { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.slot-day-tabs { display: flex; gap: 8px; }
+.slot-day-tab {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.slot-day-tab.active { background: var(--accent); border-color: var(--accent); color: var(--white); }
+.slot-day-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 2px;
+}
+.slot-chip {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 8px;
+    border-radius: var(--radius-sm);
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.slot-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+.slot-chip.selected { border-color: var(--accent); background: var(--accent); color: var(--white); }
+.slot-empty { grid-column: 1 / -1; font-size: 13px; color: var(--ink-soft); margin: 4px 0; }
+.slot-error { display: none; margin: 10px 0 0; font-size: 12.5px; font-weight: 600; color: var(--coral); }
+.slot-error.show { display: block; }
+.slot-note { margin: 0; font-size: 12px; color: var(--ink-faint); }
+
+/* ---------- Help & Support sheet ---------- */
+body.support-open { overflow: hidden; }
+
+.support-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 24, 43, 0.55);
+    z-index: 120;
+}
+.support-overlay.show { display: block; }
+
+.support-sheet {
+    display: none;
+    flex-direction: column;
+    position: fixed;
+    z-index: 121;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(520px, 94vw);
+    max-height: 88vh;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+    overflow: hidden;
+}
+.support-sheet.show { display: flex; }
+
+.support-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 10px; }
+.support-head h2 { margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+.support-close {
+    width: 32px; height: 32px; border: none; border-radius: 50%;
+    background: var(--surface-2); color: var(--ink-soft); font-size: 20px; line-height: 1;
+}
+.support-close:hover { background: var(--accent-soft); color: var(--accent); }
+
+.support-tabs { display: flex; gap: 6px; padding: 0 18px 10px; overflow-x: auto; scrollbar-width: none; }
+.support-tabs::-webkit-scrollbar { display: none; }
+.support-tab {
+    flex-shrink: 0; border: none; background: var(--surface-2); color: var(--ink-soft);
+    font-weight: 700; font-size: 13px; padding: 8px 14px; border-radius: 999px;
+}
+.support-tab.active { background: var(--accent); color: var(--white); }
+
+.support-body { overflow-y: auto; padding: 4px 18px 16px; }
+.support-panel { display: none; }
+.support-panel.active { display: block; }
+
+.support-item { border-bottom: 1px solid var(--line); }
+.support-item summary {
+    list-style: none; cursor: pointer; padding: 13px 0; font-weight: 700; font-size: 14px;
+    display: flex; justify-content: space-between; gap: 12px; align-items: center;
+}
+.support-item summary::-webkit-details-marker { display: none; }
+.support-item summary::after { content: "+"; font-size: 18px; color: var(--accent); flex-shrink: 0; }
+.support-item[open] summary::after { content: "\2212"; }
+.support-item p { margin: 0 0 8px; padding-bottom: 6px; font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
+.support-item p:last-child { padding-bottom: 14px; }
+
+.support-form { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; }
+.support-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.support-form .opt { font-weight: 500; color: var(--ink-faint); }
+.support-form select,
+.support-form input,
+.support-form textarea {
+    font: inherit; font-size: 14px; font-weight: 500; color: var(--ink);
+    background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 11px 12px; width: 100%;
+}
+.support-form textarea { resize: vertical; min-height: 110px; }
+.support-form select:focus, .support-form input:focus, .support-form textarea:focus { border-color: var(--accent); outline: none; }
+.support-error { display: none; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--coral); line-height: 1.5; }
+.support-error.show { display: block; }
+.support-error a { color: var(--accent-dark); text-decoration: underline; }
+.support-submit {
+    border: none; background: var(--accent); color: var(--white); font-weight: 700; font-size: 14px;
+    padding: 13px; border-radius: var(--radius-sm); box-shadow: 0 3px 0 var(--accent-dark);
+}
+.support-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.support-submit:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+
+.support-done { text-align: center; padding: 26px 6px 10px; }
+.support-done .icon { font-size: 38px; margin-bottom: 6px; }
+.support-done h3 { margin: 0 0 6px; font-family: var(--font-display); font-size: 18px; }
+.support-done p { margin: 0 0 14px; font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; }
+.support-done .support-again { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: var(--radius-sm); }
+
+.support-contact {
+    display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 18px;
+    border-top: 1px solid var(--line); background: var(--surface-2); font-size: 13px; font-weight: 600;
+}
+.support-contact a { color: var(--accent-dark); text-decoration: none; }
+.support-contact a:hover { text-decoration: underline; }
+
+@media (max-width: 560px) {
+    .support-sheet {
+        top: auto; bottom: 0; left: 0; transform: none; width: 100%; max-height: 90vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+}
+
+/* ---------- Orders page: "Get help" button + locked order line in the support sheet ---------- */
+.order-help-btn {
+    display: inline-block;
+    margin-top: 10px;
+    background: transparent;
+    color: #E8491D;
+    border: 1px solid #E8491D;
+    border-radius: 7px;
+    padding: 5px 11px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.order-help-btn:hover { background: #E8491D; color: #fff; }
+
+.support-order {
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+}

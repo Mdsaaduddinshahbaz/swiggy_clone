@@ -1,3 +1,572 @@
+/* ============================================================
+   kirana_utils.js  (load BEFORE home.js and cart.js)
+
+   Shared helpers, exposed as window.KiranaUtils:
+   - etaRange(km)            real delivery ETA from distance + prep time
+   - refreshHeaderPill()     header "N mins delivery" pill from the store cards on Home
+   - renderMenuInfo(p, items) menu page: ETA / cost-for-two / distance line
+   - buildSlots(now)         delivery time slots for today + tomorrow
+   - isSlotAvailable(slot)   is a previously picked slot still bookable
+   ============================================================ */
+(function () {
+    "use strict";
+
+    // ---- Tuning knobs -------------------------------------------------
+    const PREP_MINUTES = 10;      // typical time a shop needs to pack an order
+    const SLOT_START_HOUR = 8;    // first delivery slot starts at 8:00
+    const SLOT_END_HOUR = 22;     // last delivery slot ends at 22:00
+    const SLOT_MINUTES = 30;      // slot length
+    const MIN_LEAD_MINUTES = 45;  // earliest a slot can start, counted from now
+    // -------------------------------------------------------------------
+
+    function esc(str) {
+        return String(str ?? "").replace(/[&<>"']/g, (c) => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[c]);
+    }
+
+    function minutesPerKm(km) {
+        if (km < 3) return 3.0;
+        if (km < 7) return 2.5;
+        return 2.0;
+    }
+
+    // Prep time + travel time, shown as a 5-minute window, e.g. { label: "20-25" }.
+    function etaRange(distanceKm) {
+        const km = Number(distanceKm);
+        const travel = Number.isFinite(km) && km > 0 ? km * minutesPerKm(km) : 0;
+        const total = PREP_MINUTES + travel;
+        const lower = Math.max(10, Math.floor(total / 5) * 5);
+        const upper = lower + 5;
+        return { lower, upper, label: `${lower}-${upper}` };
+    }
+
+    // Reads the rendered store cards (data-distance / data-delivery / data-radius)
+    // and shows the fastest ETA among stores that are open AND deliver to you.
+    // Only acts while the Home list is mounted, so the pill keeps its last value
+    // on Orders / Cart / Menu.
+    function refreshHeaderPill() {
+        const pill = document.getElementById("deliveryEtaPill");
+        if (!pill || !document.getElementById("resturants_container")) return;
+
+        let nearest = null;
+        document.querySelectorAll(".store-card").forEach((card) => {
+            if (card.classList.contains("is-offline")) return;
+            if (card.dataset.delivery !== "true") return;
+
+            const km = parseFloat(card.dataset.distance);
+            const radius = parseFloat(card.dataset.radius);
+            if (!Number.isFinite(km)) return;
+            if (Number.isFinite(radius) && km > radius) return;
+
+            if (nearest === null || km < nearest) nearest = km;
+        });
+
+        if (nearest === null) {
+            pill.style.display = "none";
+            return;
+        }
+        pill.style.display = "";
+        pill.innerHTML = `<i class="fa-solid fa-bolt"></i> ${esc(etaRange(nearest).label)} mins delivery`;
+    }
+
+    function median(nums) {
+        if (!nums.length) return null;
+        const s = nums.slice().sort((a, b) => a - b);
+        const mid = Math.floor(s.length / 2);
+        return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    }
+
+    // Average spend for two diners, rounded to the nearest ₹50. Restaurants only.
+    function costForTwo(items) {
+        const prices = items
+            .filter((i) => i.item_qty > 0 && i.price > 0)
+            .map((i) => i.price);
+        const m = median(prices);
+        if (m === null) return null;
+        return Math.max(50, Math.round((m * 2) / 50) * 50);
+    }
+
+    // params = the menuParams stashed by navigateToMenu (distanceKm, type, delivery, radius)
+    function renderMenuInfo(params, items) {
+        const box = document.querySelector(".res-delivery-info");
+        if (!box) return;
+
+        const p = params || {};
+        const km = parseFloat(p.distanceKm);
+        const delivery = p.delivery === true || String(p.delivery) === "true";
+        const parts = [];
+
+        if (delivery && Number.isFinite(km)) {
+            parts.push(`<span><i class="fa-solid fa-clock"></i> ${esc(etaRange(km).label)} MINS</span>`);
+        } else if (!delivery) {
+            parts.push(`<span><i class="fa-solid fa-store"></i> PICKUP ONLY &middot; READY IN ~${PREP_MINUTES}-${PREP_MINUTES + 5} MINS</span>`);
+        }
+
+        if (p.type === "restaurant") {
+            const two = costForTwo(items || []);
+            if (two !== null) {
+                parts.push(`<span><i class="fa-solid fa-indian-rupee-sign"></i> ₹${esc(two)} for two</span>`);
+            }
+        } else {
+            const inStock = (items || []).filter((i) => i.item_qty > 0).length;
+            parts.push(`<span><i class="fa-solid fa-box"></i> ${esc(inStock)} item${inStock === 1 ? "" : "s"} in stock</span>`);
+        }
+
+        if (Number.isFinite(km)) {
+            parts.push(`<span><i class="fa-solid fa-location-dot"></i> ${esc(km.toFixed(1))} km away</span>`);
+        }
+
+        box.innerHTML = parts.join("");
+    }
+
+    // ---------------- Delivery slots ----------------
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    function ymd(d) {
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function fmt12(totalMinutes) {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? "PM" : "AM"}`;
+    }
+
+    function daySlots(day, earliestMs) {
+        const out = [];
+        for (let mins = SLOT_START_HOUR * 60; mins + SLOT_MINUTES <= SLOT_END_HOUR * 60; mins += SLOT_MINUTES) {
+            const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, mins);
+            if (start.getTime() < earliestMs) continue;
+            out.push({
+                date: ymd(start),
+                time: `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`,
+                label: `${fmt12(mins)} - ${fmt12(mins + SLOT_MINUTES)}`
+            });
+        }
+        return out;
+    }
+
+    // Returns { today: [...], tomorrow: [...] }; each slot is { date, time, label }.
+    function buildSlots(now) {
+        const base = now instanceof Date ? now : new Date();
+        const earliest = base.getTime() + MIN_LEAD_MINUTES * 60000;
+        const tomorrow = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+        return { today: daySlots(base, earliest), tomorrow: daySlots(tomorrow, earliest) };
+    }
+
+    function isSlotAvailable(slot, now) {
+        if (!slot) return false;
+        const lists = buildSlots(now);
+        return lists.today.concat(lists.tomorrow).some((s) => s.date === slot.date && s.time === slot.time);
+    }
+
+    window.KiranaUtils = {
+        PREP_MINUTES,
+        etaRange,
+        refreshHeaderPill,
+        costForTwo,
+        renderMenuInfo,
+        buildSlots,
+        isSlotAvailable
+    };
+})();
+
+/* ============================================================
+   support.js  (load AFTER user_navbar.js, at the end of <body>)
+
+   Help & Support sheet: FAQ, "Report an issue" form, policies.
+   Built entirely in JS, so no template changes are needed.
+
+   Open it from anywhere:
+     - any element with   data-open-support            -> FAQ tab
+                          data-open-support="policies" -> Policies tab
+     - JS:  KiranaSupport.open("report", { orderId: "abc123", storeName: "Shop" })
+                          (the report form only opens for a specific order,
+                           it is launched from "Get help with this order" on Orders)
+   ============================================================ */
+(function () {
+    "use strict";
+
+    // ---- Edit these -----------------------------------------------------
+    const SUPPORT_EMAIL = "";               // e.g. "help@yourdomain.com" (leave "" to hide)
+    const SUPPORT_PHONE = "";               // e.g. "+91 98765 43210"      (leave "" to hide)
+    const TICKET_ENDPOINT = "/support_ticket";
+
+    const CATEGORIES = [
+        ["item", "Missing or wrong item"],
+        ["quality", "Item quality"],
+        ["late", "Late delivery or pickup"],
+        ["payment", "Payment or refund"],
+        ["other", "Something else"]
+    ];
+
+    const FAQ = [
+        {
+            q: "How do I place an order?",
+            a: "Open a store, add items, then go to your cart. Choose Pickup or Delivery, review the bill and tap Place Order."
+        },
+        {
+            q: "Why can't I add items from a store?",
+            a: "The store may be offline (closed or paused). You can still browse its menu and items already in your cart stay saved. You will see a message when the store is back online."
+        },
+        {
+            q: "Can I order from two stores at once?",
+            a: "A cart holds items from one store at a time. If you add an item from another store, we ask whether you want to replace your cart."
+        },
+        {
+            q: "What is the difference between Pickup and Delivery?",
+            a: "With Pickup you choose a time and collect your order from the shop. Delivery is offered only by some stores and only within the delivery radius shown on the store card. Your delivery address must be inside that radius."
+        },
+        {
+            q: "Can I schedule my delivery for later?",
+            a: "Yes. In your cart, under Delivery Time, choose Schedule for later and pick a 30-minute slot for today or tomorrow."
+        },
+        {
+            q: "How are delivery times estimated?",
+            a: "We add the shop's usual packing time to the travel time from the shop to you. It is an estimate, not a guarantee."
+        },
+        {
+            q: "How do I change my delivery address?",
+            a: "In your cart, tap Change next to the address. You can also manage saved addresses from your profile."
+        },
+        {
+            q: "My order has a problem. What should I do?",
+            a: "Go to Orders, find the order that had the problem and tap Get help with this order. Help is available for 24 hours after an order is completed or canceled."
+        }
+    ];
+
+    // TODO: replace with your final, reviewed legal text before launch.
+    const POLICIES = [
+        {
+            title: "Terms of use",
+            body: [
+                "Stores set their own prices, stock and opening hours. Prices and availability can change, and an item can sell out while it is in your cart.",
+                "Please place genuine orders and give correct address and contact details so the store can reach you."
+            ]
+        },
+        {
+            title: "Privacy",
+            body: [
+                "We use your location to show stores near you and to check whether a store can deliver to your address.",
+                "Your name, phone number and saved addresses are used to fulfil your orders and are shared with the store you order from."
+            ]
+        },
+        {
+            title: "Cancellations and refunds",
+            body: [
+                "Orders are prepared and fulfilled by the store, so cancellations and refunds depend on the order status.",
+                "If something went wrong, open the order in Orders and tap Get help with this order within 24 hours of it being completed or canceled."
+            ]
+        },
+        {
+            title: "Delivery and pickup",
+            body: [
+                "Delivery is available only where a store offers it and only inside its delivery radius.",
+                "For pickup, please collect your order at the time you selected."
+            ]
+        }
+    ];
+    // ---------------------------------------------------------------------
+
+    let overlay = null;
+    let sheet = null;
+    let lastFocus = null;
+
+    function esc(str) {
+        return String(str ?? "").replace(/[&<>"']/g, (c) => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[c]);
+    }
+
+    function currentUserId() {
+        const parts = window.location.pathname.split("/").filter(Boolean);
+        return window.APP_USER_ID || parts[parts.length - 1] || "";
+    }
+
+    function normalizePhone(phone) {
+        const cleaned = (phone || "").replace(/[\s-]/g, "");
+        return cleaned.replace(/^(?:\+?91|0)(?=\d{10}$)/, "");
+    }
+
+    function accordion(items, textKey) {
+        return items.map((it) => {
+            const paragraphs = Array.isArray(it[textKey]) ? it[textKey] : [it[textKey]];
+            return `
+                <details class="support-item">
+                    <summary>${esc(it.q || it.title)}</summary>
+                    ${paragraphs.map((p) => `<p>${esc(p)}</p>`).join("")}
+                </details>`;
+        }).join("");
+    }
+
+    function contactMarkup() {
+        const bits = [];
+        if (SUPPORT_PHONE) bits.push(`<a href="tel:${esc(SUPPORT_PHONE.replace(/[^\d+]/g, ""))}"><i class="fa-solid fa-phone"></i> ${esc(SUPPORT_PHONE)}</a>`);
+        if (SUPPORT_EMAIL) bits.push(`<a href="mailto:${esc(SUPPORT_EMAIL)}"><i class="fa-regular fa-envelope"></i> ${esc(SUPPORT_EMAIL)}</a>`);
+        return bits.length ? `<div class="support-contact">${bits.join("")}</div>` : "";
+    }
+
+    function build() {
+        if (sheet && document.body.contains(sheet)) return;
+
+        overlay = document.createElement("div");
+        overlay.className = "support-overlay";
+        overlay.addEventListener("click", close);
+
+        sheet = document.createElement("section");
+        sheet.className = "support-sheet";
+        sheet.setAttribute("role", "dialog");
+        sheet.setAttribute("aria-modal", "true");
+        sheet.setAttribute("aria-labelledby", "supportTitle");
+
+        sheet.innerHTML = `
+            <header class="support-head">
+                <h2 id="supportTitle">Help &amp; support</h2>
+                <button type="button" class="support-close" aria-label="Close">&times;</button>
+            </header>
+
+            <div class="support-tabs" role="tablist">
+                <button type="button" role="tab" class="support-tab active" data-tab="faq" aria-selected="true">FAQ</button>
+                <button type="button" role="tab" class="support-tab" data-tab="report" aria-selected="false" hidden>Get help with this order</button>
+                <button type="button" role="tab" class="support-tab" data-tab="policies" aria-selected="false">Policies</button>
+            </div>
+
+            <div class="support-body">
+                <div class="support-panel active" data-panel="faq">${accordion(FAQ, "a")}</div>
+
+                <div class="support-panel" data-panel="report">
+                    <form class="support-form" novalidate>
+                        <label>What is this about?
+                            <select name="category">
+                                ${CATEGORIES.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}
+                            </select>
+                        </label>
+                        <div class="support-order" aria-live="polite"></div>
+                        <input name="order_id" type="hidden">
+                        <label>Tell us what happened
+                            <textarea name="message" maxlength="1000" placeholder="Describe the problem..."></textarea>
+                        </label>
+                        <label>Phone number <span class="opt">(optional, so we can call you)</span>
+                            <input name="phone" type="tel" maxlength="13" autocomplete="tel">
+                        </label>
+                        <p class="support-error" role="alert"></p>
+                        <button type="submit" class="support-submit">Send</button>
+                    </form>
+
+                    <div class="support-done" hidden>
+                        <div class="icon">✅</div>
+                        <h3>Request sent</h3>
+                        <p class="support-done-text">Thanks, we have received your request.</p>
+                        <button type="button" class="support-again">Report another issue</button>
+                    </div>
+                </div>
+
+                <div class="support-panel" data-panel="policies">${accordion(POLICIES, "body")}</div>
+            </div>
+            ${contactMarkup()}
+        `;
+
+        sheet.querySelector(".support-close").addEventListener("click", close);
+
+        sheet.querySelector(".support-tabs").addEventListener("click", (e) => {
+            const tab = e.target.closest(".support-tab");
+            if (tab) selectTab(tab.dataset.tab);
+        });
+
+        sheet.querySelector(".support-form").addEventListener("submit", onSubmit);
+        sheet.querySelector(".support-again").addEventListener("click", () => showForm());
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(sheet);
+    }
+
+    function selectTab(name) {
+        sheet.querySelectorAll(".support-tab").forEach((t) => {
+            const on = t.dataset.tab === name;
+            t.classList.toggle("active", on);
+            t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        sheet.querySelectorAll(".support-panel").forEach((p) => {
+            p.classList.toggle("active", p.dataset.panel === name);
+        });
+    }
+
+    function showForm() {
+        sheet.querySelector(".support-form").hidden = false;
+        sheet.querySelector(".support-done").hidden = true;
+        showError("");
+    }
+
+    function showDone(ticketId) {
+        sheet.querySelector(".support-form").hidden = true;
+        const done = sheet.querySelector(".support-done");
+        done.hidden = false;
+        done.querySelector(".support-done-text").textContent = ticketId
+            ? `Thanks, we have received your request. Your reference is ${ticketId}.`
+            : "Thanks, we have received your request.";
+    }
+
+    // html=true only for strings built here from escaped parts.
+    function showError(message, html) {
+        const el = sheet.querySelector(".support-error");
+        if (!message) {
+            el.textContent = "";
+            el.classList.remove("show");
+            return;
+        }
+        if (html) el.innerHTML = message; else el.textContent = message;
+        el.classList.add("show");
+    }
+
+    function mailtoFallback(data) {
+        if (!SUPPORT_EMAIL) return "";
+        const subject = `Support request: ${data.category}`;
+        const body = `Order ID: ${data.order_id || "-"}\nPhone: ${data.phone || "-"}\n\n${data.message}`;
+        const href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        return ` <a href="${esc(href)}">Email us instead</a>`;
+    }
+
+    async function onSubmit(e) {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const btn = form.querySelector(".support-submit");
+
+        const data = {
+            user_id: currentUserId(),
+            category: form.elements.category.value,
+            order_id: form.elements.order_id.value.trim(),
+            message: form.elements.message.value.trim(),
+            phone: normalizePhone(form.elements.phone.value),
+            page: document.body.dataset.page || ""
+        };
+
+        if (!data.order_id) {
+            showError("Please open this form from an order in Orders.");
+            return;
+        }
+        if (data.message.length < 10) {
+            showError("Please describe the problem in a few words (at least 10 characters).");
+            return;
+        }
+        if (data.phone && !/^[6-9]\d{9}$/.test(data.phone)) {
+            showError("Please enter a valid 10-digit phone number, or leave it empty.");
+            return;
+        }
+
+        showError("");
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+
+        try {
+            const res = await fetch(TICKET_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+
+            if (res.status === 401) {
+                alert("Unauthorized user. Please log in");
+                window.location.href = "/login/user";
+                return;
+            }
+
+            let body = null;
+            try { body = await res.json(); } catch (err) { /* non-JSON error page */ }
+
+            if (res.ok && body && body.success) {
+                form.reset();
+                showDone(body.ticket_id);
+            } else {
+                const msg = (body && body.message) || "We couldn't send your request right now.";
+                showError(esc(msg) + mailtoFallback(data), true);
+            }
+        } catch (err) {
+            console.error("support ticket failed", err);
+            showError(esc("Network error. Please try again.") + mailtoFallback(data), true);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Send";
+        }
+    }
+
+    function open(tab, opts) {
+        build();
+        lastFocus = document.activeElement;
+
+        const orderId = opts && opts.orderId ? String(opts.orderId) : "";
+        const form = sheet.querySelector(".support-form");
+        const reportTab = sheet.querySelector('.support-tab[data-tab="report"]');
+
+        // The report form only exists in the context of one order.
+        reportTab.hidden = !orderId;
+        if (orderId) {
+            if (form.elements.order_id.value !== orderId) form.reset();
+            form.elements.order_id.value = orderId;
+            const store = opts.storeName ? ` \u00b7 ${opts.storeName}` : "";
+            sheet.querySelector(".support-order").textContent = `Order #${orderId}${store}`;
+        }
+
+        const wanted = tab === "report" && !orderId ? "faq" : (tab || "faq");
+        selectTab(wanted);
+        showForm();
+
+        overlay.classList.add("show");
+        sheet.classList.add("show");
+        document.body.classList.add("support-open");
+        sheet.querySelector(".support-close").focus();
+    }
+
+    function close() {
+        if (!sheet) return;
+        overlay.classList.remove("show");
+        sheet.classList.remove("show");
+        document.body.classList.remove("support-open");
+        if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+    }
+
+    function isOpen() {
+        return !!(sheet && sheet.classList.contains("show"));
+    }
+
+    // Open from any [data-open-support] element (header button, profile link, orders page...)
+    document.addEventListener("click", (e) => {
+        const trigger = e.target.closest("[data-open-support]");
+        if (!trigger) return;
+        e.preventDefault();
+        open(trigger.dataset.openSupport || "faq");
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (!isOpen()) return;
+
+        if (e.key === "Escape") {
+            close();
+            return;
+        }
+
+        // Keep Tab focus inside the sheet while it is open
+        if (e.key === "Tab") {
+            const focusable = Array.from(sheet.querySelectorAll(
+                "button, [href], input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"
+            )).filter((el) => !el.disabled && el.offsetParent !== null);
+            if (!focusable.length) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    });
+
+    window.KiranaSupport = { open, close };
+})();
+
 let map;
 let marker;
 let userLatt = null;
@@ -96,9 +665,9 @@ function goToPage(page) {
     }
 }
 
-function navigateToMenu(resName, address, resId, userId) {
+function navigateToMenu(resName, address, resId, userId, extra = {}) {
     try {
-        sessionStorage.setItem("menuParams", JSON.stringify({ resName, address, resId, userId }));
+        sessionStorage.setItem("menuParams", JSON.stringify({ resName, address, resId, userId, ...extra }));
     } catch (e) {
         console.warn("Could not persist menu params", e);
     }
@@ -197,6 +766,7 @@ function applyStoreStatus(resId, online, opts = {}) {
 
     const card = document.getElementById(resId);
     if (card && card.classList.contains("store-card")) setCardOnline(card, online);
+    KiranaUtils.refreshHeaderPill();
 
     if (activeMenu && activeMenu.resId === resId && document.body.contains(activeMenu.container)) {
         activeMenu.onChange(online, opts);
@@ -543,6 +1113,7 @@ function renderRestaurants(results, containers) {
     if (!results || Object.keys(results).length === 0) {
         display_resturants.innerHTML = "";
         no_results_container.style.display = "block";
+        KiranaUtils.refreshHeaderPill();
         return;
     }
 
@@ -560,23 +1131,7 @@ function renderRestaurants(results, containers) {
         const isFavorite = favorites.has(id);
         const cached = previewItemsCache.get(id);
         const productsMarkup = cached ? productThumbsMarkup(cached) : skeletonThumbs;
-        let distance_km = parseFloat(detail.distance_km);
-        let minutes_per_km = 2.5; // default value
-        if (distance_km < 3) {
-            minutes_per_km = 3.0
-        }
-        else if (distance_km < 7) {
-            minutes_per_km = 2.5
-        }
-        else {
-            minutes_per_km = 2.0
-        }
-
-        let eta = distance_km * minutes_per_km
-        let lower = Math.floor(eta / 5) * 5;
-        let upper = lower + 5;
-
-        let displayEta = `${lower}-${upper}`;
+        const displayEta = KiranaUtils.etaRange(detail.distance_km).label;
 
         // Live status wins over a possibly stale list/cache value.
         const online = storeStatus.has(id) ? storeStatus.get(id) : detail.is_online !== false;
@@ -587,7 +1142,7 @@ function renderRestaurants(results, containers) {
         const hasDelivery = String(detail.delivery_available).toLowerCase() === "true";
 
         return `
-        <div class="store-card${online ? "" : " is-offline"}" id=${escapeHtml(id)} data-type="${escapeHtml(detail.type || "")}" style="--i:${index}">
+        <div class="store-card${online ? "" : " is-offline"}" id="${escapeHtml(id)}" data-type="${escapeHtml(detail.type || "")}" data-distance="${escapeHtml(detail.distance_km)}" data-delivery="${hasDelivery}" data-radius="${escapeHtml(detail.delivery_radius ?? "")}" style="--i:${index}">
             <div class="store-head">
                 <div>
                     <h3 class="store-name resturant_name">${escapeHtml(detail.res_name)}</h3>
@@ -635,6 +1190,7 @@ function renderRestaurants(results, containers) {
         </div>`;
     }).join("");
     display_resturants.innerHTML = html;
+    KiranaUtils.refreshHeaderPill();
 
     // Join the realtime rooms so these cards flip the moment a seller toggles.
     watchStores(Object.keys(results));
@@ -900,7 +1456,12 @@ async function initHomePage() {
             // Routes inside the SPA so the header/map/session state never gets
             // torn down. Offline stores are still browsable; the menu page
             // shows the offline banner and disables ordering.
-            navigateToMenu(name, addresss, res_id, userId);
+            navigateToMenu(name, addresss, res_id, userId, {
+                distanceKm: card.dataset.distance,
+                type: card.dataset.type,
+                delivery: card.dataset.delivery === "true",
+                radius: card.dataset.radius
+            });
         }
     });
 
@@ -1554,6 +2115,8 @@ async function initMenuPage() {
     });
 
     if (loading) loading.style.display = "none";
+
+    KiranaUtils.renderMenuInfo(menuParams, menuItems);
 
     let activeCategoryId = "all";
     let activeSubcategoryId = "all";

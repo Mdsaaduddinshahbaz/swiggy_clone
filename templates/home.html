@@ -64,10 +64,7 @@
                         <span id="currentAddress">Select location</span>
                         <i class="fa-solid fa-chevron-down"></i>
                     </div>
-                    <span class="delivery-pill" id="deliveryEtaPill">
-                        <i class="fa-solid fa-bolt"></i>
-                        18 mins delivery
-                    </span>
+                    <span class="delivery-pill" id="deliveryEtaPill" style="display:none"></span>
                 </div>
 
                 <div class="kirana-cash-badge" id="kiranaCashBadge">
@@ -78,9 +75,14 @@
                     </span>
                 </div>
 
-                <button class="avatar-btn" type="button" aria-label="Profile">
-                    <img src="../static/profile.png" alt="Profile" id="profileLogo">
-                </button>
+                <div class="header-actions">
+                    <button class="help-btn" type="button" aria-label="Help and support" title="Help &amp; support" data-open-support>
+                        <i class="fa-regular fa-circle-question"></i>
+                    </button>
+                    <button class="avatar-btn" type="button" aria-label="Profile">
+                        <img src="../static/profile.png" alt="Profile" id="profileLogo">
+                    </button>
+                </div>
 
             </div>
 
@@ -367,6 +369,33 @@
                         </label>
                     </div>
                 </div>
+                <div class="checkout-card" id="deliveryTimeCard" style="display:none">
+                    <div class="step-header">
+                        <i class="fa-regular fa-clock"></i>
+                        <div>
+                            <h3>Delivery Time</h3>
+                        </div>
+                    </div>
+                    <div class="payment-options order-type-options">
+                        <label class="payment-option">
+                            <input type="radio" name="deliveryMode" value="now" checked>
+                            <span>⚡ Deliver now <small id="deliveryNowEta"></small></span>
+                        </label>
+                        <label class="payment-option">
+                            <input type="radio" name="deliveryMode" value="scheduled">
+                            <span>🗓️ Schedule for later</span>
+                        </label>
+                    </div>
+                    <div class="slot-picker" id="slotPicker" style="display:none">
+                        <div class="slot-day-tabs" id="slotDayTabs">
+                            <button type="button" class="slot-day-tab active" data-day="today">Today</button>
+                            <button type="button" class="slot-day-tab" data-day="tomorrow">Tomorrow</button>
+                        </div>
+                        <div class="slot-grid" id="slotGrid"></div>
+                        <p class="slot-note">Slots are 30-minute delivery windows.</p>
+                    </div>
+                    <p class="slot-error" id="slotError" role="alert"></p>
+                </div>
                 <div class="checkout-card active-step" id="addressCard">
                     <div class="step-header">
                         <i class="fa-solid fa-location-dot"></i>
@@ -446,10 +475,9 @@
                 <div class="cart-right">
                     <div class="order-summary-card">
                         <div class="res-mini-header">
-                            <img src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=50&q=80"
-                                alt="Res">
+                            <span class="res-initial" id="cartStoreInitial" aria-hidden="true">S</span>
                             <div class="res-info">
-                                <h4>Burger King</h4>
+                                <h4 id="cartStoreName">Your order</h4>
                             </div>
                         </div>
                         <div class="cart-items" id="cart_items"></div>
@@ -499,16 +527,7 @@
                     </div>
                 </div>
 
-                <div class="res-delivery-info">
-                    <span>
-                        <i class="fa-solid fa-clock"></i>
-                        25-30 MINS
-                    </span>
-                    <span>
-                        <i class="fa-solid fa-indian-rupee-sign"></i>
-                        ₹350 for two
-                    </span>
-                </div>
+                <div class="res-delivery-info"></div>
 
             </section>
 
@@ -611,6 +630,9 @@
                     </button>
                     <button class="profile-link-btn" id="profileHomeBtn">
                         <i class="fa-solid fa-house"></i> Back to Home
+                    </button>
+                    <button class="profile-link-btn" type="button" data-open-support>
+                        <i class="fa-regular fa-circle-question"></i> Help &amp; Support
                     </button>
                 </div>
             </section>
