@@ -34,13 +34,18 @@ resturants_items = db["resturants_items"]
 owners = db["owners"]
 customers = db["customers"]
 customer_carts = db["customer_carts"]
-orders = db["Orders"]
+# NOTE: the old "Orders" collection is gone. seller_orders is now the single
+# source of truth: one doc per restaurant per checkout, tied together by "checkout_id".
 seller_orders = db["seller_orders"]
 users = db["users"]
 categories = db["categories"]
 MAX_RETRIES = 5
 users.create_index("email", unique=True)
 owners.create_index("email", unique=True)
+# seller_orders is now queried by user (order history), by checkout (cancel) and by restaurant (seller dashboard)
+seller_orders.create_index([("user_id", 1), ("time", 1)])
+seller_orders.create_index([("checkout_id", 1), ("user_id", 1)])
+seller_orders.create_index([("restaurant_id", 1), ("time", -1)])
 
 
 class InventoryError(Exception):
@@ -342,209 +347,19 @@ def generate_token():
         return token
 
 
-def store_orderss(userid):
-    try:
-        start = time.perf_counter()
-        token = generate_token()
-
-        items = get_cart(userid)
-        print("cart", time.perf_counter() - start)
-        print("items=", items)
-        if (items == None or not items.get("cart")):
-            return 404
-
-        seller_docs = []
-        res_ids = []
-        seller_inventory = []
-        current_time = datetime.utcnow()
-        print("items in store_orders", items["cart"])
-        cart = items["cart"]
-        print("cart=", cart)
-        for res_id, data in cart.items():
-            print(res_id, data)
-            seller_doc = {
-                "user_id": userid,
-                "token_no": token,
-                "restaurant_id": res_id,
-                "restaurant_name": data["name"],
-
-                "items": data["items"],
-
-                "status": "placed",
-                "time": current_time
-            }
-            res_ids.append(res_id)
-            for item_id, item in data["items"].items():
-                print(item)
-                seller_inventory.append(
-                    UpdateOne(
-                        {
-                            "_id": ObjectId(item_id),
-                            "available": {"$gte": item["qty"]}
-                        },
-                        {
-                            "$inc": {
-                                "available": -item["qty"],
-                                "sold": item["qty"]
-                            }
-                        }
-                    )
-                )
-
-            seller_docs.append(seller_doc)
-
-        for attempt in range(MAX_RETRIES):
-            try:
-                start_trasac = time.perf_counter()
-                with client.start_session() as session:
-                    with session.start_transaction():
-
-                        result = orders.insert_one({"user_id": userid, "token_no": token, "status": "placed", "items": items, "time": current_time}, session=session)
-                        parent_id = result.inserted_id
-
-                        for doc in seller_docs:
-                            doc["parent_order_id"] = str(parent_id)
-                        if seller_docs:
-                            seller_orders.insert_many(seller_docs, session=session)
-
-                        if seller_inventory:
-                            result = resturants_items.bulk_write(seller_inventory, session=session)
-                        start = time.perf_counter()
-                        delete_cart(userid, session=session)
-                        print("delete", time.perf_counter() - start)
-                        print("Order stored successfully")
-                print("txn", time.perf_counter() - start_trasac)
-                return res_ids
-            except OperationFailure as e:
-
-                if "TransientTransactionError" in e.details.get("errorLabels", []):
-
-                    print(f"Retrying transaction ({attempt+1})")
-
-                    time.sleep(0.05)
-
-                    continue
-
-                raise
-    except Exception as e:
-        print(e)
-        return False
-
-
-def store_ordersss(userid):
-
-    token = generate_token()
-
-    items = get_cart(userid)
-
-    if not items or not items.get("cart"):
-        return 404
-
-    current_time = datetime.utcnow()
-
-    seller_docs = []
-    inventory_updates = []
-    restaurant_ids = []
-
-    for restaurant_id, restaurant in items["cart"].items():
-
-        restaurant_ids.append(restaurant_id)
-
-        seller_docs.append({
-            "user_id": userid,
-            "token_no": token,
-            "restaurant_id": restaurant_id,
-            "restaurant_name": restaurant["name"],
-            "items": restaurant["items"],
-            "status": "placed",
-            "time": current_time
-        })
-
-        for item_id, item in restaurant["items"].items():
-
-            inventory_updates.append(
-                UpdateOne(
-                    {
-                        "_id": ObjectId(item_id),
-                        "available": {"$gte": item["qty"]}
-                    },
-                    {
-                        "$inc": {
-                            "available": -item["qty"],
-                            "sold": item["qty"]
-                        }
-                    }
-                )
-            )
-
-    for attempt in range(MAX_RETRIES):
-
-        try:
-
-            with client.start_session() as session:
-
-                with session.start_transaction():
-
-                    t = time.perf_counter()
-
-                    result = orders.insert_one(
-                        {
-                            "user_id": userid,
-                            "token_no": token,
-                            "status": "placed",
-                            "items": items,
-                            "time": current_time
-                        },
-                        session=session
-                    )
-
-                    print("order insert", time.perf_counter() - t)
-
-                    parent = str(result.inserted_id)
-
-                    for doc in seller_docs:
-                        doc["parent_order_id"] = parent
-
-                    t = time.perf_counter()
-
-                    if seller_docs:
-                        seller_orders.insert_many(
-                            seller_docs,
-                            session=session
-                        )
-
-                    print("seller insert", time.perf_counter() - t)
-
-                    t = time.perf_counter()
-
-                    if inventory_updates:
-                        inventory_result = resturants_items.bulk_write(
-                            inventory_updates,
-                            session=session
-                        )
-
-                    print("inventory", time.perf_counter() - t)
-
-            t = time.perf_counter()
-
-            delete_cart(userid)
-
-            print("delete cart", time.perf_counter() - t)
-
-            return restaurant_ids
-
-        except OperationFailure as e:
-
-            if "TransientTransactionError" in e.details.get("errorLabels", []):
-
-                time.sleep(0.05)
-
-                continue
-
-            raise
-
-    return False
-
+# =========================================================
+# Orders (seller_orders is the single source of truth)
+#
+# One seller_orders doc per restaurant per checkout. All docs created by the
+# same checkout share the same "checkout_id" - that is what the customer sees
+# as "an order" (it replaces the old parent doc in the Orders collection).
+#
+#   {
+#     _id, checkout_id, user_id, token_no,
+#     restaurant_id, restaurant_name, items,
+#     status, time, pickup_time, order_type, delivery_address
+#   }
+# =========================================================
 
 def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None):
     token = generate_token()
@@ -592,6 +407,9 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
         }
 
     current_time = datetime.utcnow()
+    # Shared by every seller doc of this checkout; replaces the old parent order _id.
+    # Generated once, outside the retry loop, so a retried transaction reuses it.
+    checkout_id = str(ObjectId())
     seller_docs = []
     inventory_updates = []
     restaurant_ids = []
@@ -636,6 +454,7 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
             )
 
         seller_docs.append({
+            "checkout_id": checkout_id,
             "user_id": userid,
             "token_no": token,
             "restaurant_id": restaurant_id,
@@ -655,29 +474,6 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
             with client.start_session() as session:
 
                 with session.start_transaction():
-
-                    t = time.perf_counter()
-
-                    result = orders.insert_one(
-                        {
-                            "user_id": userid,
-                            "token_no": token,
-                            "status": "placed",
-                            "items": items,
-                            "time": current_time,
-                            "pickup_time": pickup_time,
-                            "order_type": order_type,
-                            "delivery_address": delivery_address
-                        },
-                        session=session
-                    )
-
-                    print("order insert", time.perf_counter() - t)
-
-                    parent = str(result.inserted_id)
-
-                    for doc in seller_docs:
-                        doc["parent_order_id"] = parent
 
                     t = time.perf_counter()
 
@@ -722,6 +518,10 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
 
                 time.sleep(0.05)
 
+                # insert_many may have mutated the dicts with an _id; strip it so the retry is clean
+                for doc in seller_docs:
+                    doc.pop("_id", None)
+
                 continue
 
             raise
@@ -729,22 +529,58 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
     return False
 
 
-def get_orders(userid):
-    final_orders = []
-    orderss = orders.find({"user_id": userid})
-    for order in orderss:
-        data = {
-            "order_id": str(order["_id"]),
-            "token_no": order["token_no"],
-            "resturants": order["items"],
-            "status": order["status"],
-            "date": order["time"],
-            "pickup_time": order.get("pickup_time"),
-            "order_type": order.get("order_type", "pickup"),
-            "delivery_address": order.get("delivery_address")
-        }
+def _combined_status(statuses):
+    """
+    A checkout can span several restaurants and each restaurant has its own status.
+    Collapse them into one status for the customer's order list:
+      all same            -> that status
+      any still "placed"  -> "placed"
+      otherwise (mix of completed + canceled) -> "completed"
+    """
+    unique = set(statuses)
+    if len(unique) == 1:
+        return statuses[0]
+    if "placed" in unique:
+        return "placed"
+    return "completed"
 
-        final_orders.append(data)
+
+def get_orders(userid):
+    """
+    Customer order history, rebuilt from seller_orders by grouping on checkout_id.
+    Same shape as before: one entry per checkout, "resturants" holds the per-restaurant items.
+    """
+    groups = {}
+    for doc in seller_orders.find({"user_id": userid}).sort("time", 1):
+        key = doc.get("checkout_id") or str(doc["_id"])   # fallback for un-migrated docs
+
+        group = groups.get(key)
+        if group is None:
+            group = {
+                "order_id": key,
+                "token_no": doc.get("token_no"),
+                "resturants": {"cart": {}},
+                "statuses": [],
+                "date": doc.get("time"),
+                "pickup_time": doc.get("pickup_time"),
+                "order_type": doc.get("order_type", "pickup"),
+                "delivery_address": doc.get("delivery_address")
+            }
+            groups[key] = group
+
+        group["resturants"]["cart"][doc["restaurant_id"]] = {
+            "name": doc.get("restaurant_name"),
+            "items": doc.get("items", {}),
+            # extra per-restaurant info (safe to ignore on the client)
+            "status": doc.get("status"),
+            "seller_order_id": str(doc["_id"])
+        }
+        group["statuses"].append(doc.get("status", "placed"))
+
+    final_orders = []
+    for group in groups.values():
+        group["status"] = _combined_status(group.pop("statuses"))
+        final_orders.append(group)
     return final_orders
 
 
@@ -841,49 +677,43 @@ def check_existing_owner(email, password):
 
 
 def update_order_status_seller(order_id, status, userid, res_id):
-    with client.start_session() as session:
-        with session.start_transaction():
-            updated_seller_doc = seller_orders.find_one_and_update(
-                {"_id": ObjectId(order_id),
-                 "restaurant_id": res_id},
-                {"$set": {"status": status}},
-                session=session,
-                return_document=ReturnDocument.AFTER
-            )
-            if not updated_seller_doc:
-                return ({"success": False, "message": "Order not found or unauthorized"})
-            if updated_seller_doc:
-                # Grab the parent_id stored at order time
-                parent_id = updated_seller_doc.get("parent_order_id")
-                parent_result = None
+    """
+    order_id is the seller_orders _id. A seller only changes THEIR restaurant's part
+    of a checkout; the customer-facing status is derived in get_orders().
+    """
+    try:
+        updated_seller_doc = seller_orders.find_one_and_update(
+            {"_id": ObjectId(order_id),
+             "restaurant_id": res_id},
+            {"$set": {"status": status}},
+            return_document=ReturnDocument.AFTER
+        )
+    except Exception:
+        return {"success": False, "message": "Order not found or unauthorized"}
 
-                # Update the main order using that specific ID
-                if parent_id:
-                    parent_result = orders.find_one_and_update(
-                        {
-                            "_id": ObjectId(parent_id),
-                            "user_id": updated_seller_doc["user_id"]
-                        },
-                        {"$set": {"status": status}},
-                        session=session
-                    )
-                if not parent_result:
-                    return {"success": False, "message": "Parent order not found"}
-                return ({"success": True})
+    if not updated_seller_doc:
+        return {"success": False, "message": "Order not found or unauthorized"}
+    return {"success": True}
 
 
 def update_order_status_user(order_id, status, userid):
+    """
+    order_id is the checkout_id (what get_orders() returns as "order_id").
+    Updates every restaurant's part of that checkout, scoped to this user.
+    """
     with client.start_session() as session:
         with session.start_transaction():
-
-            updated_order = orders.find_one_and_update({"_id": ObjectId(order_id), "user_id": userid}, {"$set": {"status": status}}, session=session, return_document=ReturnDocument.AFTER)
-            if not updated_order:
+            result = seller_orders.update_many(
+                {"checkout_id": order_id, "user_id": userid},
+                {"$set": {"status": status}},
+                session=session
+            )
+            if result.matched_count == 0:
                 return {
                     "success": False,
                     "message": "Order not found or unauthorized"
                 }
-            seller_orders.update_many({"parent_order_id": str(updated_order["_id"])}, {"$set": {"status": status}}, session=session)
-            return ({"success": True})
+            return {"success": True}
 
 
 def resturant_stats(res_id):
@@ -1232,6 +1062,7 @@ def serialize_address(addr):
     out["_id"] = str(out["_id"])
     return out
 
+
 def update_address(address_id, user_id, address, adrs_type, phone=None, coordinates=None):
     """Update one saved address, scoped to this user."""
     try:
@@ -1270,6 +1101,8 @@ def update_address(address_id, user_id, address, adrs_type, phone=None, coordina
         return {"success": False, "message": "Address not found"}
 
     return {"success": True, "address": updated_address}
+
+
 def save_address(address, type, uid, cordinates, phone=None):
     user = users.find_one(ObjectId(uid))
     if user:
@@ -1377,3 +1210,140 @@ def save_category(res_id, category, subcats):
             "success": False,
             "error": str(e)
         }
+
+def edit_seller_order_items(order_id, res_id, new_qtys):
+    """
+    Seller trims an order he can't fully serve.
+    new_qtys = { item_id: new_qty }. Rules:
+      - order must belong to this restaurant and still be "placed"
+      - 0 <= new_qty <= ordered qty (reduce / remove only)
+      - at least one item must remain
+    Stock removed from the order is given back (item_qty += diff, sold -= diff),
+    the exact reverse of store_orders(). Everything runs in one transaction.
+    """
+    try:
+        oid = ObjectId(order_id)
+    except Exception:
+        return {"success": False, "message": "Invalid order id", "status": 400}
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            with client.start_session() as session:
+                with session.start_transaction():
+                    order = seller_orders.find_one(
+                        {"_id": oid, "restaurant_id": res_id}, session=session
+                    )
+                    if not order:
+                        return {"success": False, "message": "Order not found", "status": 404}
+                    if order.get("status") != "placed":
+                        return {"success": False, "message": "Only pending orders can be edited", "status": 409}
+
+                    old_items = order.get("items", {}) or {}
+
+                    for item_id in new_qtys:
+                        if item_id not in old_items:
+                            return {"success": False, "message": "Unknown item in order", "status": 400}
+
+                    updated_items = {}
+                    inventory_ops = []
+                    changed = False
+
+                    for item_id, item in old_items.items():
+                        old_qty = int(item.get("qty", 0))
+                        new_qty = new_qtys.get(item_id, old_qty)
+
+                        if new_qty < 0 or new_qty > old_qty:
+                            return {"success": False,
+                                    "message": f"You can only reduce quantities ({item.get('name', 'item')})",
+                                    "status": 400}
+
+                        diff = old_qty - new_qty
+                        if diff > 0:
+                            changed = True
+                            inventory_ops.append(UpdateOne(
+                                {"_id": ObjectId(item_id)},
+                                {"$inc": {"item_qty": diff, "sold": -diff}}
+                            ))
+                        if new_qty > 0:
+                            kept = dict(item)
+                            kept["qty"] = new_qty
+                            updated_items[item_id] = kept
+
+                    if not updated_items:
+                        return {"success": False,
+                                "message": "At least one item must remain. Cancel the order instead.",
+                                "status": 400}
+
+                    if changed:
+                        set_fields = {
+                            "items": updated_items,
+                            "edited": True,
+                            "edited_at": datetime.utcnow()
+                        }
+                        # keep the customer's original order for the first edit only
+                        if "original_items" not in order:
+                            set_fields["original_items"] = old_items
+
+                        seller_orders.update_one(
+                            {"_id": oid, "status": "placed"},
+                            {"$set": set_fields},
+                            session=session
+                        )
+                        if inventory_ops:
+                            resturants_items.bulk_write(inventory_ops, session=session)
+
+            total = sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in updated_items.values())
+            return {
+                "success": True,
+                "changed": changed,
+                "user_id": order["user_id"],
+                "token_no": order.get("token_no"),
+                "items": updated_items,
+                "total": total
+            }
+
+        except OperationFailure as e:
+            if "TransientTransactionError" in (e.details or {}).get("errorLabels", []):
+                time.sleep(0.05)
+                continue
+            raise
+
+    return {"success": False, "message": "Please try again", "status": 500}
+# =========================================================
+# ONE-TIME MIGRATION (run manually, NOT at import)
+#
+# Moves data from the old Orders collection into seller_orders:
+#   - parent_order_id  -> checkout_id (same value, so order ids the app already
+#                         knows keep working)
+#   - pickup_time / order_type / delivery_address copied over if the seller doc lacks them
+#
+# Usage:  python -c "import mydatabase; print(mydatabase.migrate_orders_to_seller_orders())"
+# Afterwards, once you've checked the app, you can drop the old collection:
+#   db["Orders"].drop()
+# =========================================================
+
+# def migrate_orders_to_seller_orders():
+#     legacy_orders = db["Orders"]
+#     migrated = 0
+
+#     for doc in seller_orders.find({"checkout_id": {"$exists": False}}):
+#         parent_id = doc.get("parent_order_id")
+#         updates = {"checkout_id": parent_id or str(doc["_id"])}
+
+#         parent = None
+#         if parent_id:
+#             try:
+#                 parent = legacy_orders.find_one({"_id": ObjectId(parent_id)})
+#             except Exception:
+#                 parent = None
+
+#         if parent:
+#             for field in ("pickup_time", "order_type", "delivery_address"):
+#                 if field not in doc and field in parent:
+#                     updates[field] = parent[field]
+
+#         seller_orders.update_one({"_id": doc["_id"]}, {"$set": updates})
+#         migrated += 1
+
+#     return migrated
+# migrate_orders_to_seller_orders()

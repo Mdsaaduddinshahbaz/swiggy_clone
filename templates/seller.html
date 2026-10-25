@@ -474,6 +474,27 @@ Pulses
       <div style="margin-bottom: 40px;"></div>
     </div>
 
+    <!-- ================= Edit Order Items ================= -->
+    <div class="ed-backdrop" id="edBackdrop"></div>
+    <div class="ed-sheet" id="edSheet" role="dialog" aria-label="Edit order items">
+      <div class="ed-handle"></div>
+      <div class="ed-head">
+        <div>
+          <div class="ed-title">Edit order items</div>
+          <div class="ed-sub" id="edSub"></div>
+        </div>
+        <button type="button" class="ed-close" id="edClose" aria-label="Close">✕</button>
+      </div>
+      <div class="ed-note">Reduce or remove items you don't have. Stock is restored and the customer sees the updated
+        order.</div>
+      <div class="ed-list" id="edList"></div>
+      <div class="ed-foot">
+        <div class="ed-total"><span>New total</span><span id="edTotal">₹0</span></div>
+        <div class="ed-error" id="edError"></div>
+        <button type="button" class="ed-save" id="edSave">Save changes</button>
+        <button type="button" class="ed-cancel" id="edCancel">Cancel</button>
+      </div>
+    </div>
     <!-- ================= FLOATING BOTTOM NAV (single copy) ================= -->
     <div class="floating-nav">
       <button class="nav-btn {% if page == 'dashboard' %}active{% endif %}" id="DashboardsBtn" data-view="dashboard">
@@ -491,6 +512,7 @@ Pulses
         <span>Orders</span>
       </button>
     </div>
+
   </main>
 
   <!-- ================= SCRIPTS ================= -->

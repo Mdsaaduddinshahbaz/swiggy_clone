@@ -2007,7 +2007,7 @@ function applyFilter() {
         if (show) {
             hasVisibleCards = true;
         }
-        const buttons = card.querySelectorAll(".statusBtn");
+        const buttons = card.querySelectorAll(".statusBtn, .editOrderBtn");
 
         buttons.forEach(btn => {
             const enable = selected === "placed";
@@ -2278,12 +2278,13 @@ async function loadOrders() {
                         ${escapeSellerHtml(order.status)}
                     </span>
                 </div>
-                <div class="token-no">Token No: ${escapeSellerHtml(order.token_no)}</div>
+                                <div class="token-no">Token No: ${escapeSellerHtml(order.token_no)}${order.edited ? '<span class="edited-tag">Edited</span>' : ''}</div>
                 <div class="order-date">${escapeSellerHtml(order.time)}</div>
                 <div class="order-date">Pickup Time: ${escapeSellerHtml(order.pickup_time)}</div>
                 ${restaurantsHTML}
 
                 <div class="total">Total: ₹${total}</div>
+                 <button class="editOrderBtn" data-order-id="${escapeSellerHtml(order.order_id)}">✎ Edit items</button>
                 <button class="completeBtn statusBtn" style="
                     background: green;
                     color: white;
@@ -2366,7 +2367,157 @@ document.addEventListener("click", async (e) => {
         user_id: card.getAttribute("user_id")
     }, isComplete ? "completed" : "canceled");
 });
+/* =====================================================================
+   EDIT ORDER ITEMS
+   Seller can reduce / remove items he doesn't have, then Save ->
+   POST /seller/edit_order. Server restores stock and notifies the customer.
+===================================================================== */
+const edSheet = document.getElementById("edSheet");
+const edBackdrop = document.getElementById("edBackdrop");
+const edList = document.getElementById("edList");
+const edSave = document.getElementById("edSave");
 
+const edit = { order: null, orig: {}, qtys: {}, saving: false, error: "" };
+
+function edOpen() { return edSheet.classList.contains("show"); }
+
+function openEditOrder(orderId) {
+    const order = sellerOrders.find(o => String(o.order_id) === String(orderId));
+    if (!order || order.status !== "placed") return;
+
+    edit.order = order;
+    edit.orig = order.items || {};
+    edit.qtys = {};
+    edit.saving = false;
+    edit.error = "";
+    Object.entries(edit.orig).forEach(([id, it]) => { edit.qtys[id] = Number(it.qty) || 0; });
+
+    renderEditSheet();
+    edBackdrop.classList.add("show");
+    edSheet.classList.add("show");
+    document.body.style.overflow = "hidden";
+}
+
+function closeEditSheet() {
+    edSheet.classList.remove("show");
+    edBackdrop.classList.remove("show");
+    document.body.style.overflow = "";
+    edit.order = null;
+}
+
+function editHasChanges() {
+    return Object.keys(edit.orig).some(id => edit.qtys[id] !== Number(edit.orig[id].qty));
+}
+
+function renderEditSheet() {
+    const o = edit.order;
+    if (!o) return;
+
+    document.getElementById("edSub").textContent = `Token ${o.token_no} · Order #${o.order_id}`;
+
+    let total = 0;
+    let kept = 0;
+
+    edList.innerHTML = Object.entries(edit.orig).map(([id, it]) => {
+        const orig = Number(it.qty) || 0;
+        const q = edit.qtys[id];
+        const price = Number(it.price) || 0;
+        total += price * q;
+        if (q > 0) kept++;
+
+        const right = q === 0
+            ? `<button type="button" class="ed-undo" data-act="undo" data-id="${escapeSellerHtml(id)}">Undo</button>`
+            : `<div class="ed-step">
+                   <button type="button" data-act="dec" data-id="${escapeSellerHtml(id)}" aria-label="Decrease">−</button>
+                   <span>${q}</span>
+                   <button type="button" data-act="inc" data-id="${escapeSellerHtml(id)}" aria-label="Increase" ${q >= orig ? "disabled" : ""}>+</button>
+               </div>
+               <button type="button" class="ed-del" data-act="remove" data-id="${escapeSellerHtml(id)}" aria-label="Remove item">🗑</button>`;
+
+        return `
+            <div class="ed-row ${q === 0 ? "removed" : ""}">
+                <div class="ed-info">
+                    <div class="ed-name">${escapeSellerHtml(it.name)}</div>
+                    <div class="ed-price">₹${price} each${q !== orig ? ` · ordered ${orig}` : ""}</div>
+                </div>
+                ${right}
+            </div>`;
+    }).join("");
+
+    document.getElementById("edTotal").textContent = "₹" + total.toLocaleString("en-IN");
+
+    const err = document.getElementById("edError");
+    err.textContent = edit.error ||
+        (kept === 0 ? "At least one item must remain. To drop the whole order, cancel it instead." : "");
+
+    edSave.disabled = edit.saving || kept === 0 || !editHasChanges();
+    edSave.textContent = edit.saving ? "Saving…" : "Save changes";
+}
+
+edList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn || edit.saving) return;
+    const id = btn.dataset.id;
+    const orig = Number(edit.orig[id]?.qty) || 0;
+
+    if (btn.dataset.act === "dec") edit.qtys[id] = Math.max(0, edit.qtys[id] - 1);
+    else if (btn.dataset.act === "inc") edit.qtys[id] = Math.min(orig, edit.qtys[id] + 1);
+    else if (btn.dataset.act === "remove") edit.qtys[id] = 0;
+    else if (btn.dataset.act === "undo") edit.qtys[id] = orig;
+
+    edit.error = "";
+    renderEditSheet();
+});
+
+async function saveEditedOrder() {
+    if (edit.saving || !edit.order) return;
+    edit.saving = true;
+    edit.error = "";
+    renderEditSheet();
+
+    try {
+        const res = await fetch("/seller/edit_order", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order_id: edit.order.order_id, items: edit.qtys })
+        });
+
+        if (res.status === 401) {
+            alert("unauthorized,Please Log in");
+            window.location.href = "/login/seller";
+            return;
+        }
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) {
+            throw new Error((data && data.message) || "Couldn't save changes");
+        }
+
+        closeEditSheet();
+        await loadOrders();      // card re-renders with the new items/total + "Edited" tag
+    } catch (err) {
+        console.error("edit order failed", err);
+        edit.error = err.message || "Couldn't save changes. Please try again.";
+        // order may have been cancelled meanwhile -> refresh list in the background
+        loadOrders().catch(() => { });
+    } finally {
+        edit.saving = false;
+        if (edOpen()) renderEditSheet();
+    }
+}
+
+edSave.addEventListener("click", saveEditedOrder);
+document.getElementById("edClose").addEventListener("click", closeEditSheet);
+document.getElementById("edCancel").addEventListener("click", closeEditSheet);
+edBackdrop.addEventListener("click", closeEditSheet);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && edOpen()) closeEditSheet(); });
+
+// "Edit items" button on an order card
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".editOrderBtn");
+    if (btn) openEditOrder(btn.dataset.orderId);
+});
 // ===============================================================
 // QR SCANNER  (full-screen in-app camera, square scan frame in the centre)
 // Renamed from scanner/openScanner/closeScanner/stopCamera so it can't

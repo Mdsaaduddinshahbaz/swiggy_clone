@@ -1,4 +1,4 @@
-from database import fetch_profiles, get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
+from database import fetch_profiles,edit_seller_order_items, get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
 from flask import Flask, request, render_template, redirect, url_for, jsonify, g, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, get_cart_restaurant
@@ -401,7 +401,50 @@ def remove_item():
         print(e)
         return ({"success": False})
 
+@app.post("/seller/edit_order")
+@login_required
+def edit_order():
 
+    if g.type != "seller":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
+    items = data.get("items")
+
+    if not order_id or not isinstance(items, dict) or not items:
+        return jsonify({"success": False, "message": "order_id and items are required"}), 400
+
+    clean = {}
+    for item_id, qty in items.items():
+        if isinstance(qty, bool) or not isinstance(qty, int) or qty < 0:
+            return jsonify({"success": False, "message": "Quantities must be whole numbers, 0 or more"}), 400
+        clean[str(item_id)] = qty
+
+    try:
+        result = edit_seller_order_items(str(order_id), g.res_id, clean)
+    except Exception as e:
+        print("edit_order error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+
+    if not result["success"]:
+        return jsonify({"success": False, "message": result["message"]}), result.get("status", 400)
+
+    if result["changed"]:
+        # tell the customer their order was changed (listen for this on the user pages)
+        socketio.emit(
+            "order_items_updated",
+            {
+                "order_id": str(order_id),
+                "token_no": result["token_no"],
+                "res_id": g.res_id,
+                "items": result["items"],
+                "total": result["total"]
+            },
+            room=result["user_id"]
+        )
+
+    return jsonify({"success": True, "items": result["items"], "total": result["total"]})
 @app.post("/list_resturants")
 @login_required
 def list_resturantss():
