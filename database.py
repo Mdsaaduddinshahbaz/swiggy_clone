@@ -31,6 +31,8 @@ except Exception as e:
 db = client["restaurants"]
 restaurants_name = db["restaurants_name"]
 resturants_items = db["resturants_items"]
+offers = db["offers"]
+seller_payouts = db["seller_payouts"]
 owners = db["owners"]
 customers = db["customers"]
 customer_carts = db["customer_carts"]
@@ -46,6 +48,8 @@ owners.create_index("email", unique=True)
 seller_orders.create_index([("user_id", 1), ("time", 1)])
 seller_orders.create_index([("checkout_id", 1), ("user_id", 1)])
 seller_orders.create_index([("restaurant_id", 1), ("time", -1)])
+offers.create_index([("restaurant_id", 1), ("code", 1)], unique=True)
+seller_payouts.create_index([("restaurant_id", 1), ("date", -1)])
 
 
 class InventoryError(Exception):
@@ -589,18 +593,19 @@ def store_seller_orders(res_id, items, userid):
 
 
 def get_seller_ordes(res_id):
-    print(res_id)
-    orders = seller_orders.find({"restaurant_id": res_id})
+    orders = seller_orders.find({"restaurant_id": res_id}).sort("time", -1)
     final_orders = []
-    print("seller_orders=", orders)
     for order in orders:
+        t = order["time"]
         data = {
             "order_id": str(order["_id"]),
             "token_no": order["token_no"],
             "user_id": order['user_id'],
             "items": order["items"],
             "status": order["status"],
-            "time": order["time"],
+            "time": t,
+            "created_at": t.isoformat() if isinstance(t, datetime) else None,
+            "edited": bool(order.get("edited", False)),
             "pickup_time": order.get("pickup_time"),
             "order_type": order.get("order_type", "pickup"),
             "delivery_address": order.get("delivery_address")
@@ -1309,41 +1314,175 @@ def edit_seller_order_items(order_id, res_id, new_qtys):
             raise
 
     return {"success": False, "message": "Please try again", "status": 500}
+
 # =========================================================
-# ONE-TIME MIGRATION (run manually, NOT at import)
-#
-# Moves data from the old Orders collection into seller_orders:
-#   - parent_order_id  -> checkout_id (same value, so order ids the app already
-#                         knows keep working)
-#   - pickup_time / order_type / delivery_address copied over if the seller doc lacks them
-#
-# Usage:  python -c "import mydatabase; print(mydatabase.migrate_orders_to_seller_orders())"
-# Afterwards, once you've checked the app, you can drop the old collection:
-#   db["Orders"].drop()
+# Store settings (stored on the restaurant document)
 # =========================================================
 
-# def migrate_orders_to_seller_orders():
-#     legacy_orders = db["Orders"]
-#     migrated = 0
+def get_store_settings(res_id):
+    try:
+        doc = restaurants_name.find_one({"_id": ObjectId(res_id)})
+    except Exception:
+        return None
+    if not doc:
+        return None
+    return {
+        "store_name": doc.get("name", ""),
+        "phone": doc.get("phone_no", ""),
+        "address": doc.get("address", ""),
+        "opens": doc.get("opens", ""),
+        "closes": doc.get("closes", ""),
+        "prep_time": doc.get("prep_time", ""),
+        "min_order": doc.get("min_order", ""),
+    }
 
-#     for doc in seller_orders.find({"checkout_id": {"$exists": False}}):
-#         parent_id = doc.get("parent_order_id")
-#         updates = {"checkout_id": parent_id or str(doc["_id"])}
 
-#         parent = None
-#         if parent_id:
-#             try:
-#                 parent = legacy_orders.find_one({"_id": ObjectId(parent_id)})
-#             except Exception:
-#                 parent = None
+def update_store_settings(res_id, s):
+    """s is already validated by the server."""
+    try:
+        result = restaurants_name.update_one(
+            {"_id": ObjectId(res_id)},
+            {"$set": {
+                "name": s["store_name"],
+                "phone_no": s["phone"],
+                "address": s["address"],
+                "opens": s["opens"],
+                "closes": s["closes"],
+                "prep_time": s["prep_time"],
+                "min_order": s["min_order"],
+            }}
+        )
+    except Exception:
+        return False
+    if result.matched_count == 0:
+        return False
+    # keep the owner record's copy of the name in sync
+    owners.update_one({"resturant_id": res_id}, {"$set": {"restaurant_name": s["store_name"]}})
+    return True
 
-#         if parent:
-#             for field in ("pickup_time", "order_type", "delivery_address"):
-#                 if field not in doc and field in parent:
-#                     updates[field] = parent[field]
 
-#         seller_orders.update_one({"_id": doc["_id"]}, {"$set": updates})
-#         migrated += 1
+# =========================================================
+# Offers & coupons
+#   { restaurant_id, code, type: "percent"|"flat", value, min_order,
+#     expires: "YYYY-MM-DD" | None, active, created_at }
+# =========================================================
 
-#     return migrated
-# migrate_orders_to_seller_orders()
+def _offer_out(d):
+    return {
+        "id": str(d["_id"]),
+        "code": d["code"],
+        "type": d["type"],
+        "value": d["value"],
+        "min_order": d.get("min_order", 0),
+        "expires": d.get("expires"),
+        "active": bool(d.get("active", True)),
+    }
+
+
+def list_offers(res_id):
+    return [_offer_out(d) for d in offers.find({"restaurant_id": res_id}).sort("created_at", -1)]
+
+
+def save_offer(res_id, offer_id, fields):
+    """offer_id None -> create, otherwise update (scoped to this restaurant)."""
+    try:
+        if offer_id:
+            doc = offers.find_one_and_update(
+                {"_id": ObjectId(offer_id), "restaurant_id": res_id},
+                {"$set": fields},
+                return_document=ReturnDocument.AFTER
+            )
+            if not doc:
+                return {"success": False, "message": "Offer not found", "status": 404}
+        else:
+            new_doc = dict(fields, restaurant_id=res_id, created_at=datetime.utcnow())
+            offers.insert_one(new_doc)
+            doc = new_doc
+        return {"success": True, "offer": _offer_out(doc)}
+    except DuplicateKeyError:
+        return {"success": False, "message": "You already have an offer with this code", "status": 409}
+    except Exception as e:
+        print("save_offer error:", e)
+        return {"success": False, "message": "Invalid offer", "status": 400}
+
+
+def delete_offer(res_id, offer_id):
+    try:
+        result = offers.delete_one({"_id": ObjectId(offer_id), "restaurant_id": res_id})
+    except Exception:
+        return False
+    return result.deleted_count == 1
+
+
+def validate_coupon(res_id, code, subtotal):
+    """
+    Customer side: check a code against a server-computed subtotal.
+    Returns {"success": True, "discount": x, "total": y, ...} or {"success": False, "message": ...}
+    """
+    offer = offers.find_one({"restaurant_id": res_id, "code": str(code).strip().upper()})
+    if not offer or not offer.get("active", True):
+        return {"success": False, "message": "Invalid coupon code"}
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    if offer.get("expires") and offer["expires"] < today:
+        return {"success": False, "message": "This coupon has expired"}
+
+    min_order = offer.get("min_order", 0) or 0
+    if subtotal < min_order:
+        return {"success": False, "message": f"Add items worth ₹{min_order} or more to use this coupon"}
+
+    if offer["type"] == "percent":
+        discount = round(subtotal * offer["value"] / 100, 2)
+    else:
+        discount = min(float(offer["value"]), float(subtotal))
+
+    return {
+        "success": True,
+        "code": offer["code"],
+        "discount": discount,
+        "total": round(subtotal - discount, 2),
+    }
+
+
+# =========================================================
+# Payouts
+#   Earnings = completed orders (price snapshot stored on each order line).
+#   seller_payouts docs are created by YOU (admin / script) when you pay a
+#   seller: create_payout(res_id, amount). Pending balance = earnings - payouts.
+# =========================================================
+
+def _lifetime_earnings(res_id):
+    pipeline = [
+        {"$match": {"restaurant_id": res_id, "status": "completed"}},
+        {"$project": {"i": {"$objectToArray": "$items"}}},
+        {"$unwind": "$i"},
+        {"$group": {"_id": None, "total": {"$sum": {"$multiply": ["$i.v.price", "$i.v.qty"]}}}},
+    ]
+    rows = list(seller_orders.aggregate(pipeline))
+    return float(rows[0]["total"]) if rows else 0.0
+
+
+def get_payout_summary(res_id):
+    docs = list(seller_payouts.find({"restaurant_id": res_id}).sort("date", -1))
+    paid_out = sum(float(d.get("amount", 0)) for d in docs if d.get("status") in ("pending", "paid"))
+    balance = max(_lifetime_earnings(res_id) - paid_out, 0)
+    return {
+        "balance": round(balance, 2),
+        "payouts": [{
+            "id": d.get("ref") or str(d["_id"])[-8:].upper(),
+            "date": d["date"].strftime("%d %b %Y"),
+            "amount": d.get("amount", 0),
+            "status": d.get("status", "pending"),
+        } for d in docs],
+    }
+
+
+def create_payout(res_id, amount, status="pending"):
+    """Admin helper, e.g.  python -c "import database; database.create_payout('<res_id>', 1500, 'paid')" """
+    seller_payouts.insert_one({
+        "restaurant_id": res_id,
+        "ref": "PO-" + uuid.uuid4().hex[:8].upper(),
+        "amount": amount,
+        "status": status,
+        "date": datetime.utcnow(),
+    })

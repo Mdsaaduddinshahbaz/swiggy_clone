@@ -3055,3 +3055,453 @@ loadOrders();
 // otherwise keep the one Flask marked active via `page`.
 const hashView = location.hash.slice(1);
 if (VIEWS.includes(hashView)) showView(hashView, false);
+
+/* =====================================================================
+   7. EXTRA PAGES — Customers, Sales Report, Analytics, Payouts,
+      Offers & Coupons, Settings
+===================================================================== */
+(function () {
+    const H = escapeSellerHtml;
+    const money = n => "₹" + Math.round(Number(n) || 0).toLocaleString("en-IN");
+    const $ = (s, r = document) => r.querySelector(s);
+    const DAY = 864e5;
+
+    /* ---------------- helpers ---------------- */
+    function toast(msg, kind) {
+        let el = document.getElementById("sdToast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "sdToast"; el.className = "sd-toast";
+            document.body.appendChild(el);
+        }
+        el.textContent = msg;
+        el.dataset.kind = kind || "info";
+        el.classList.add("show");
+        clearTimeout(toast.t);
+        toast.t = setTimeout(() => el.classList.remove("show"), 3000);
+    }
+
+    async function api(url, body) {
+        const opts = { credentials: "same-origin", headers: { "Content-Type": "application/json" } };
+        if (body !== undefined) { opts.method = "POST"; opts.body = JSON.stringify(body); }
+        const res = await fetch(url, opts);
+        if (res.status === 401) {
+            alert("unauthorized,Please Log in");
+            window.location.href = "/login/seller";
+            throw new Error("unauthorized");
+        }
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) {
+            throw new Error((data && data.message) || `Request failed (${res.status})`);
+        }
+        return data;
+    }
+
+    function downloadCSV(name, rows) {
+        const csv = rows.map(r => r.map(c => {
+            const s = String(c ?? "");
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }).join(",")).join("\n");
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
+        a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    // ----- order accessors (tolerant of the payload shape) -----
+    const allOrders = () => sellerOrders || [];
+    const oItems = o => Object.values(o.items || {}).filter(i => Number(i.qty) > 0);
+    function oTotal(o) {
+        if (o.total_amount != null && !isNaN(o.total_amount)) return Number(o.total_amount);
+        return oItems(o).reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
+    }
+    // Uses created_at (UTC) when the API sends it, otherwise the `time` string.
+    function oDate(o) {
+        const raw = o.created_at || o.time;
+        if (!raw) return null;
+        const d = o.created_at ? parseServerDate(o.created_at) : new Date(raw);
+        return isNaN(d) ? null : d;
+    }
+    const done = o => o.status === "completed";
+    const fmtDay = d => d.toLocaleDateString("en-CA"); // yyyy-mm-dd, local
+    const custName = id => "Customer #" + String(id ?? "").slice(-6);
+
+    const noDateNote = () => allOrders().some(o => !oDate(o))
+        ? `<div class="pg-note">Some orders have no readable date, so they are left out of date-based figures. Send <code>created_at</code> in /seller/orders to include them.</div>` : "";
+
+    const table = (heads, rows, empty) => rows.length
+        ? `<table class="pg-table"><thead><tr>${heads.map(h => `<th class="${h[1] || ""}">${h[0]}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`
+        : `<div class="pg-empty">${empty}</div>`;
+
+    const kpi = (v, l) => `<div class="pg-kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+    const bar = (label, pct, val) => `<div class="bar-row"><span class="bl" title="${H(label)}">${H(label)}</span><span class="bt"><span class="bf" style="display:block;width:${pct}%"></span></span><span class="bv">${val}</span></div>`;
+
+    /* ---------------- page registry ---------------- */
+    const PAGES = {};
+    function page(name, title, sub, actions, body, load) {
+        PAGES[name] = { title, sub, actions, body, load };
+    }
+
+    /* ===== CUSTOMERS ===== */
+    page("customers", "Customers", "Everyone who has ordered from your store", "",
+        `<div class="pg-kpis" id="cu-kpis"></div>
+         <div class="pg-filters"><input id="cu-search" placeholder="Search customer ID" style="width:260px;max-width:100%"></div>
+         <div class="widget" id="cu-table"></div>`,
+        () => {
+            const map = {};
+            allOrders().forEach(o => {
+                const c = map[o.user_id] ||= { id: o.user_id, orders: 0, spent: 0, last: null };
+                c.orders++;
+                if (done(o)) c.spent += oTotal(o);
+                const d = oDate(o);
+                if (d && (!c.last || d > c.last)) c.last = d;
+            });
+            const list = Object.values(map).sort((a, b) => b.spent - a.spent);
+            const repeat = list.filter(c => c.orders > 1).length;
+            $("#cu-kpis").innerHTML =
+                kpi(list.length, "Total customers") +
+                kpi(repeat, "Repeat customers") +
+                kpi(list.length ? Math.round(repeat / list.length * 100) + "%" : "0%", "Repeat rate");
+            const draw = () => {
+                const q = $("#cu-search").value.trim().toLowerCase();
+                const rows = list.filter(c => custName(c.id).toLowerCase().includes(q) || String(c.id).includes(q)).map(c => `
+                    <tr><td>${H(custName(c.id))}</td><td class="num">${c.orders}</td><td class="num">${money(c.spent)}</td>
+                    <td>${c.last ? timeAgo(c.last.toISOString()) : "—"}</td></tr>`);
+                $("#cu-table").innerHTML = table([["Customer"], ["Orders", "num"], ["Spent", "num"], ["Last order"]], rows, "No customers yet.");
+            };
+            $("#cu-search").oninput = draw;
+            draw();
+        });
+
+    /* ===== SALES REPORT ===== */
+    const sr = { from: null, to: null };
+    function setRange(days) {
+        const t = new Date(); t.setHours(23, 59, 59, 999);
+        const f = new Date(); f.setHours(0, 0, 0, 0); f.setTime(f.getTime() - (days - 1) * DAY);
+        sr.from = f; sr.to = t;
+        $("#sr-from").value = fmtDay(f); $("#sr-to").value = fmtDay(t);
+    }
+    const srOrders = () => allOrders().filter(o => { const d = oDate(o); return d && d >= sr.from && d <= sr.to; });
+
+    page("sales", "Sales report", "Revenue counts completed orders only",
+        `<button class="btn-outline" id="sr-export"><i data-lucide="download" width="14" height="14"></i> Export CSV</button>`,
+        `<div class="pg-filters">
+            <button class="chip" data-days="1">Today</button><button class="chip" data-days="7">7 days</button>
+            <button class="chip active" data-days="30">30 days</button><button class="chip" data-days="90">90 days</button>
+            <input type="date" id="sr-from"> <span style="color:var(--muted)">to</span> <input type="date" id="sr-to">
+         </div>
+         <div id="sr-note"></div>
+         <div class="pg-kpis" id="sr-kpis"></div>
+         <div class="pg-grid">
+            <div class="widget"><div class="widget-head"><span class="widget-title">Daily sales</span></div><div id="sr-daily"></div></div>
+            <div class="widget"><div class="widget-head"><span class="widget-title">Items sold</span></div><div id="sr-items"></div></div>
+         </div>`,
+        () => {
+            if (!sr.from) {
+                setRange(30);
+                document.querySelectorAll("#view-sales .chip").forEach(ch => ch.onclick = () => {
+                    document.querySelectorAll("#view-sales .chip").forEach(c => c.classList.toggle("active", c === ch));
+                    setRange(+ch.dataset.days); drawSales();
+                });
+                const custom = () => {
+                    sr.from = new Date($("#sr-from").value + "T00:00:00");
+                    sr.to = new Date($("#sr-to").value + "T23:59:59");
+                    document.querySelectorAll("#view-sales .chip").forEach(c => c.classList.remove("active"));
+                    drawSales();
+                };
+                $("#sr-from").onchange = custom; $("#sr-to").onchange = custom;
+                $("#sr-export").onclick = () => {
+                    const rows = [["Token", "Order ID", "Date", "Status", "Items", "Total"]];
+                    srOrders().forEach(o => rows.push([o.token_no, o.order_id, o.time || o.created_at, o.status,
+                        oItems(o).map(i => `${i.name} x${i.qty}`).join("; "), oTotal(o)]));
+                    downloadCSV(`sales_${fmtDay(sr.from)}_${fmtDay(sr.to)}.csv`, rows);
+                };
+            }
+            drawSales();
+        });
+
+    function drawSales() {
+        if (!sr.from || isNaN(sr.from) || isNaN(sr.to)) return;
+        const list = srOrders(), comp = list.filter(done);
+        const rev = comp.reduce((s, o) => s + oTotal(o), 0);
+        $("#sr-note").innerHTML = noDateNote();
+        $("#sr-kpis").innerHTML =
+            kpi(money(rev), "Revenue") + kpi(list.length, "Orders placed") + kpi(comp.length, "Completed") +
+            kpi(list.filter(o => o.status === "canceled").length, "Canceled") +
+            kpi(money(comp.length ? rev / comp.length : 0), "Avg order value");
+
+        const days = {};
+        list.forEach(o => {
+            const k = fmtDay(oDate(o)); const r = days[k] ||= { n: 0, rev: 0 };
+            r.n++; if (done(o)) r.rev += oTotal(o);
+        });
+        $("#sr-daily").innerHTML = table([["Date"], ["Orders", "num"], ["Revenue", "num"]],
+            Object.keys(days).sort().reverse().map(k => `<tr><td>${k}</td><td class="num">${days[k].n}</td><td class="num">${money(days[k].rev)}</td></tr>`),
+            "No orders in this range.");
+
+        const items = {};
+        comp.forEach(o => oItems(o).forEach(i => {
+            const r = items[i.name] ||= { qty: 0, rev: 0 };
+            r.qty += Number(i.qty); r.rev += (Number(i.price) || 0) * Number(i.qty);
+        }));
+        $("#sr-items").innerHTML = table([["Item"], ["Qty", "num"], ["Revenue", "num"]],
+            Object.entries(items).sort((a, b) => b[1].rev - a[1].rev).map(([n, r]) =>
+                `<tr><td>${H(n)}</td><td class="num">${r.qty}</td><td class="num">${money(r.rev)}</td></tr>`),
+            "Nothing sold in this range.");
+    }
+
+    /* ===== ANALYTICS ===== */
+    page("analytics", "Analytics", "Based on all your orders", "",
+        `<div id="an-note"></div><div class="pg-kpis" id="an-kpis"></div>
+         <div class="pg-grid">
+            <div class="widget"><div class="widget-head"><span class="widget-title">Orders by hour</span></div><div id="an-hours"></div></div>
+            <div class="widget"><div class="widget-head"><span class="widget-title">Orders by weekday</span></div><div id="an-week"></div></div>
+         </div>
+         <div class="pg-grid">
+            <div class="widget"><div class="widget-head"><span class="widget-title">Top items (by quantity)</span></div><div id="an-top"></div></div>
+            <div class="widget"><div class="widget-head"><span class="widget-title">Order status</span></div><div id="an-status"></div></div>
+         </div>`,
+        () => {
+            const list = allOrders(), n = list.length;
+            const comp = list.filter(done), canc = list.filter(o => o.status === "canceled");
+            const custs = {}; list.forEach(o => custs[o.user_id] = (custs[o.user_id] || 0) + 1);
+            const cu = Object.values(custs);
+            $("#an-note").innerHTML = noDateNote();
+            $("#an-kpis").innerHTML =
+                kpi(n, "Total orders") +
+                kpi(n ? Math.round(comp.length / n * 100) + "%" : "0%", "Completion rate") +
+                kpi(n ? Math.round(canc.length / n * 100) + "%" : "0%", "Cancellation rate") +
+                kpi(cu.length ? Math.round(cu.filter(c => c > 1).length / cu.length * 100) + "%" : "0%", "Repeat customers") +
+                kpi(money(comp.length ? comp.reduce((s, o) => s + oTotal(o), 0) / comp.length : 0), "Avg order value");
+
+            const hrs = Array(24).fill(0), wk = Array(7).fill(0);
+            list.forEach(o => { const d = oDate(o); if (d) { hrs[d.getHours()]++; wk[d.getDay()]++; } });
+            const hm = Math.max(...hrs, 1);
+            $("#an-hours").innerHTML = `<div class="hours">${hrs.map((v, h) =>
+                `<div class="hc" title="${h}:00 — ${v} orders"><div class="hb" style="height:${v / hm * 100}%"></div><div class="hl">${h % 6 === 0 ? h : ""}</div></div>`).join("")}</div>`;
+            const wm = Math.max(...wk, 1), names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            $("#an-week").innerHTML = wk.map((v, i) => bar(names[i], v / wm * 100, v)).join("");
+
+            const items = {};
+            list.filter(o => o.status !== "canceled").forEach(o => oItems(o).forEach(i => items[i.name] = (items[i.name] || 0) + Number(i.qty)));
+            const top = Object.entries(items).sort((a, b) => b[1] - a[1]).slice(0, 8), tm = top.length ? top[0][1] : 1;
+            $("#an-top").innerHTML = top.length ? top.map(([nm, q]) => bar(nm, q / tm * 100, q)).join("") : `<div class="pg-empty">No sales yet.</div>`;
+
+            const st = { Pending: list.filter(o => o.status === "placed").length, Completed: comp.length, Canceled: canc.length };
+            $("#an-status").innerHTML = Object.entries(st).map(([k, v]) => bar(k, n ? v / n * 100 : 0, v)).join("");
+        });
+
+    /* ===== PAYOUTS ===== */
+    page("payouts", "Payouts", "Your earnings and transfers to your bank", "",
+        `<div class="pg-kpis" id="po-kpis"></div><div id="po-note"></div>
+         <div class="widget"><div class="widget-head"><span class="widget-title">Payout history</span></div><div id="po-table"></div></div>`,
+        async () => {
+            const comp = allOrders().filter(done);
+            const total = comp.reduce((s, o) => s + oTotal(o), 0);
+            const cut = Date.now() - 30 * DAY;
+            const m30 = comp.filter(o => { const d = oDate(o); return d && d.getTime() >= cut; }).reduce((s, o) => s + oTotal(o), 0);
+            const draw = (extra, rows, msg) => {
+                $("#po-kpis").innerHTML = kpi(money(total), "Lifetime earnings") + kpi(money(m30), "Last 30 days") + extra;
+                $("#po-table").innerHTML = table([["Date"], ["Reference"], ["Amount", "num"], ["Status"]], rows, msg);
+            };
+            draw("", [], "Loading…");
+            try {
+                const d = await api(`/seller/payouts?res_id=${encodeURIComponent(resId)}`);
+                $("#po-note").innerHTML = "";
+                draw(kpi(money(d.balance), "Pending payout"), (d.payouts || []).map(p => `
+                    <tr><td>${H(p.date)}</td><td class="coupon">${H(p.id)}</td><td class="num">${money(p.amount)}</td>
+                    <td><span class="tag ${p.status === "paid" ? "ok" : "warn"}">${H(p.status)}</span></td></tr>`), "No payouts yet.");
+            } catch (e) {
+                $("#po-note").innerHTML = `<div class="pg-note">Payout history isn't available yet (${H(e.message)}). Earnings above are calculated from completed orders.</div>`;
+                draw("", [], "No payout data.");
+            }
+        });
+
+    /* ===== OFFERS & COUPONS ===== */
+    let offers = [];
+    page("offers", "Offers & coupons", "Create discount codes for your customers",
+        `<button class="btn-primary" id="of-new">+ New offer</button>`,
+        `<div id="of-note"></div><div class="widget" id="of-table"></div>`,
+        async () => {
+            $("#of-new").onclick = () => openOffer();
+            $("#of-table").innerHTML = `<div class="pg-empty">Loading…</div>`;
+            try {
+                offers = (await api(`/seller/offers?res_id=${encodeURIComponent(resId)}`)).offers || [];
+                $("#of-note").innerHTML = "";
+            } catch (e) {
+                offers = [];
+                $("#of-note").innerHTML = `<div class="pg-note">Couldn't load offers (${H(e.message)}).</div>`;
+            }
+            drawOffers();
+        });
+
+    function drawOffers() {
+        const rows = offers.map(o => `
+            <tr><td class="coupon">${H(o.code)}</td>
+            <td>${o.type === "percent" ? H(o.value) + "% off" : money(o.value) + " off"}</td>
+            <td class="num">${o.min_order ? money(o.min_order) : "—"}</td>
+            <td>${H(o.expires || "No expiry")}</td>
+            <td><span class="tag ${o.active ? "ok" : "off"}">${o.active ? "Active" : "Paused"}</span></td>
+            <td class="num"><button class="btn-outline btn-sm" data-of="toggle" data-id="${H(o.id)}">${o.active ? "Pause" : "Activate"}</button>
+            <button class="btn-outline btn-sm" data-of="edit" data-id="${H(o.id)}">Edit</button>
+            <button class="btn-outline btn-sm btn-danger" data-of="del" data-id="${H(o.id)}">Delete</button></td></tr>`);
+        $("#of-table").innerHTML = table([["Code"], ["Discount"], ["Min order", "num"], ["Expires"], ["Status"], [""]], rows, "No offers yet. Click “New offer” to create one.");
+    }
+
+    let modal;
+    function openOffer(o) {
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.className = "pg-modal-bg";
+            modal.innerHTML = `<div class="pg-modal pg-form">
+                <h3 id="om-title">New offer</h3>
+                <label>Coupon code<input id="om-code" placeholder="WELCOME10" style="text-transform:uppercase"></label>
+                <div class="two">
+                    <label>Type<select id="om-type"><option value="percent">Percent (%)</option><option value="flat">Flat (₹)</option></select></label>
+                    <label>Value<input id="om-value" type="number" min="1" step="any"></label>
+                </div>
+                <div class="two">
+                    <label>Min order (₹)<input id="om-min" type="number" min="0" value="0"></label>
+                    <label>Expires<input id="om-exp" type="date"></label>
+                </div>
+                <label class="check"><input id="om-active" type="checkbox" checked> Active</label>
+                <div class="row-btns"><button class="btn-outline" id="om-cancel">Cancel</button><button class="btn-primary" id="om-save">Save</button></div>
+            </div>`;
+            document.body.appendChild(modal);
+            $("#om-cancel").onclick = () => modal.classList.remove("show");
+            modal.addEventListener("click", e => { if (e.target === modal) modal.classList.remove("show"); });
+            $("#om-save").onclick = saveOffer;
+        }
+        modal.dataset.id = o ? o.id : "";
+        $("#om-title").textContent = o ? "Edit offer" : "New offer";
+        $("#om-code").value = o?.code || "";
+        $("#om-type").value = o?.type || "percent";
+        $("#om-value").value = o?.value || "";
+        $("#om-min").value = o?.min_order || 0;
+        $("#om-exp").value = o?.expires || "";
+        $("#om-active").checked = o ? !!o.active : true;
+        modal.classList.add("show");
+    }
+
+    async function saveOffer() {
+        const offer = {
+            id: modal.dataset.id || undefined, res_id: resId,
+            code: $("#om-code").value.trim().toUpperCase(),
+            type: $("#om-type").value, value: Number($("#om-value").value),
+            min_order: Number($("#om-min").value) || 0,
+            expires: $("#om-exp").value || null, active: $("#om-active").checked
+        };
+        if (!offer.code || !(offer.value > 0)) return toast("Enter a code and a discount value", "warn");
+        if (offer.type === "percent" && offer.value > 100) return toast("Percent can't exceed 100", "warn");
+        try {
+            await api("/seller/offers/save", offer);
+            modal.classList.remove("show");
+            toast("Offer saved", "success");
+            PAGES.offers.load();
+        } catch (e) { toast(e.message, "error"); }
+    }
+
+    async function offerAction(act, id) {
+        const o = offers.find(x => String(x.id) === String(id));
+        if (!o) return;
+        if (act === "edit") return openOffer(o);
+        try {
+            if (act === "toggle") await api("/seller/offers/save", { ...o, res_id: resId, active: !o.active });
+            if (act === "del") {
+                if (!confirm(`Delete offer ${o.code}?`)) return;
+                await api("/seller/offers/delete", { id, res_id: resId });
+            }
+            PAGES.offers.load();
+        } catch (e) { toast(e.message, "error"); }
+    }
+
+    /* ===== SETTINGS ===== */
+    const SET_FIELDS = ["store_name", "phone", "address", "opens", "closes", "prep_time", "min_order"];
+    page("settings", "Settings", "Store profile and preferences", "",
+        `<div id="se-note"></div>
+         <div class="widget" style="margin-bottom:20px"><div class="widget-head"><span class="widget-title">Store profile</span></div>
+            <div class="pg-form">
+                <label>Store name<input id="se-store_name"></label>
+                <label>Phone<input id="se-phone" type="tel"></label>
+                <label>Address<input id="se-address"></label>
+                <div class="two"><label>Opens<input id="se-opens" type="time"></label><label>Closes<input id="se-closes" type="time"></label></div>
+                <div class="two"><label>Prep time (minutes)<input id="se-prep_time" type="number" min="0"></label><label>Minimum order (₹)<input id="se-min_order" type="number" min="0"></label></div>
+                <div><button class="btn-primary" id="se-save">Save changes</button></div>
+            </div></div>
+         <div class="widget"><div class="widget-head"><span class="widget-title">Account</span></div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Store online/offline can be switched from the Dashboard.</p>
+            <button class="btn-outline btn-danger" id="se-logout">Log out</button></div>`,
+        async () => {
+            $("#se-logout").onclick = () => document.getElementById("Logout").click();
+            $("#se-save").onclick = async () => {
+                const settings = {}; SET_FIELDS.forEach(f => settings[f] = $("#se-" + f).value.trim());
+                if (!settings.store_name) return toast("Store name is required", "warn");
+                const btn = $("#se-save"); btn.disabled = true;
+                try {
+                    await api("/seller/settings", { res_id: resId, settings });
+                    toast("Settings saved", "success");
+                    const n = document.querySelector(".seller-name"); if (n) n.textContent = settings.store_name;
+                } catch (e) { toast(e.message, "error"); }
+                btn.disabled = false;
+            };
+            try {
+                const s = (await api(`/seller/settings?res_id=${encodeURIComponent(resId)}`)).settings || {};
+                SET_FIELDS.forEach(f => $("#se-" + f).value = s[f] ?? "");
+                $("#se-note").innerHTML = "";
+            } catch (e) {
+                $("#se-note").innerHTML = `<div class="pg-note">Couldn't load saved settings (${H(e.message)}).</div>`;
+            }
+        });
+
+    /* ---------------- build the views ---------------- */
+    const host = $(".main-content");
+    const anchor = $("#edBackdrop");
+    Object.entries(PAGES).forEach(([name, p]) => {
+        if (!VIEWS.includes(name)) VIEWS.push(name);
+        const v = document.createElement("div");
+        v.className = "view"; v.id = "view-" + name;
+        v.innerHTML = `<div class="pg">
+            <div class="pg-head">
+                <button class="menu-toggle" aria-label="Menu">☰</button>
+                <div><div class="pg-title">${p.title}</div><div class="pg-sub">${p.sub}</div></div>
+                <div class="pg-head-actions">${p.actions}</div>
+            </div>${p.body}</div>`;
+        host.insertBefore(v, anchor);
+        $(".menu-toggle", v).onclick = openNavSidebar;
+    });
+    if (window.lucide) lucide.createIcons();
+
+    // Offer table buttons (delegated)
+    document.addEventListener("click", e => {
+        const b = e.target.closest("[data-of]");
+        if (b) offerAction(b.dataset.of, b.dataset.id);
+    });
+
+    /* ---------------- hook into showView ---------------- */
+    const baseShowView = showView;
+    showView = function (name, refresh = true) {
+        baseShowView(name, refresh);
+        if (PAGES[name]) {
+            const run = () => PAGES[name].load();
+            if (refresh || !allOrders().length) loadOrders().then(run).catch(run); else run();
+        }
+    };
+
+    // Dashboard shortcuts
+    const exportBtn = $(".topbar-right .btn-outline");
+    if (exportBtn) exportBtn.addEventListener("click", () => showView("sales"));
+    const offerBtn = document.getElementById("createOfferBtn");
+    if (offerBtn) offerBtn.addEventListener("click", () => showView("offers"));
+    const exportOrders = Array.from(document.querySelectorAll(".action-btn"))
+        .find(b => /export orders/i.test(b.textContent));
+    if (exportOrders) exportOrders.addEventListener("click", () => {
+        const rows = [["Token", "Order ID", "Date", "Status", "Items", "Total"]];
+        allOrders().forEach(o => rows.push([o.token_no, o.order_id, o.time || o.created_at, o.status,
+            oItems(o).map(i => `${i.name} x${i.qty}`).join("; "), oTotal(o)]));
+        downloadCSV("orders.csv", rows);
+    });
+
+    // Opened directly on one of the new pages (e.g. #payouts)
+    const h = location.hash.slice(1);
+    if (PAGES[h]) showView(h, false);
+})();

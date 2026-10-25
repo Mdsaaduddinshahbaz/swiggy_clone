@@ -1,4 +1,4 @@
-from database import fetch_profiles,edit_seller_order_items, get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
+from database import fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
 from flask import Flask, request, render_template, redirect, url_for, jsonify, g, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, get_cart_restaurant
@@ -2175,6 +2175,224 @@ def validate_signup(data):
         "role": role
     }, None
 
+################# seller pages: payouts / offers / settings #########################
 
+def _seller_guard():
+    """Returns an error response if the caller isn't a seller, else None."""
+    if g.type != "seller":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    return None
+
+
+# ---------- payouts ----------
+@app.get("/seller/payouts")
+@login_required
+def seller_payouts_route():
+    err = _seller_guard()
+    if err:
+        return err
+    try:
+        summary = get_payout_summary(g.res_id)
+        return jsonify({"success": True, **summary})
+    except Exception as e:
+        print("payouts error:", e)
+        return jsonify({"success": False, "message": "Couldn't load payouts"}), 500
+
+
+# ---------- offers ----------
+OFFER_CODE_RE = re.compile(r"^[A-Z0-9_-]{3,20}$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def validate_offer(data):
+    code = str(data.get("code", "")).strip().upper()
+    if not OFFER_CODE_RE.match(code):
+        return None, "Code must be 3-20 letters, numbers, - or _"
+
+    otype = data.get("type")
+    if otype not in ("percent", "flat"):
+        return None, "Type must be percent or flat"
+
+    try:
+        value = float(data.get("value"))
+    except (TypeError, ValueError):
+        return None, "Discount value must be a number"
+    if value <= 0:
+        return None, "Discount value must be greater than 0"
+    if otype == "percent" and value > 100:
+        return None, "Percent can't exceed 100"
+    value = int(value) if value == int(value) else value
+
+    try:
+        min_order = float(data.get("min_order") or 0)
+    except (TypeError, ValueError):
+        return None, "Min order must be a number"
+    if min_order < 0:
+        return None, "Min order can't be negative"
+    min_order = int(min_order) if min_order == int(min_order) else min_order
+
+    expires = data.get("expires") or None
+    if expires:
+        if not DATE_RE.match(str(expires)):
+            return None, "Invalid expiry date"
+        try:
+            datetime.strptime(expires, "%Y-%m-%d")
+        except ValueError:
+            return None, "Invalid expiry date"
+
+    active = data.get("active", True)
+    if not isinstance(active, bool):
+        return None, "active must be true or false"
+
+    return {
+        "code": code, "type": otype, "value": value,
+        "min_order": min_order, "expires": expires, "active": active
+    }, None
+
+
+@app.get("/seller/offers")
+@login_required
+def seller_offers_list():
+    err = _seller_guard()
+    if err:
+        return err
+    try:
+        return jsonify({"success": True, "offers": list_offers(g.res_id)})
+    except Exception as e:
+        print("offers list error:", e)
+        return jsonify({"success": False, "message": "Couldn't load offers"}), 500
+
+
+@app.post("/seller/offers/save")
+@login_required
+def seller_offers_save():
+    err = _seller_guard()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    fields, error = validate_offer(data)
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+
+    result = save_offer(g.res_id, data.get("id"), fields)
+    if not result["success"]:
+        return jsonify({"success": False, "message": result["message"]}), result.get("status", 400)
+    return jsonify({"success": True, "offer": result["offer"]})
+
+
+@app.post("/seller/offers/delete")
+@login_required
+def seller_offers_delete():
+    err = _seller_guard()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    offer_id = data.get("id")
+    if not offer_id:
+        return jsonify({"success": False, "message": "id is required"}), 400
+    if not delete_offer(g.res_id, str(offer_id)):
+        return jsonify({"success": False, "message": "Offer not found"}), 404
+    return jsonify({"success": True})
+
+
+# ---------- customer: check a coupon against the cart ----------
+@app.post("/validate_coupon")
+@login_required
+def validate_coupon_route():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    data = request.get_json(silent=True) or {}
+    res_id = str(data.get("res_id", "")).strip()
+    code = str(data.get("code", "")).strip()
+    if not res_id or not code:
+        return jsonify({"success": False, "message": "res_id and code are required"}), 400
+
+    # subtotal comes from the server-side cart, never from the client
+    cart = get_cart(g.user_id) or {}
+    restaurant = (cart.get("cart") or {}).get(res_id)
+    if not restaurant:
+        return jsonify({"success": False, "message": "Your cart has no items from this store"}), 400
+    subtotal = sum(float(i.get("price", 0)) * int(i.get("qty", 0)) for i in restaurant["items"].values())
+
+    result = validate_coupon(res_id, code, subtotal)
+    return jsonify(result), (200 if result["success"] else 400)
+
+
+# ---------- settings ----------
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def validate_settings(s):
+    store_name = str(s.get("store_name", "")).strip()
+    if not store_name:
+        return None, "Store name is required"
+    if len(store_name) > 100:
+        return None, "Store name is too long"
+
+    phone = str(s.get("phone", "")).strip()
+    if phone and (not phone.isdigit() or len(phone) != 10):
+        return None, "Phone must be a 10 digit number"
+
+    address = str(s.get("address", "")).strip()
+    if len(address) > 250:
+        return None, "Address is too long"
+
+    opens = str(s.get("opens", "")).strip()
+    closes = str(s.get("closes", "")).strip()
+    for label, t in (("Opening", opens), ("Closing", closes)):
+        if t and not TIME_RE.match(t):
+            return None, f"{label} time is invalid"
+
+    def whole(name, raw, maximum):
+        raw = str(raw if raw is not None else "").strip()
+        if raw == "":
+            return None, None
+        try:
+            n = int(float(raw))
+        except ValueError:
+            return None, f"{name} must be a number"
+        if n < 0 or n > maximum:
+            return None, f"{name} is out of range"
+        return n, None
+
+    prep_time, e1 = whole("Prep time", s.get("prep_time"), 600)
+    if e1:
+        return None, e1
+    min_order, e2 = whole("Minimum order", s.get("min_order"), 100000)
+    if e2:
+        return None, e2
+
+    return {
+        "store_name": store_name, "phone": phone, "address": address,
+        "opens": opens, "closes": closes,
+        "prep_time": prep_time, "min_order": min_order
+    }, None
+
+
+@app.get("/seller/settings")
+@login_required
+def seller_settings_get():
+    err = _seller_guard()
+    if err:
+        return err
+    settings = get_store_settings(g.res_id)
+    if settings is None:
+        return jsonify({"success": False, "message": "Restaurant not found"}), 404
+    return jsonify({"success": True, "settings": settings})
+
+
+@app.post("/seller/settings")
+@login_required
+def seller_settings_save():
+    err = _seller_guard()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    clean, error = validate_settings(data.get("settings") or {})
+    if error:
+        return jsonify({"success": False, "message": error}), 400
+    if not update_store_settings(g.res_id, clean):
+        return jsonify({"success": False, "message": "Restaurant not found"}), 404
+    return jsonify({"success": True})
 if __name__ == "__main__":
     socketio.run(app, debug=True)
