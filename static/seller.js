@@ -3643,7 +3643,6 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
       }).join("");
 
       const placed = order.status === "placed";
-
       return `
         <div class="order-card" user_id="${H(order.user_id)}">
           <div class="order-header">
@@ -3652,7 +3651,8 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
           </div>
           <div class="token-no">Token No: ${H(order.token_no)}${order.edited ? '<span class="edited-tag">Edited</span>' : ""}</div>
           <div class="order-date">${H(order.time)}</div>
-          <div class="order-date">Pickup Time: ${H(order.pickup_time)}</div>
+          ${order.pickup_time!== null ? `<div class="order-date">Pickup Time: ${H(order.pickup_time)}</div>`:`<div class="order-date">Delivery to: ${H(order.delivery_address.adrs_type)} - ${H(order.delivery_address.address)}</div>`}
+          ${order.pickup_time!==null ? "":`<div class="order-date">Phone: ${H(order.delivery_address.phone)}</div>`}
           ${rows}
           <div class="total">Total: ₹${total}</div>
           ${order.cancel_reason ? `<div class="cancel-reason">Reason: ${H(order.cancel_reason)}</div>` : ""}

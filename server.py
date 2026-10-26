@@ -1316,7 +1316,8 @@ def update_status():
         order_id = data["order_id"]
         status = data["status"]
         userid = data["user_id"]
-        res = update_order_status_seller(order_id, status, userid, res_id)
+        reason=data["reason"]
+        res = update_order_status_seller(order_id, status, userid, res_id, reason=reason)
         if (res["success"]):
             return ({"success": True})
         else:

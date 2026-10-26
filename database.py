@@ -681,16 +681,24 @@ def check_existing_owner(email, password):
         return {"success": 404}
 
 
-def update_order_status_seller(order_id, status, userid, res_id):
+
+def update_order_status_seller(order_id, status, userid, res_id, **kwargs):
     """
     order_id is the seller_orders _id. A seller only changes THEIR restaurant's part
     of a checkout; the customer-facing status is derived in get_orders().
     """
     try:
+        update_fields = {"status": status}
+
+        if status == "canceled":
+            update_fields["reason"] = kwargs.get("reason")
+
         updated_seller_doc = seller_orders.find_one_and_update(
-            {"_id": ObjectId(order_id),
-             "restaurant_id": res_id},
-            {"$set": {"status": status}},
+            {
+                "_id": ObjectId(order_id),
+                "restaurant_id": res_id
+            },
+            {"$set": update_fields},
             return_document=ReturnDocument.AFTER
         )
     except Exception:
@@ -698,7 +706,9 @@ def update_order_status_seller(order_id, status, userid, res_id):
 
     if not updated_seller_doc:
         return {"success": False, "message": "Order not found or unauthorized"}
+
     return {"success": True}
+
 
 
 def update_order_status_user(order_id, status, userid):
