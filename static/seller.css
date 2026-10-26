@@ -1283,3 +1283,124 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   .pg-form .two { grid-template-columns: 1fr; }
   .bar-row .bl { width: 80px; }
 }
+
+
+/* =====================================================================
+   seller-extras.css — paste at the END of seller.css (or link after it)
+   Uses the existing theme variables only.
+===================================================================== */
+
+/* ----- new order statuses (orders view) ----- */
+.order-status.status-accepted { background: var(--blue-lt, #EBF0F6); color: var(--blue, #2C4A6E); }
+.order-status.status-ready    { background: var(--green-bg); color: var(--green); }
+
+/* Accept / Mark ready: same shape as the Completed button, flame colour */
+.stageBtn {
+  background: var(--flame) !important;
+  color: var(--white) !important;
+  box-shadow: 0 3px 0 var(--flame-dark);
+  margin-right: 10px !important;
+}
+.stageBtn:hover { background: var(--flame-dark) !important; }
+.stageBtn:disabled { opacity: .6; }
+
+/* Print slip: quiet ghost button */
+.printBtn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 0;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-ticket-body);
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.printBtn:hover { border-color: var(--flame); color: var(--flame-dark); }
+
+.cancel-reason {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--red-bg);
+  color: var(--red);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ----- mute button ----- */
+#muteBtn { font-size: 16px; line-height: 1; }
+
+/* ----- cancel-reason modal ----- */
+.reason-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pg-modal .btn-primary {
+  background: var(--blue); color: #fff; border: none; border-radius: 8px;
+  padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pg-modal .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.pg-modal .btn-danger-fill { background: var(--danger); }
+.pg-modal .btn-outline { justify-content: center; }
+.pg-modal input { -webkit-user-select: text; user-select: text; }
+
+/* ----- availability switch on item cards ----- */
+.avail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.avail-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: #D0D5DD;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.avail-toggle input::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .25);
+  transition: transform .2s ease;
+}
+.avail-toggle input:checked { background: var(--green); }
+.avail-toggle input:checked::after { transform: translateX(16px); }
+.avail-toggle input:disabled { opacity: .6; cursor: progress; }
+.avail-toggle input:checked + span { color: var(--green); }
+
+/* ----- bulk stock modal ----- */
+.bs-list { max-height: 50vh; overflow-y: auto; }
+.bs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.bs-row:last-child { border-bottom: none; }
+.bs-info { flex: 1; min-width: 0; }
+.bs-name { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.bs-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.bs-row input {
+  width: 96px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--font-mono);
+  -webkit-user-select: text;
+  user-select: text;
+}

@@ -3505,3 +3505,570 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     const h = location.hash.slice(1);
     if (PAGES[h]) showView(h, false);
 })();
+
+
+/* =====================================================================
+   seller-extras.js  — load AFTER seller.js
+   (original order flow: placed -> completed / canceled)
+
+   Adds / fixes:
+     1. New-order sound + vibration, with a mute toggle
+     2. Cancel reason (sent to server + customer)
+     3. Bulk stock update (Dashboard > Update stock)
+     4. Quick "Listed" switch on every item card
+     5. Delete confirmation
+     6. Print order slip
+     7. Fixes: escaped dashboard renders, single-pass order render,
+        orders re-render after a status change so filters stay correct
+
+   BACKEND NOTES
+     /update_order accepts status "completed" / "canceled" and an
+     optional "reason" field. Socket emitted: order_completed (+ reason).
+===================================================================== */
+(function () {
+  "use strict";
+
+  const H = escapeSellerHtml;
+  const $ = (s, r = document) => r.querySelector(s);
+  const money = n => "₹" + Math.round(Number(n) || 0).toLocaleString("en-IN");
+
+  /* ---------- toast (reuses the .sd-toast styles) ---------- */
+  let toastTimer;
+  function toast(msg, kind) {
+    let el = document.getElementById("sdToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "sdToast";
+      el.className = "sd-toast";
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.dataset.kind = kind || "info";
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
+  }
+
+  /* =====================================================================
+     1. NEW-ORDER SOUND
+  ===================================================================== */
+  let audioCtx = null;
+  let muted = false;
+  try { muted = localStorage.getItem("sellerMuted") === "1"; } catch (e) { }
+
+  function unlockAudio() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) { }
+  }
+  ["pointerdown", "keydown", "touchstart"].forEach(ev =>
+    document.addEventListener(ev, unlockAudio, { passive: true }));
+
+  function beep() {
+    if (navigator.vibrate && !muted) navigator.vibrate([200, 100, 200]);
+    if (muted) return;
+    if (!audioCtx || audioCtx.state !== "running") {
+      toast("New order! Tap anywhere on the page once to enable sound.", "warn");
+      return;
+    }
+    const t = audioCtx.currentTime;
+    [0, 0.22, 0.44].forEach((d, i) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.value = i === 2 ? 1175 : 880;
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.4, t + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.18);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(t + d);
+      o.stop(t + d + 0.2);
+    });
+  }
+  socket.on("new_order", beep);
+
+  const muteBtn = document.createElement("button");
+  muteBtn.className = "icon-btn";
+  muteBtn.id = "muteBtn";
+  muteBtn.type = "button";
+  function paintMute() {
+    muteBtn.textContent = muted ? "🔕" : "🔔";
+    muteBtn.title = muted ? "Order sound is off" : "Order sound is on";
+    muteBtn.setAttribute("aria-label", muteBtn.title);
+  }
+  muteBtn.addEventListener("click", () => {
+    unlockAudio();
+    muted = !muted;
+    try { localStorage.setItem("sellerMuted", muted ? "1" : "0"); } catch (e) { }
+    paintMute();
+    toast(muted ? "Order sound off" : "Order sound on", "info");
+    if (!muted) beep();
+  });
+  paintMute();
+  const topRight = $(".topbar-right");
+  if (topRight) topRight.prepend(muteBtn);
+
+  /* =====================================================================
+     ORDERS (original flow: placed -> completed / canceled)
+  ===================================================================== */
+  window.loadOrders = async function () {
+    const res = await fetch("/seller/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ res_id: resId })
+    });
+    if (res.status == 401) {
+      alert("unauthorized,Please Log in");
+      window.location.href = "/login/seller";
+      return;
+    }
+    const data = await res.json();
+    if (!data.success) {
+      ordersList.innerHTML = `<p>Error loading orders - ${H(data.message)}</p>`;
+      return;
+    }
+
+    sellerOrders = data.orders || [];
+
+    // build everything once, assign once
+    const html = sellerOrders.map(order => {
+      let total = 0;
+      const rows = Object.entries(order.items).map(([key, d]) => {
+        const line = d.price * d.qty;
+        total += line;
+        return `<div class="item" item_id="${H(key)}">
+                  <span>${H(d.name)} x ${H(d.qty)}</span><span>₹${line}</span></div>`;
+      }).join("");
+
+      const placed = order.status === "placed";
+
+      return `
+        <div class="order-card" user_id="${H(order.user_id)}">
+          <div class="order-header">
+            <span class="order-id">#${H(order.order_id)}</span>
+            <span class="order-status status-${H(order.status)}">${H(order.status)}</span>
+          </div>
+          <div class="token-no">Token No: ${H(order.token_no)}${order.edited ? '<span class="edited-tag">Edited</span>' : ""}</div>
+          <div class="order-date">${H(order.time)}</div>
+          <div class="order-date">Pickup Time: ${H(order.pickup_time)}</div>
+          ${rows}
+          <div class="total">Total: ₹${total}</div>
+          ${order.cancel_reason ? `<div class="cancel-reason">Reason: ${H(order.cancel_reason)}</div>` : ""}
+          <button class="editOrderBtn" data-order-id="${H(order.order_id)}">✎ Edit items</button>
+          <button class="printBtn" data-order-id="${H(order.order_id)}">🖨 Print slip</button>
+          <button class="completeBtn statusBtn" style="
+              background: green;
+              color: white;
+              padding: 5px 11px;
+              border-radius: 7px;
+              border: none;
+              cursor: pointer;
+          ">Completed</button>
+          <button class="cancelBtn statusBtn" style="
+              background: red;
+              cursor: pointer;
+              color: white;
+              padding: 5px 11px;
+              border-radius: 7px;
+              border: none;
+              
+                    position:absolute;
+                    right:5px;
+          ">Cancel Order</button>
+        </div>`;
+    }).join("");
+
+    ordersList.innerHTML = html;
+    updateActiveCount();
+    applyFilter();
+    if (document.getElementById("view-orders").classList.contains("active")) markOrdersSeen();
+  };
+
+  window.setOrderStatus = async function (order, status, reason) {
+    let data = null;
+    try {
+      const res = await fetch("/update_order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          status,
+          user_id: order.user_id,
+          reason: reason || ""
+        })
+      });
+      data = await res.json();
+    } catch (e) { console.error(e); }
+
+    if (!data || !data.success) {
+      toast("Couldn't update the order. Try again.", "error");
+      return false;
+    }
+
+    socket.emit("order_completed", {
+      order_id: order.order_id,
+      userid: order.user_id,
+      token_no: order.token_no,
+      res_id: resId,
+      status,
+      reason: reason || ""
+    });
+
+    const known = sellerOrders.find(o => String(o.order_id) === String(order.order_id));
+    if (known) { known.status = status; if (reason) known.cancel_reason = reason; }
+    updateActiveCount();
+    await loadOrders();            // re-render so every filter stays correct
+    return true;
+  };
+
+  function orderFromCard(card) {
+    return {
+      order_id: card.querySelector(".order-id").textContent.replace("#", ""),
+      token_no: card.querySelector(".token-no").textContent.split(": ")[1].replace("Edited", "").trim(),
+      user_id: card.getAttribute("user_id")
+    };
+  }
+
+  // Completed button (capture: replaces seller.js handler, strips the "Edited" tag from the token)
+  document.addEventListener("click", async e => {
+    const b = e.target.closest(".completeBtn");
+    if (!b) return;
+    e.stopImmediatePropagation();
+    b.disabled = true;
+    const ok = await setOrderStatus(orderFromCard(b.closest(".order-card")), "completed");
+    if (ok) toast("Order completed", "success");
+    else b.disabled = false;
+  }, true);
+
+  /* =====================================================================
+     2. CANCEL REASON
+  ===================================================================== */
+  const REASONS = ["Item out of stock", "Shop is closing", "Too busy right now", "Customer not reachable", "Other"];
+  let reasonModal, reasonDone;
+
+  function askReason() {
+    return new Promise(resolve => {
+      if (!reasonModal) {
+        reasonModal = document.createElement("div");
+        reasonModal.className = "pg-modal-bg";
+        reasonModal.innerHTML = `
+          <div class="pg-modal pg-form">
+            <h3>Why are you canceling?</h3>
+            <div class="reason-chips">${REASONS.map(r => `<button type="button" class="chip" data-r="${H(r)}">${H(r)}</button>`).join("")}</div>
+            <label>Add a note (optional)<input id="rsNote" maxlength="120" placeholder="Shown to the customer"></label>
+            <div class="row-btns">
+              <button type="button" class="btn-outline" id="rsBack">Keep order</button>
+              <button type="button" class="btn-primary btn-danger-fill" id="rsGo" disabled>Cancel order</button>
+            </div>
+          </div>`;
+        document.body.appendChild(reasonModal);
+
+        reasonModal.addEventListener("click", ev => {
+          const chip = ev.target.closest(".chip");
+          if (chip) {
+            reasonModal.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === chip));
+            $("#rsGo").disabled = false;
+          }
+          if (ev.target === reasonModal || ev.target.id === "rsBack") finish(null);
+          if (ev.target.id === "rsGo") {
+            const chosen = $(".chip.active", reasonModal)?.dataset.r || "";
+            const note = $("#rsNote").value.trim();
+            finish(note ? `${chosen} — ${note}` : chosen);
+          }
+        });
+      }
+      reasonModal.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+      $("#rsNote").value = "";
+      $("#rsGo").disabled = true;
+      reasonDone = resolve;
+      reasonModal.classList.add("show");
+    });
+  }
+  function finish(v) {
+    reasonModal.classList.remove("show");
+    if (reasonDone) { reasonDone(v); reasonDone = null; }
+  }
+
+  // capture phase: runs before seller.js's own cancel handler and replaces it
+  document.addEventListener("click", async e => {
+    const b = e.target.closest(".cancelBtn");
+    if (!b) return;
+    e.stopImmediatePropagation();
+    const order = orderFromCard(b.closest(".order-card"));
+    const reason = await askReason();
+    if (reason === null) return;
+    const ok = await setOrderStatus(order, "canceled", reason);
+    if (ok) toast("Order canceled", "warn");
+  }, true);
+
+  /* =====================================================================
+     6. PRINT SLIP
+  ===================================================================== */
+  function printSlip(orderId) {
+    const o = sellerOrders.find(x => String(x.order_id) === String(orderId));
+    if (!o) return;
+    let total = 0;
+    const rows = Object.values(o.items || {}).filter(i => Number(i.qty) > 0).map(i => {
+      const line = (Number(i.price) || 0) * (Number(i.qty) || 0);
+      total += line;
+      return `<tr><td>${H(i.name)} x ${H(i.qty)}</td><td style="text-align:right">₹${line}</td></tr>`;
+    }).join("");
+
+    const store = document.querySelector(".seller-name")?.textContent || "Store";
+    const doc = `<html><head><title>Order ${H(o.token_no)}</title>
+      <style>
+        body{font-family:monospace;width:280px;margin:0 auto;padding:10px;color:#000}
+        h2,h3,p{margin:4px 0;text-align:center} table{width:100%;border-collapse:collapse;margin:8px 0}
+        td{padding:3px 0;font-size:13px} hr{border:none;border-top:1px dashed #000}
+        .t{font-weight:700;font-size:15px}
+      </style></head><body>
+      <h2>${H(store)}</h2><hr>
+      <h3>TOKEN ${H(o.token_no)}</h3>
+      <p>Order #${H(o.order_id)}</p><p>${H(o.time || "")}</p><p>Pickup: ${H(o.pickup_time || "-")}</p><hr>
+      <table>${rows}</table><hr>
+      <table><tr class="t"><td>Total</td><td style="text-align:right">₹${total}</td></tr></table>
+      <p>Thank you!</p></body></html>`;
+
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    document.body.appendChild(frame);
+    frame.contentDocument.open();
+    frame.contentDocument.write(doc);
+    frame.contentDocument.close();
+    setTimeout(() => {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+      setTimeout(() => frame.remove(), 1500);
+    }, 200);
+  }
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".printBtn");
+    if (b) printSlip(b.dataset.orderId);
+  });
+
+  /* =====================================================================
+     INVENTORY helpers (3, 4, 5)
+  ===================================================================== */
+  async function pushItem(item) {
+    const fd = new FormData();
+    fd.append("res_id", resId);
+    fd.append("sub_id", item.subId);
+    fd.append("desc", item.desc);
+    fd.append("itm_name", item.name);
+    fd.append("unit", item.unit);
+    fd.append("price", item.price);
+    fd.append("itm_qty", item.stock);
+    fd.append("lowat", item.lowAt);
+    fd.append("available", item.available);
+    fd.append("sold", 0);
+    fd.append("item_id", item.id);
+    fd.append("name", item.name);
+    fd.append("lowAt", item.lowAt);
+    fd.append("subId", item.subId);
+    fd.append("stock", item.stock);
+    const res = await fetch("/update_item_details", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || "Update failed");
+  }
+
+  /* ----- 4 + 5: decorate item cards ----- */
+  const baseRenderCards = renderCards;
+  window.renderCards = function () {
+    const p = baseRenderCards.apply(this, arguments);
+    decorateCards();
+    return p;
+  };
+
+  function decorateCards() {
+    document.querySelectorAll("#itemsGrid .card").forEach(card => {
+      const idEl = card.querySelector('div[style*="JetBrains"]');
+      const controls = card.querySelector(".controlsContainer");
+      if (!idEl || !controls) return;
+      const item = state.items.find(i => i.id === idEl.textContent.trim());
+      if (!item) return;
+
+      // 5. confirm before delete
+      const del = Array.from(controls.querySelectorAll("button")).find(b => b.textContent.trim() === "Delete");
+      if (del) {
+        const original = del.onclick;
+        del.onclick = () => { if (confirm(`Delete "${item.name}"? This can't be undone.`)) original(); };
+      }
+
+      // 4. quick Listed switch
+      const wrap = document.createElement("label");
+      wrap.className = "avail-toggle";
+      wrap.innerHTML = `<input type="checkbox" ${item.available ? "checked" : ""}><span>${item.available ? "Listed" : "Hidden"}</span>`;
+      const box = wrap.querySelector("input");
+      box.addEventListener("change", async () => {
+        const next = box.checked;
+        box.disabled = true;
+        item.available = next;
+        wrap.querySelector("span").textContent = next ? "Listed" : "Hidden";
+        try {
+          await pushItem(item);
+          renderStats();
+          toast(next ? `${item.name} is listed` : `${item.name} hidden from customers`, next ? "success" : "warn");
+        } catch (err) {
+          item.available = !next;
+          box.checked = !next;
+          wrap.querySelector("span").textContent = !next ? "Listed" : "Hidden";
+          toast("Couldn't update. Try again.", "error");
+        }
+        box.disabled = false;
+      });
+      controls.prepend(wrap);
+    });
+  }
+  render();   // redraw once so the first paint is decorated
+
+  /* ----- 3: bulk stock update ----- */
+  let stockModal;
+  function openBulkStock() {
+    const list = state.items.filter(i => i.stock <= i.lowAt)
+      .sort((a, b) => a.stock - b.stock);
+
+    if (!stockModal) {
+      stockModal = document.createElement("div");
+      stockModal.className = "pg-modal-bg";
+      stockModal.innerHTML = `<div class="pg-modal pg-form" style="max-width:520px">
+          <h3>Restock low items</h3>
+          <div id="bsList" class="bs-list"></div>
+          <div class="row-btns">
+            <button type="button" class="btn-outline" id="bsCancel">Close</button>
+            <button type="button" class="btn-primary" id="bsSave">Save all</button>
+          </div></div>`;
+      document.body.appendChild(stockModal);
+      stockModal.addEventListener("click", e => { if (e.target === stockModal || e.target.id === "bsCancel") stockModal.classList.remove("show"); });
+      $("#bsSave", stockModal).addEventListener("click", saveBulk);
+    }
+
+    $("#bsList", stockModal).innerHTML = list.length ? list.map(i => `
+      <div class="bs-row" data-id="${H(i.id)}">
+        <div class="bs-info"><div class="bs-name">${H(i.name)}</div>
+          <div class="bs-meta">${H(i.unit)} · ${i.stock === 0 ? "Out of stock" : i.stock + " left"}</div></div>
+        <input type="number" min="0" placeholder="New qty" data-cur="${i.stock}">
+      </div>`).join("") : `<div class="pg-empty">All stocked up 🎉</div>`;
+
+    $("#bsSave", stockModal).disabled = !list.length;
+    stockModal.classList.add("show");
+  }
+
+  async function saveBulk() {
+    const btn = $("#bsSave", stockModal);
+    const rows = Array.from(stockModal.querySelectorAll(".bs-row"))
+      .map(r => ({ id: r.dataset.id, v: r.querySelector("input").value }))
+      .filter(r => r.v !== "" && Number(r.v) >= 0);
+    if (!rows.length) return toast("Type a new quantity for at least one item", "warn");
+
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    let ok = 0, fail = 0;
+    for (const r of rows) {
+      const item = state.items.find(i => i.id === r.id);
+      if (!item) continue;
+      const prev = item.stock;
+      item.stock = Number(r.v);
+      try { await pushItem(item); ok++; }
+      catch (e) { item.stock = prev; fail++; }
+    }
+    btn.disabled = false;
+    btn.textContent = "Save all";
+    render();
+    if (typeof loadDashboard === "function") loadDashboard();
+    stockModal.classList.remove("show");
+    toast(fail ? `${ok} updated, ${fail} failed` : `${ok} item${ok === 1 ? "" : "s"} restocked`, fail ? "warn" : "success");
+  }
+
+  // capture: replaces the old "just filter low items" behaviour
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#updateStockBtn")) return;
+    e.stopImmediatePropagation();
+    showView("inventory", false);
+    openBulkStock();
+  }, true);
+
+  /* =====================================================================
+     7. ESCAPED DASHBOARD RENDERS
+  ===================================================================== */
+  window.renderOrders = function (orders) {
+    const tbody = document.getElementById("ordersBody");
+    if (!orders || !orders.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;color:var(--muted);">No orders yet</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = orders.slice(0, 5).map(o => {
+      const s = statusMap[o.status] || { cls: "new", label: o.status || "Unknown" };
+      return `<tr>
+        <td><span class="order-id">${H(o.tokenNo)}</span></td>
+        <td><div class="order-details">
+          <div class="order-name">Customer #${H(String(o.customer_id).slice(-6))}</div>
+          <div class="order-items">${H(o.items_summary || "—")}</div></div></td>
+        <td><span class="order-price">${money(o.total_amount)}</span></td>
+        <td><span class="status-pill ${s.cls}"><span class="status-dot"></span>${H(s.label)}</span></td>
+        <td style="font-size:12px;color:var(--muted);">${timeAgo(o.created_at)}</td></tr>`;
+    }).join("");
+  };
+
+  window.renderTopProducts = function (products) {
+    const el = document.getElementById("topProducts");
+    if (!products || !products.length) {
+      el.innerHTML = `<div style="padding:12px;color:var(--muted);font-size:13px;">No sales yet</div>`;
+      return;
+    }
+    const maxSold = Math.max(...products.map(p => p.sold), 1);
+    el.innerHTML = products.map((p, i) => `
+      <div class="product-row">
+        <span class="prod-rank">${i + 1}</span>
+        <div class="prod-icon">📦</div>
+        <div class="prod-info"><div class="prod-name">${H(p.item_name)}</div><div class="prod-sub">${H(p.unit || "")}</div></div>
+        <div style="flex:1;min-width:60px;padding:0 10px;"><div class="prod-bar-track"><div class="prod-bar-fill" style="width:${Math.round(p.sold / maxSold * 100)}%"></div></div></div>
+        <div style="text-align:right;"><div class="prod-revenue">${money(p.revenue)}</div><div class="prod-sold">${H(p.sold)} sold</div></div>
+      </div>`).join("");
+  };
+
+  window.renderStockAlerts = function (alerts) {
+    const el = document.getElementById("stockAlerts");
+    if (!alerts || !alerts.length) {
+      el.innerHTML = `<div style="padding:12px;color:var(--muted);font-size:13px;">All stocked up</div>`;
+      return;
+    }
+    el.innerHTML = alerts.map(s => `
+      <div class="stock-item"><div>
+        <div class="stock-name">${H(s.item_name)}</div>
+        <div class="stock-cat">${s.sub_id != null ? "Category #" + H(s.sub_id) : ""}</div></div>
+        <span class="stock-count ${s.status === "out" ? "out" : "low"}">${s.status === "out" ? "Out of stock" : H(s.stock) + " left"}</span>
+      </div>`).join("");
+  };
+
+  window.renderActivity = function (stats) {
+    const el = document.getElementById("activityFeed");
+    const items = [];
+    (stats.recent_orders || []).slice(0, 4).forEach(o => {
+      const c = o.status === "canceled";
+      items.push({
+        color: c ? "var(--danger)" : "var(--green)",
+        msg: c ? `<strong>Order #${H(o.tokenNo)}</strong> was cancelled`
+          : `<strong>Order #${H(o.tokenNo)}</strong> placed — ${money(o.total_amount)}`,
+        time: timeAgo(o.created_at),
+        sortKey: parseServerDate(o.created_at).getTime()   // was new Date(): wrong timezone
+      });
+    });
+    (stats.stock_alerts || []).slice(0, 3).forEach(s => items.push({
+      color: s.status === "out" ? "var(--danger)" : "var(--amber)",
+      msg: s.status === "out" ? `<strong>${H(s.item_name)}</strong> is out of stock`
+        : `<strong>${H(s.item_name)}</strong> is running low — ${H(s.stock)} left`,
+      time: "", sortKey: 0
+    }));
+    items.sort((a, b) => b.sortKey - a.sortKey);
+    el.innerHTML = items.length ? items.map(a => `
+      <div class="feed-item"><div class="feed-dot" style="background:${a.color};"></div>
+        <div><div class="feed-msg">${a.msg}</div>${a.time ? `<div class="feed-time">${a.time}</div>` : ""}</div></div>`).join("")
+      : `<div style="padding:12px;color:var(--muted);font-size:13px;">No recent activity</div>`;
+  };
+
+  // redraw with the new renderers
+  loadOrders();
+  loadDashboard();
+})();
