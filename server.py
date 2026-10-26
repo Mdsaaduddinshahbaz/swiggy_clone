@@ -1297,13 +1297,61 @@ def sellerTemplate(name, seller_id):
         return ({"success": False})
 
 
+
 @app.get("/landing")
 def renderLanding():
     try:
+        user_token = request.cookies.get("user_token")
+        
+
+        # Check customer session
+        if user_token:
+            try:
+                payload = jwt.decode(
+                    user_token,
+                    app.config["SECRET_KEY"],
+                    algorithms=["HS256"]
+                )
+
+                if payload.get("type") == "user" and payload.get("user_id"):
+                    return redirect(
+                        url_for("home", userid=payload["user_id"])
+                    )
+
+            except jwt.InvalidTokenError:
+                pass
+        seller_token = request.cookies.get("seller_token")
+        # Check seller session
+        if seller_token:
+            try:
+                payload = jwt.decode(
+                    seller_token,
+                    app.config["SECRET_KEY"],
+                    algorithms=["HS256"]
+                )
+
+                if (
+                    payload.get("type") == "seller"
+                    and payload.get("res_id")
+                    and payload.get("res_name")
+                ):
+                    return redirect(
+                        url_for(
+                            "sellerTemplate",
+                            name=payload["res_name"],
+                            seller_id=payload["res_id"]
+                        )
+                    )
+
+            except jwt.InvalidTokenError:
+                pass
+
         return render_template("landing.html")
-    except Exception as e:
-        print(e)
-        return ({"success": False})
+
+    except Exception:
+        # app.logger.exception("Landing page error")
+        return "Internal server error", 500
+
 
 
 @app.post("/update_order")
