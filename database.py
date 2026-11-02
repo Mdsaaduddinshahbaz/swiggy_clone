@@ -699,7 +699,6 @@ def update_order_status_seller(order_id, status, userid, res_id, **kwargs):
     of a checkout; the customer-facing status is derived in get_orders().
     """
     try:
-        # update_fields = {"status": status}
         update_fields = {"status": status, "status_updated_at": datetime.utcnow()}
 
         if status == "canceled":
@@ -1508,17 +1507,20 @@ def create_payout(res_id, amount, status="pending"):
         "status": status,
         "date": datetime.utcnow(),
     })
+
+
 # =========================================================
 # Support tickets / complaints
 #   Server is the source of truth for duplicates, order status and eligibility.
 #   { ticket_id, user_id, checkout_id, category, category_label, message, phone,
 #     order_status, order_type, restaurant_ids, restaurant_names, shop_online,
-#     priority, status: "open", created_at }
+#     priority, status: "open", photo_url, geo, created_at }
 # =========================================================
 
 SUPPORT_REPEAT_BLOCK = timedelta(hours=6)    # same order + same reason
 SUPPORT_HELP_WINDOW = timedelta(hours=24)    # finished orders only
 SUPPORT_DAILY_LIMIT = 10                     # tickets per user per 24h
+SUPPORT_SHOP_RADIUS_M = 300                  # how close to the shop a "shop is closed" report must be taken
 
 # Keep in sync with CATEGORIES in support.js.
 # when: "active" (pending) | "done" (completed/canceled) | "any"   for: "pickup" | "delivery" | "any"
@@ -1569,7 +1571,7 @@ def get_reported_categories(user_id, order_id):
     return out
 
 
-def create_support_ticket(user_id, order_id, category, message, phone, photo_url=None):
+def create_support_ticket(user_id, order_id, category, message, phone, photo_uploader=None, lat=None, lng=None, accuracy=None):
     """
     Returns {"success": True, "ticket_id", "restaurant_ids", "priority", ...}
     or {"success": False, "message", "status", ["ticket_id"]}.
@@ -1577,8 +1579,6 @@ def create_support_ticket(user_id, order_id, category, message, phone, photo_url
     """
     order_id = str(order_id or "").strip()
     cat = SUPPORT_CATEGORIES.get(category)
-    if category == "shop_closed" and not photo_url:
-        return {"success": False, "message": "A photo of the shop is required", "status": 400}
     if not order_id:
         return {"success": False, "message": "Order id is required", "status": 400}
     if not cat:
@@ -1618,6 +1618,33 @@ def create_support_ticket(user_id, order_id, category, message, phone, photo_url
     if phone and not re.fullmatch(r"[6-9]\d{9}", phone):
         return {"success": False, "message": "Please enter a valid 10-digit phone number, or leave it empty", "status": 400}
 
+    # ---- shop-closed proof: photo + the user must actually be near the shop ----
+    geo = None
+    if category == "shop_closed":
+        if photo_uploader is None:
+            return {"success": False, "message": "A photo of the shop is required", "status": 400}
+        try:
+            lat, lng = float(lat), float(lng)
+            acc = max(float(accuracy or 0), 0.0)
+        except (TypeError, ValueError):
+            return {"success": False, "message": "Location is required to report a closed shop", "status": 400}
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            return {"success": False, "message": "Invalid location", "status": 400}
+
+        dists = []
+        for rid in {d["restaurant_id"] for d in docs}:
+            s = get_restaurant_delivery(rid)
+            if s and s.get("latt") is not None and s.get("long") is not None:
+                dists.append(_haversine_km(lat, lng, float(s["latt"]), float(s["long"])) * 1000)
+        if not dists:
+            return {"success": False, "message": "Couldn't verify the shop location", "status": 400}
+
+        nearest = min(dists)
+        if nearest > SUPPORT_SHOP_RADIUS_M + min(acc, 200):   # allow for GPS inaccuracy, capped
+            return {"success": False, "status": 400,
+                    "message": f"You seem to be about {int(nearest)} m from the shop. Please report from the shop."}
+        geo = {"lat": lat, "lng": lng, "accuracy": acc, "distance_m": round(nearest)}
+
     # ---- abuse guards ----
     existing = support_tickets.find_one({
         "user_id": user_id, "checkout_id": order_id, "category": category,
@@ -1629,6 +1656,12 @@ def create_support_ticket(user_id, order_id, category, message, phone, photo_url
 
     if support_tickets.count_documents({"user_id": user_id, "created_at": {"$gte": now - timedelta(hours=24)}}) >= SUPPORT_DAILY_LIMIT:
         return {"success": False, "message": "You've sent too many reports today. Please try again tomorrow.", "status": 429}
+
+    # ---- every check passed: only now upload the photo (no orphan files) ----
+    photo_url = None
+    if photo_uploader:
+        file_id = photo_uploader()
+        photo_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
 
     restaurant_ids = [d["restaurant_id"] for d in docs]
     ticket = {
@@ -1648,6 +1681,7 @@ def create_support_ticket(user_id, order_id, category, message, phone, photo_url
         "priority": cat["priority"],
         "status": "open",
         "photo_url": photo_url,
+        "geo": geo,
         "created_at": now,
     }
     try:
@@ -1662,6 +1696,8 @@ def create_support_ticket(user_id, order_id, category, message, phone, photo_url
         "priority": ticket["priority"],
         "category": category,
     }
+
+
 # =========================================================
 # Seller side of support tickets (complaints)
 #   status: "open" | "resolved" | "dismissed"
@@ -1705,6 +1741,7 @@ def get_seller_complaints(res_id, limit=200):
             "message": t.get("message", ""),
             "phone": t.get("phone"),
             "photo_url": t.get("photo_url"),
+            "geo": t.get("geo"),
             "priority": t.get("priority", "normal"),
             "status": t.get("status", "open"),
             "seller_note": t.get("seller_note"),

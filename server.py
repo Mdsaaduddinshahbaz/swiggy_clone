@@ -198,6 +198,14 @@ def ratelimit_handler(e):
     }), 429
 
 
+@app.errorhandler(413)
+def too_large_handler(e):
+    return jsonify({
+        "success": False,
+        "message": "The file is too large (max 10 MB)"
+    }), 413
+
+
 @app.route("/", methods=["GET", "POST"])
 def land():
     return redirect(url_for('renderLanding'))
@@ -609,20 +617,20 @@ def get_item_details():
     try:
         data = request.get_json(force=True) or {}
         barcode = re.sub(r"\D", "", str(data.get("barcode") or ""))  # digits only
- 
+
         if not barcode:
             return jsonify({"success": False, "message": "barcode is required"}), 400
- 
+
         details = get_product_details(barcode)
         if details is None:
             return jsonify({"success": False, "message": "Item Not Found"}), 404
- 
+
         return jsonify({"success": True, "details": details})
- 
+
     except Exception as e:
         print("get_item_details error:", e)
         return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
- 
+
 @app.post("/update_cart")
 @login_required
 #@limiter.limit("120 per minute")
@@ -1303,7 +1311,7 @@ def sellerTemplate(name, seller_id):
 def renderLanding():
     try:
         user_token = request.cookies.get("user_token")
-        
+
 
         # Check customer session
         if user_token:
@@ -2444,6 +2452,8 @@ def seller_settings_save():
     if not update_store_settings(g.res_id, clean):
         return jsonify({"success": False, "message": "Restaurant not found"}), 404
     return jsonify({"success": True})
+
+
 ################# support tickets / complaints #########################
 
 @app.post("/support_ticket")
@@ -2466,17 +2476,18 @@ def support_ticket():
         return jsonify({"success": False, "message": "Your request is already being sent"}), 409
 
     try:
-        photo_url = None
+        uploader = None
         if category == "shop_closed":
             if not photo or not photo.filename or not allowed_file(photo.filename):
                 return jsonify({"success": False, "message": "A photo of the shop (png, jpg, jpeg, webp) is required"}), 400
-            file_id = upload_image(photo)
-            photo_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+            # uploaded only after every check passes, so rejected reports leave no orphan file
+            uploader = lambda: upload_image(photo)
 
         result = create_support_ticket(
             g.user_id, order_id, category,
             data.get("message"), data.get("phone"),
-            photo_url=photo_url,
+            photo_uploader=uploader,
+            lat=data.get("lat"), lng=data.get("lng"), accuracy=data.get("accuracy"),
         )
     except Exception as e:
         print("support_ticket error:", e)
@@ -2516,6 +2527,8 @@ def support_ticket_reported():
     except Exception as e:
         print("support_ticket_reported error:", e)
         return jsonify({"success": False, "message": "Something went wrong"}), 500
+
+
 ################# seller: complaints #########################
 
 @app.get("/seller/complaints")
@@ -2567,5 +2580,7 @@ def seller_complaints_update():
         room=result["user_id"]
     )
     return jsonify({"success": True, "status": result["status"]})
+
+
 if __name__ == "__main__":
     socketio.run(app, debug=True)

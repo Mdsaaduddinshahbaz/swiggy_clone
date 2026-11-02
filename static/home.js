@@ -212,7 +212,7 @@
     //                  so someone standing outside a closed shop can report in two taps)
     const CATEGORIES = [
         {
-            id: "shop_closed", label: "Shop is closed", when: "active", for: "any",  photoRequired: true,
+            id: "shop_closed", label: "Shop is closed", when: "active", for: "any", photoRequired: true,
             hint: "The shop is shut or nobody is there. We'll flag this order for review and contact the shop."
         },
         {
@@ -386,7 +386,7 @@
         return "";
     }
 
-        // ---- duplicate reports: the SERVER is the source of truth ----
+    // ---- duplicate reports: the SERVER is the source of truth ----
     // Memory only (no localStorage). Filled from /support_ticket/reported when the sheet opens.
     const reportedByOrder = {};   // orderId -> { categoryId: ticketId }
 
@@ -434,10 +434,101 @@
         style.textContent = `
             .support-hint { margin: 0; font-size: 13px; line-height: 1.4; color: #6b5f58; }
             .support-hint:empty { display: none; }
+            .support-cam-video, .support-cam-preview { width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; background: #000; }
+            .support-cam-actions { display: flex; gap: 8px; margin-top: 8px; }
+            .support-cam-title { margin: 0 0 8px; font-weight: 600; }
         `;
         document.head.appendChild(style);
     }
+    // ---- live camera proof (no file picker) ----
+    let camStream = null;
+    let shot = null;   // { blob, lat, lng, accuracy }
+    const qs = (sel) => sheet.querySelector(sel);
 
+    function stopCamera() {
+        if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
+        const v = sheet && qs(".support-cam-video");
+        if (v) { v.srcObject = null; v.hidden = true; }
+    }
+
+    function resetCamUI() {
+        if (!sheet) return;
+        stopCamera();
+        shot = null;
+        const p = qs(".support-cam-preview");
+        if (p.src) URL.revokeObjectURL(p.src);
+        p.removeAttribute("src");
+        p.hidden = true;
+        qs(".support-cam-open").hidden = false;
+        qs(".support-cam-snap").hidden = true;
+        qs(".support-cam-retake").hidden = true;
+    }
+
+    function getFix() {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) return reject(new Error("no geolocation"));
+            navigator.geolocation.getCurrentPosition(resolve, reject,
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+        });
+    }
+
+    async function openCamera() {
+        showError("");
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError("Camera isn't available here (the site must be opened over HTTPS).");
+            return;
+        }
+        try {
+            camStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: "environment" } }, audio: false
+            });
+        } catch (e) {
+            showError("Couldn't open the camera. Please allow camera access and try again.");
+            return;
+        }
+        const v = qs(".support-cam-video");
+        v.srcObject = camStream;
+        try { await v.play(); } catch (e) { /* autoplay quirks */ }
+        v.hidden = false;
+        qs(".support-cam-preview").hidden = true;
+        qs(".support-cam-open").hidden = true;
+        qs(".support-cam-retake").hidden = true;
+        qs(".support-cam-snap").hidden = false;
+    }
+
+    async function capturePhoto() {
+        const v = qs(".support-cam-video");
+        const snap = qs(".support-cam-snap");
+        if (!v.videoWidth) return;
+        snap.disabled = true;
+        showError("");
+
+        let fix;
+        try { fix = await getFix(); }
+        catch (e) {
+            showError("Location is required. Please allow location access and try again.");
+            snap.disabled = false;
+            return;
+        }
+
+        const scale = Math.min(1, 1280 / v.videoWidth);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(v.videoWidth * scale);
+        canvas.height = Math.round(v.videoHeight * scale);
+        canvas.getContext("2d").drawImage(v, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+        snap.disabled = false;
+        if (!blob) { showError("Couldn't capture the photo. Please try again."); return; }
+
+        shot = { blob, lat: fix.coords.latitude, lng: fix.coords.longitude, accuracy: fix.coords.accuracy };
+        stopCamera();
+        const p = qs(".support-cam-preview");
+        if (p.src) URL.revokeObjectURL(p.src);
+        p.src = URL.createObjectURL(blob);
+        p.hidden = false;
+        snap.hidden = true;
+        qs(".support-cam-retake").hidden = false;
+    }
     function build() {
         if (sheet && document.body.contains(sheet)) return;
         ensureExtraStyle();
@@ -478,9 +569,16 @@
                         <label><span class="support-msg-label">Tell us what happened</span>
                             <textarea name="message" maxlength="1000" placeholder="Describe the problem..."></textarea>
                         </label>
-                        <label class="support-photo-wrap" hidden>Photo of the shop <span class="opt">(required)</span>
-                            <input name="photo" type="file" accept="image/*" capture="environment">
-                        </label>
+                                                <div class="support-cam" hidden>
+                            <p class="support-cam-title">Photo of the shop <span class="opt">(required, live camera)</span></p>
+                            <video class="support-cam-video" playsinline muted hidden></video>
+                            <img class="support-cam-preview" alt="Shop photo" hidden>
+                            <div class="support-cam-actions">
+                                <button type="button" class="support-cam-open" style="font: inherit;font-size: 14px;font-weight: 500;color: var(--ink);background: var(--surface-2);border: 1px solid transparent;border-radius: var(--radius-sm);padding: 11px 12px;width: 100%;">Open camera</button>
+                                <button type="button" class="support-cam-snap" hidden>Capture</button>
+                                <button type="button" class="support-cam-retake" hidden>Retake</button>
+                            </div>
+                        </div>
                         <label>Phone number <span class="opt">(optional, so we can call you)</span>
                             <input name="phone" type="tel" maxlength="13" autocomplete="tel">
                         </label>
@@ -511,6 +609,9 @@
         const form = sheet.querySelector(".support-form");
         form.addEventListener("submit", onSubmit);
         form.elements.category.addEventListener("change", onCategoryChange);
+        sheet.querySelector(".support-cam-open").addEventListener("click", openCamera);
+        sheet.querySelector(".support-cam-snap").addEventListener("click", capturePhoto);
+        sheet.querySelector(".support-cam-retake").addEventListener("click", openCamera);
         sheet.querySelector(".support-again").addEventListener("click", () => showForm());
 
         document.body.appendChild(overlay);
@@ -533,13 +634,12 @@
             : "Anything else we should know? (optional)";
         form.elements.message.placeholder = required ? "Describe the problem..." : "Optional details...";
         const needPhoto = !!(cat && cat.photoRequired);
-        const photoWrap = sheet.querySelector(".support-photo-wrap");
-        photoWrap.hidden = !needPhoto;
-        if (!needPhoto) form.elements.photo.value = "";
+        sheet.querySelector(".support-cam").hidden = !needPhoto;
+        if (!needPhoto) resetCamUI();
         showError("");
     }
 
-        function fillCategories(ctx) {
+    function fillCategories(ctx) {
         const form = sheet.querySelector(".support-form");
         const reported = reportedByOrder[ctx.orderId] || {};
         const isDone = (id) => Object.prototype.hasOwnProperty.call(reported, id);
@@ -643,14 +743,12 @@
             showError("Please enter a valid 10-digit phone number, or leave it empty.");
             return;
         }
-        const photo = form.elements.photo.files[0];
-        if (cat.photoRequired) {
-            if (!photo) { showError("Please take a photo of the shop with its name visible."); return; }
-            if (!photo.type.startsWith("image/")) { showError("Please upload an image."); return; }
-            if (photo.size > 8 * 1024 * 1024) { showError("Photo is too large (max 8 MB)."); return; }
+        if (cat.photoRequired && !shot) {
+            showError("Please capture a live photo of the shop first.");
+            return;
         }
 
-        
+
 
         showError("");
         btn.disabled = true;
@@ -662,7 +760,12 @@
             fd.append("category", data.category);
             fd.append("message", data.message);
             fd.append("phone", data.phone);
-            if (cat.photoRequired) fd.append("photo", photo);
+            if (cat.photoRequired) {
+                fd.append("photo", shot.blob, "shop.jpg");
+                fd.append("lat", shot.lat);
+                fd.append("lng", shot.lng);
+                fd.append("accuracy", shot.accuracy);
+            }
             const res = await fetch(TICKET_ENDPOINT, { method: "POST", body: fd });
 
             if (res.status === 401) {
@@ -675,6 +778,7 @@
             try { body = await res.json(); } catch (err) { /* non-JSON error page */ }
 
             if (res.ok && body && body.success) {
+                resetCamUI();
                 markReported(data.order_id, data.category, body.ticket_id);
                 form.reset();
                 fillCategories(currentCtx);
@@ -722,7 +826,8 @@
                 || currentCtx.orderType !== ctx.orderType;
             currentCtx = ctx;
 
-            if (changed) form.reset();
+            // if (changed) form.reset();
+            if (changed) { form.reset(); resetCamUI(); }
             form.elements.order_id.value = orderId;
             fillCategories(ctx);
             // pull which reasons were already reported from the server, then refresh the dropdown
@@ -747,6 +852,7 @@
 
     function close() {
         if (!sheet) return;
+        stopCamera();
         overlay.classList.remove("show");
         sheet.classList.remove("show");
         document.body.classList.remove("support-open");
