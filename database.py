@@ -1,6 +1,7 @@
 from pymongo import MongoClient, UpdateOne, ReturnDocument
 from pymongo.errors import DuplicateKeyError, OperationFailure
 from dotenv import load_dotenv
+import re
 from bson import ObjectId
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -50,6 +51,10 @@ seller_orders.create_index([("checkout_id", 1), ("user_id", 1)])
 seller_orders.create_index([("restaurant_id", 1), ("time", -1)])
 offers.create_index([("restaurant_id", 1), ("code", 1)], unique=True)
 seller_payouts.create_index([("restaurant_id", 1), ("date", -1)])
+support_tickets = db["support_tickets"]
+support_tickets.create_index([("user_id", 1), ("checkout_id", 1), ("category", 1), ("created_at", -1)])
+support_tickets.create_index([("restaurant_ids", 1), ("created_at", -1)])
+support_tickets.create_index([("ticket_id", 1)], unique=True)
 
 
 class InventoryError(Exception):
@@ -565,6 +570,7 @@ def get_orders(userid):
                 "token_no": doc.get("token_no"),
                 "resturants": {"cart": {}},
                 "statuses": [],
+                "updated_ats": [],
                 "date": doc.get("time"),
                 "pickup_time": doc.get("pickup_time"),
                 "order_type": doc.get("order_type", "pickup"),
@@ -575,15 +581,20 @@ def get_orders(userid):
         group["resturants"]["cart"][doc["restaurant_id"]] = {
             "name": doc.get("restaurant_name"),
             "items": doc.get("items", {}),
-            # extra per-restaurant info (safe to ignore on the client)
             "status": doc.get("status"),
             "seller_order_id": str(doc["_id"])
         }
         group["statuses"].append(doc.get("status", "placed"))
+        stamp = doc.get("status_updated_at") or doc.get("time")
+        if stamp:
+            group["updated_ats"].append(stamp)
 
     final_orders = []
     for group in groups.values():
         group["status"] = _combined_status(group.pop("statuses"))
+        stamps = group.pop("updated_ats")
+        # used by orders.js to close the 24h help window on finished orders
+        group["status_updated_at"] = max(stamps) if stamps else group.get("date")
         final_orders.append(group)
     return final_orders
 
@@ -688,7 +699,8 @@ def update_order_status_seller(order_id, status, userid, res_id, **kwargs):
     of a checkout; the customer-facing status is derived in get_orders().
     """
     try:
-        update_fields = {"status": status}
+        # update_fields = {"status": status}
+        update_fields = {"status": status, "status_updated_at": datetime.utcnow()}
 
         if status == "canceled":
             update_fields["reason"] = kwargs.get("reason")
@@ -720,7 +732,7 @@ def update_order_status_user(order_id, status, userid):
         with session.start_transaction():
             result = seller_orders.update_many(
                 {"checkout_id": order_id, "user_id": userid},
-                {"$set": {"status": status}},
+                {"$set": {"status": status, "status_updated_at": datetime.utcnow()}},
                 session=session
             )
             if result.matched_count == 0:
@@ -1496,3 +1508,239 @@ def create_payout(res_id, amount, status="pending"):
         "status": status,
         "date": datetime.utcnow(),
     })
+# =========================================================
+# Support tickets / complaints
+#   Server is the source of truth for duplicates, order status and eligibility.
+#   { ticket_id, user_id, checkout_id, category, category_label, message, phone,
+#     order_status, order_type, restaurant_ids, restaurant_names, shop_online,
+#     priority, status: "open", created_at }
+# =========================================================
+
+SUPPORT_REPEAT_BLOCK = timedelta(hours=6)    # same order + same reason
+SUPPORT_HELP_WINDOW = timedelta(hours=24)    # finished orders only
+SUPPORT_DAILY_LIMIT = 10                     # tickets per user per 24h
+
+# Keep in sync with CATEGORIES in support.js.
+# when: "active" (pending) | "done" (completed/canceled) | "any"   for: "pickup" | "delivery" | "any"
+SUPPORT_CATEGORIES = {
+    "shop_closed":         {"label": "Shop is closed", "when": "active", "for": "any", "msg_required": False, "priority": "high"},
+    "shop_not_responding": {"label": "Shop isn't responding / not preparing my order", "when": "active", "for": "any", "msg_required": False, "priority": "normal"},
+    "not_ready":           {"label": "Order isn't ready at my pickup time", "when": "active", "for": "pickup", "msg_required": False, "priority": "normal"},
+    "qr_not_working":      {"label": "QR / token not accepted at the shop", "when": "active", "for": "pickup", "msg_required": False, "priority": "normal"},
+    "delivery_late":       {"label": "Delivery is taking too long", "when": "active", "for": "delivery", "msg_required": False, "priority": "normal"},
+    "rider_unreachable":   {"label": "Can't reach the delivery person / shop", "when": "active", "for": "delivery", "msg_required": False, "priority": "normal"},
+    "wrong_address":       {"label": "I need to fix my address or phone number", "when": "active", "for": "delivery", "msg_required": True, "priority": "normal"},
+    "not_received":        {"label": "Marked completed but I didn't get my order", "when": "done", "for": "any", "msg_required": False, "priority": "high"},
+    "item":                {"label": "Missing or wrong item", "when": "done", "for": "any", "msg_required": True, "priority": "normal"},
+    "quality":             {"label": "Item quality", "when": "done", "for": "any", "msg_required": True, "priority": "normal"},
+    "price":               {"label": "Charged more than the listed price", "when": "any", "for": "any", "msg_required": True, "priority": "normal"},
+    "payment":             {"label": "Payment or refund", "when": "any", "for": "any", "msg_required": True, "priority": "normal"},
+    "other":               {"label": "Something else", "when": "any", "for": "any", "msg_required": True, "priority": "normal"},
+}
+
+
+def _find_checkout_docs(user_id, order_id):
+    """All seller_orders docs of one checkout, scoped to this user."""
+    docs = list(seller_orders.find({"checkout_id": order_id, "user_id": user_id}))
+    if docs:
+        return docs
+    # un-migrated docs have no checkout_id; get_orders() uses str(_id) as the key for them
+    try:
+        oid = ObjectId(order_id)
+    except Exception:
+        return []
+    return list(seller_orders.find({"_id": oid, "user_id": user_id, "checkout_id": {"$exists": False}}))
+
+
+def _normalize_phone(phone):
+    cleaned = re.sub(r"[\s-]", "", str(phone or ""))
+    return re.sub(r"^(?:\+?91|0)(?=\d{10}$)", "", cleaned)
+
+
+def get_reported_categories(user_id, order_id):
+    """{category_id: ticket_id} reported by this user for this order within the repeat window."""
+    since = datetime.utcnow() - SUPPORT_REPEAT_BLOCK
+    out = {}
+    for t in support_tickets.find(
+        {"user_id": user_id, "checkout_id": str(order_id), "created_at": {"$gte": since}},
+        {"category": 1, "ticket_id": 1}
+    ):
+        out[t["category"]] = t["ticket_id"]
+    return out
+
+
+def create_support_ticket(user_id, order_id, category, message, phone, photo_url=None):
+    """
+    Returns {"success": True, "ticket_id", "restaurant_ids", "priority", ...}
+    or {"success": False, "message", "status", ["ticket_id"]}.
+    Order status / type / restaurants always come from the DB, never from the client.
+    """
+    order_id = str(order_id or "").strip()
+    cat = SUPPORT_CATEGORIES.get(category)
+    if category == "shop_closed" and not photo_url:
+        return {"success": False, "message": "A photo of the shop is required", "status": 400}
+    if not order_id:
+        return {"success": False, "message": "Order id is required", "status": 400}
+    if not cat:
+        return {"success": False, "message": "Invalid reason", "status": 400}
+
+    docs = _find_checkout_docs(user_id, order_id)
+    if not docs:
+        return {"success": False, "message": "Order not found", "status": 404}
+
+    now = datetime.utcnow()
+    order_status = _combined_status([d.get("status", "placed") for d in docs])
+    order_type = docs[0].get("order_type", "pickup")
+    active = order_status == "placed"
+
+    # ---- eligibility (mirrors the UI) ----
+    if cat["when"] == "active" and not active:
+        return {"success": False, "message": "This can only be reported while the order is pending", "status": 400}
+    if cat["when"] == "done" and active:
+        return {"success": False, "message": "This can only be reported after the order is finished", "status": 400}
+    if cat["for"] != "any" and cat["for"] != order_type:
+        return {"success": False, "message": "This reason doesn't apply to this order type", "status": 400}
+
+    if not active:
+        stamps = [d.get("status_updated_at") or d.get("time") for d in docs]
+        stamps = [s for s in stamps if isinstance(s, datetime)]
+        if stamps and now - max(stamps) > SUPPORT_HELP_WINDOW:
+            return {"success": False, "message": "Help for this order is no longer available (24 hours after completion)", "status": 403}
+
+    # ---- input ----
+    message = str(message or "").strip()[:1000]
+    if cat["msg_required"] and len(message) < 10:
+        return {"success": False, "message": "Please describe the problem in a few words (at least 10 characters)", "status": 400}
+    if not message:
+        message = cat["label"]
+
+    phone = _normalize_phone(phone)
+    if phone and not re.fullmatch(r"[6-9]\d{9}", phone):
+        return {"success": False, "message": "Please enter a valid 10-digit phone number, or leave it empty", "status": 400}
+
+    # ---- abuse guards ----
+    existing = support_tickets.find_one({
+        "user_id": user_id, "checkout_id": order_id, "category": category,
+        "created_at": {"$gte": now - SUPPORT_REPEAT_BLOCK}
+    }, {"ticket_id": 1})
+    if existing:
+        return {"success": False, "status": 409, "ticket_id": existing["ticket_id"],
+                "message": f"You already reported this for this order (reference {existing['ticket_id']}). We're looking into it."}
+
+    if support_tickets.count_documents({"user_id": user_id, "created_at": {"$gte": now - timedelta(hours=24)}}) >= SUPPORT_DAILY_LIMIT:
+        return {"success": False, "message": "You've sent too many reports today. Please try again tomorrow.", "status": 429}
+
+    restaurant_ids = [d["restaurant_id"] for d in docs]
+    ticket = {
+        "ticket_id": "TK-" + uuid.uuid4().hex[:8].upper(),
+        "user_id": user_id,
+        "checkout_id": order_id,
+        "category": category,
+        "category_label": cat["label"],
+        "message": message,
+        "phone": phone or None,
+        "order_status": order_status,
+        "order_type": order_type,
+        "restaurant_ids": restaurant_ids,
+        "restaurant_names": [d.get("restaurant_name") for d in docs],
+        # snapshot so "shop is closed" claims can be checked against what we knew
+        "shop_online": {rid: is_restaurant_online(rid) for rid in restaurant_ids},
+        "priority": cat["priority"],
+        "status": "open",
+        "photo_url": photo_url,
+        "created_at": now,
+    }
+    try:
+        support_tickets.insert_one(ticket)
+    except DuplicateKeyError:
+        return {"success": False, "message": "Please try again", "status": 500}
+
+    return {
+        "success": True,
+        "ticket_id": ticket["ticket_id"],
+        "restaurant_ids": restaurant_ids,
+        "priority": ticket["priority"],
+        "category": category,
+    }
+# =========================================================
+# Seller side of support tickets (complaints)
+#   status: "open" | "resolved" | "dismissed"
+# =========================================================
+
+COMPLAINT_STATUSES = ("open", "resolved", "dismissed")
+
+
+def get_seller_complaints(res_id, limit=200):
+    """All complaints that involve this restaurant, newest first."""
+    tickets = list(
+        support_tickets.find({"restaurant_ids": res_id})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    if not tickets:
+        return []
+
+    # order info for THIS restaurant's part of each checkout
+    checkout_ids = [t["checkout_id"] for t in tickets]
+    orders = {}
+    for o in seller_orders.find(
+        {"restaurant_id": res_id, "checkout_id": {"$in": checkout_ids}},
+        {"checkout_id": 1, "token_no": 1, "items": 1, "status": 1}
+    ):
+        orders[o["checkout_id"]] = o
+
+    out = []
+    for t in tickets:
+        o = orders.get(t["checkout_id"]) or {}
+        items = (o.get("items") or {}).values()
+        items_summary = ", ".join(
+            f"{i.get('name', 'Item')} x{i.get('qty', 0)}" for i in items
+        )
+        total = sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in (o.get("items") or {}).values())
+        created = t.get("created_at")
+        out.append({
+            "ticket_id": t["ticket_id"],
+            "category": t.get("category"),
+            "category_label": t.get("category_label", ""),
+            "message": t.get("message", ""),
+            "phone": t.get("phone"),
+            "photo_url": t.get("photo_url"),
+            "priority": t.get("priority", "normal"),
+            "status": t.get("status", "open"),
+            "seller_note": t.get("seller_note"),
+            "order_type": t.get("order_type", "pickup"),
+            "order_status": o.get("status") or t.get("order_status"),
+            "token_no": o.get("token_no"),
+            "items_summary": items_summary,
+            "total": total,
+            "customer_id": t.get("user_id"),
+            "shop_online": (t.get("shop_online") or {}).get(res_id),
+            "created_at": created.isoformat() if isinstance(created, datetime) else None,
+        })
+    return out
+
+
+def update_complaint(res_id, ticket_id, status, note=None):
+    """Seller resolves / dismisses / reopens a complaint (scoped to their restaurant)."""
+    if status not in COMPLAINT_STATUSES:
+        return {"success": False, "message": "Invalid status", "status": 400}
+
+    fields = {"status": status, "updated_at": datetime.utcnow()}
+    if note is not None:
+        fields["seller_note"] = note
+
+    doc = support_tickets.find_one_and_update(
+        {"ticket_id": ticket_id, "restaurant_ids": res_id},
+        {"$set": fields},
+        return_document=ReturnDocument.AFTER
+    )
+    if not doc:
+        return {"success": False, "message": "Complaint not found", "status": 404}
+
+    return {
+        "success": True,
+        "ticket_id": doc["ticket_id"],
+        "status": doc["status"],
+        "user_id": doc["user_id"],
+        "seller_note": doc.get("seller_note"),
+    }

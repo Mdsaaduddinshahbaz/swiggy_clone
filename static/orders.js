@@ -9,11 +9,17 @@ function escapeOrderHtml(str) {
     })[c]);
 }
 
-// "Get help with this order" is offered for 1 day after an order is completed or canceled.
+// ---------------------------------------------------------------
+// Complaints / "Report a problem"
+//
+// - While an order is still PENDING ("placed") the user can report problems
+//   right away (shop closed, shop not responding, delivery too slow, ...).
+// - After an order is completed or canceled, help stays open for 1 day.
+// ---------------------------------------------------------------
 const HELP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-// Uses the first timestamp the server provides; if none can be parsed we show the
-// button and let the server enforce the limit.
+// Only applies to finished orders. Uses the first timestamp the server provides;
+// if none can be parsed we show the button and let the server enforce the limit.
 function orderHelpOpen(order) {
     const raw = order.completed_at || order.status_updated_at || order.updated_at || order.date;
     const t = Date.parse(raw);
@@ -21,19 +27,45 @@ function orderHelpOpen(order) {
     return Date.now() - t <= HELP_WINDOW_MS;
 }
 
-function helpButtonHTML(orderId, storeName) {
+function orderCanGetHelp(order) {
+    if (order.status === "placed") return true; // pending: always allowed
+    if (order.status === "completed" || order.status === "canceled") return orderHelpOpen(order);
+    return false;
+}
+
+function helpButtonLabel(status) {
+    return status === "placed" ? "Report a problem" : "Get help with this order";
+}
+
+function helpButtonHTML(info) {
     return `<button type="button" class="order-help-btn"
-                data-order-id="${escapeOrderHtml(orderId)}"
-                data-store="${escapeOrderHtml(storeName)}">Get help with this order</button>`;
+                data-order-id="${escapeOrderHtml(info.orderId)}"
+                data-store="${escapeOrderHtml(info.storeName)}"
+                data-status="${escapeOrderHtml(info.status)}"
+                data-order-type="${escapeOrderHtml(info.orderType)}"
+                data-res-ids="${escapeOrderHtml((info.resIds || []).join(","))}">${escapeOrderHtml(helpButtonLabel(info.status))}</button>`;
 }
 
 // Used when a status changes live while the Orders page is open.
-function ensureHelpButton(card) {
-    if (!card || card.querySelector(".order-help-btn")) return;
+// Adds the button if missing and keeps its status / label in sync.
+function ensureHelpButton(card, status) {
+    if (!card) return;
     const orderId = (card.querySelector(".order-id")?.textContent || "").replace("#", "").trim();
-    const store = card.querySelector(".restaurant-name")?.textContent.trim() || "";
     if (!orderId) return;
-    card.insertAdjacentHTML("beforeend", helpButtonHTML(orderId, store));
+
+    let btn = card.querySelector(".order-help-btn");
+    if (!btn) {
+        const store = Array.from(card.querySelectorAll(".restaurant-name"))
+            .map((r) => r.textContent.trim()).filter(Boolean).join(", ");
+        const resIds = Array.from(card.querySelectorAll(".restaurant-name"))
+            .map((r) => r.getAttribute("res_id")).filter(Boolean);
+        card.insertAdjacentHTML("beforeend", helpButtonHTML({
+            orderId, storeName: store, status, orderType: card.dataset.orderType || "pickup", resIds
+        }));
+        return;
+    }
+    btn.dataset.status = status;
+    btn.textContent = helpButtonLabel(status);
 }
 
 socket.on("connect", () => {
@@ -49,7 +81,7 @@ socket.on("order_status_updated", (data) => {
             const statusSpan = card.querySelector(".order-status");
             statusSpan.textContent = data.status;
             statusSpan.className = `order-status status-${data.status}`;
-            if (data.status === "completed" || data.status === "canceled") ensureHelpButton(card);
+            if (["placed", "completed", "canceled"].includes(data.status)) ensureHelpButton(card, data.status);
 
             // QR + cancel only make sense while the order is still active
             if (data.status !== "placed") {
@@ -285,8 +317,9 @@ function renderOrders(orders, ordersList, no_order_container) {
 
         const isActive = order.status === "placed";
         const isDelivery = order.order_type === "delivery";
-        const canHelp = (order.status === "completed" || order.status === "canceled") && orderHelpOpen(order);
+        const canHelp = orderCanGetHelp(order);
         const storeLabel = Object.values(cart).map((r) => r && r.name).filter(Boolean).join(", ");
+        const resIds = Object.keys(cart);
 
         let fulfilmentHTML;
         if (isDelivery && order.delivery_address) {
@@ -300,7 +333,7 @@ function renderOrders(orders, ordersList, no_order_container) {
         }
 
         return `
-            <div class="order-card" data-token="${escapeOrderHtml(order.token_no)}">
+            <div class="order-card" data-token="${escapeOrderHtml(order.token_no)}" data-order-type="${isDelivery ? "delivery" : "pickup"}">
                 <div class="order-header">
                     <span class="order-id">#${escapeOrderHtml(order.order_id)}</span>
                     <span class="order-status status-${escapeOrderHtml(order.status)}">
@@ -336,7 +369,13 @@ function renderOrders(orders, ordersList, no_order_container) {
                     border: none;
                     ${isActive ? "" : "display:none;"}
                 ">Cancel Order</button>
-                ${canHelp ? helpButtonHTML(order.order_id, storeLabel) : ""}
+                ${canHelp ? helpButtonHTML({
+                    orderId: order.order_id,
+                    storeName: storeLabel,
+                    status: order.status,
+                    orderType: isDelivery ? "delivery" : "pickup",
+                    resIds
+                }) : ""}
             </div>
         `;
     }).join("");
@@ -413,7 +452,16 @@ function initOrdersPage() {
         const helpBtn = e.target.closest(".order-help-btn");
         if (helpBtn) {
             if (window.KiranaSupport) {
-                KiranaSupport.open("report", { orderId: helpBtn.dataset.orderId, storeName: helpBtn.dataset.store });
+                const card = helpBtn.closest(".order-card");
+                // Read the live status from the card (it may have changed since render)
+                const liveStatus = (card?.querySelector(".order-status")?.textContent || helpBtn.dataset.status || "").trim().toLowerCase();
+                KiranaSupport.open("report", {
+                    orderId: helpBtn.dataset.orderId,
+                    storeName: helpBtn.dataset.store,
+                    status: liveStatus,
+                    orderType: helpBtn.dataset.orderType || card?.dataset.orderType || "pickup",
+                    resIds: (helpBtn.dataset.resIds || "").split(",").filter(Boolean)
+                });
             } else {
                 alert("Help isn't available right now. Please try again.");
             }
@@ -450,6 +498,7 @@ function initOrdersPage() {
             e.target.style.display = "none";
             const qrBtn = card.querySelector(".qrBtn");
             if (qrBtn) qrBtn.style.display = "none";
+            ensureHelpButton(card, "canceled");
             await loadOrders(userId, { background: true });
             applyFilterFor(filterDropdown, no_order_container);
         }

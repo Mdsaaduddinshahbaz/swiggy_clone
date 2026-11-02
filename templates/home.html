@@ -30,6 +30,11 @@
 
             <div class="location-overlay" id="locationOverlay"></div>
             <div class="pickup-overlay" id="pickupOverlay"></div>
+
+            <!-- Pickup time sheet (used from Cart's scheduled-order flow).
+                 NOTE: this block used to appear twice with identical ids
+                 (pickupSheet / pickupTimeInput / pickupError / confirmPickupBtn).
+                 Duplicate ids are invalid HTML, so only one copy is kept. -->
             <div class="address-options" id="pickupSheet">
                 <h2>Pickup Time</h2>
                 <div class="pickup-time-row">
@@ -40,19 +45,6 @@
                 <button class="live-location-btn" id="confirmPickupBtn">
                     <i class="fa-solid fa-check"></i>
                     Confirm & Place Order
-                </button>
-            </div>
-            <!-- Pickup time sheet (used from Cart's scheduled-order flow) -->
-            <div class="address-options" id="pickupSheet">
-                <h2>Pickup time</h2>
-                <div class="pickup-time-row">
-                    <i class="fa-regular fa-clock"></i>
-                    <input type="time" id="pickupTimeInput" class="pickup-time-input">
-                </div>
-                <p class="pickup-error" id="pickupError">Please pick a time to continue.</p>
-                <button class="live-location-btn" id="confirmPickupBtn">
-                    <i class="fa-solid fa-check"></i>
-                    Confirm &amp; place order
                 </button>
             </div>
 
@@ -76,9 +68,7 @@
                 </div>
 
                 <div class="header-actions">
-                    <!-- <button class="help-btn" type="button" aria-label="Help and support" title="Help &amp; support" data-open-support>
-                        <i class="fa-regular fa-circle-question"></i>
-                    </button> -->
+                    <!-- <button cc -->
                     <button class="avatar-btn" type="button" aria-label="Profile">
                         <img src="../static/profile.png" alt="Profile" id="profileLogo">
                     </button>
@@ -322,6 +312,11 @@
                     <option value="canceled">Canceled</option>
                 </select>
             </div>
+
+            <!-- Tells users where complaints live (shop closed, delays, etc.) -->
+            <p class="orders-help-note" style="margin:0 0 12px;font-size:13px;color:#6b5f58;">
+                Shop closed or something not right? Tap <strong>Report a problem</strong> on your pending order.
+            </p>
 
             <div class="empty-state" id="No_orders_container">
                 <div class="icon">🛍️</div>

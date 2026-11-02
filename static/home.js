@@ -175,15 +175,27 @@
 /* ============================================================
    support.js  (load AFTER user_navbar.js, at the end of <body>)
 
-   Help & Support sheet: FAQ, "Report an issue" form, policies.
+   Help & Support sheet: FAQ, "Report a problem" (complaint) form, policies.
    Built entirely in JS, so no template changes are needed.
 
    Open it from anywhere:
      - any element with   data-open-support            -> FAQ tab
                           data-open-support="policies" -> Policies tab
-     - JS:  KiranaSupport.open("report", { orderId: "abc123", storeName: "Shop" })
-                          (the report form only opens for a specific order,
-                           it is launched from "Get help with this order" on Orders)
+     - JS:  KiranaSupport.open("report", {
+                orderId: "abc123",
+                storeName: "Shop",
+                status: "placed" | "completed" | "canceled",
+                orderType: "pickup" | "delivery",
+                resIds: ["..."]
+            })
+       (the report form only opens for a specific order, it is launched
+        from the "Report a problem" / "Get help with this order" button on Orders)
+
+   Complaint reasons depend on the order:
+     - PENDING order  -> shop closed, shop not responding, not ready,
+                         delivery late / rider unreachable, QR not accepted, ...
+     - FINISHED order -> missing/wrong item, quality, order marked done but not received, ...
+     - always         -> price mismatch, payment/refund, something else
    ============================================================ */
 (function () {
     "use strict";
@@ -192,13 +204,65 @@
     const SUPPORT_EMAIL = "";               // e.g. "help@yourdomain.com" (leave "" to hide)
     const SUPPORT_PHONE = "";               // e.g. "+91 98765 43210"      (leave "" to hide)
     const TICKET_ENDPOINT = "/support_ticket";
+    // const REPEAT_BLOCK_MS = 6 * 60 * 60 * 1000; // same order + same reason can't be re-sent for 6h
 
+    // when: "active" = order still pending, "done" = completed/canceled, "any" = both
+    // for:  "pickup" | "delivery" | "any"
+    // messageRequired: user must type details (otherwise the reason alone is enough,
+    //                  so someone standing outside a closed shop can report in two taps)
     const CATEGORIES = [
-        ["item", "Missing or wrong item"],
-        ["quality", "Item quality"],
-        ["late", "Late delivery or pickup"],
-        ["payment", "Payment or refund"],
-        ["other", "Something else"]
+        {
+            id: "shop_closed", label: "Shop is closed", when: "active", for: "any",  photoRequired: true,
+            hint: "The shop is shut or nobody is there. We'll flag this order for review and contact the shop."
+        },
+        {
+            id: "shop_not_responding", label: "Shop isn't responding / not preparing my order", when: "active", for: "any",
+            hint: "The shop hasn't accepted or started on your order."
+        },
+        {
+            id: "not_ready", label: "Order isn't ready at my pickup time", when: "active", for: "pickup",
+            hint: "You reached the shop at your pickup time but the order wasn't ready."
+        },
+        {
+            id: "qr_not_working", label: "QR / token not accepted at the shop", when: "active", for: "pickup",
+            hint: "The shop couldn't find or scan your order. Tell us what they said."
+        },
+        {
+            id: "delivery_late", label: "Delivery is taking too long", when: "active", for: "delivery",
+            hint: "Your order is past its estimated delivery time."
+        },
+        {
+            id: "rider_unreachable", label: "Can't reach the delivery person / shop", when: "active", for: "delivery",
+            hint: "Nobody is picking up when you call."
+        },
+        {
+            id: "wrong_address", label: "I need to fix my address or phone number", when: "active", for: "delivery",
+            hint: "Tell us the correct address or number so the shop can be informed.", messageRequired: true
+        },
+        {
+            id: "not_received", label: "Marked completed but I didn't get my order", when: "done", for: "any",
+            hint: "The order shows completed, but you never received it."
+        },
+        {
+            id: "item", label: "Missing or wrong item", when: "done", for: "any",
+            hint: "Tell us which item was missing or wrong.", messageRequired: true
+        },
+        {
+            id: "quality", label: "Item quality", when: "done", for: "any",
+            hint: "Damaged, expired, stale or not as described.", messageRequired: true
+        },
+        {
+            id: "price", label: "Charged more than the listed price", when: "any", for: "any",
+            hint: "Tell us what you were charged and what the price should be.", messageRequired: true
+        },
+        {
+            id: "payment", label: "Payment or refund", when: "any", for: "any",
+            hint: "Double charge, refund not received, etc.", messageRequired: true
+        },
+        {
+            id: "other", label: "Something else", when: "any", for: "any",
+            hint: "", messageRequired: true
+        }
     ];
 
     const FAQ = [
@@ -231,8 +295,16 @@
             a: "In your cart, tap Change next to the address. You can also manage saved addresses from your profile."
         },
         {
+            q: "I went to the shop but it was closed. What should I do?",
+            a: "Go to Orders, find your pending order and tap Report a problem, then choose \"Shop is closed\". You don't need to type anything. We will review the order and you can also cancel it from the same card."
+        },
+        {
+            q: "My order is still pending and the shop isn't responding.",
+            a: "Open the order in Orders and tap Report a problem. You can report that the shop isn't responding, that the order isn't ready at pickup time, or that a delivery is late."
+        },
+        {
             q: "My order has a problem. What should I do?",
-            a: "Go to Orders, find the order that had the problem and tap Get help with this order. Help is available for 24 hours after an order is completed or canceled."
+            a: "Go to Orders, find the order that had the problem and tap Report a problem (pending orders) or Get help with this order (finished orders). Help stays available for 24 hours after an order is completed or canceled."
         }
     ];
 
@@ -256,7 +328,14 @@
             title: "Cancellations and refunds",
             body: [
                 "Orders are prepared and fulfilled by the store, so cancellations and refunds depend on the order status.",
-                "If something went wrong, open the order in Orders and tap Get help with this order within 24 hours of it being completed or canceled."
+                "If something went wrong, open the order in Orders and report it. Pending orders can be reported at any time; finished orders within 24 hours of being completed or canceled."
+            ]
+        },
+        {
+            title: "Complaints",
+            body: [
+                "Reports such as \"shop is closed\" are reviewed against the store's status and order history. Please report only genuine problems.",
+                "Repeated false reports may limit your ability to place orders."
             ]
         },
         {
@@ -272,6 +351,7 @@
     let overlay = null;
     let sheet = null;
     let lastFocus = null;
+    let currentCtx = { orderId: "", storeName: "", status: "", orderType: "", resIds: [] };
 
     function esc(str) {
         return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -287,6 +367,45 @@
     function normalizePhone(phone) {
         const cleaned = (phone || "").replace(/[\s-]/g, "");
         return cleaned.replace(/^(?:\+?91|0)(?=\d{10}$)/, "");
+    }
+
+    function categoriesFor(ctx) {
+        const active = ctx.status === "placed";
+        return CATEGORIES.filter((c) => {
+            if (c.when === "active" && !active) return false;
+            if (c.when === "done" && active) return false;
+            if (c.for !== "any" && ctx.orderType && c.for !== ctx.orderType) return false;
+            return true;
+        });
+    }
+
+    function statusLabel(status) {
+        if (status === "placed") return "Pending";
+        if (status === "completed") return "Completed";
+        if (status === "canceled") return "Canceled";
+        return "";
+    }
+
+        // ---- duplicate reports: the SERVER is the source of truth ----
+    // Memory only (no localStorage). Filled from /support_ticket/reported when the sheet opens.
+    const reportedByOrder = {};   // orderId -> { categoryId: ticketId }
+
+    async function loadReported(orderId) {
+        try {
+            const res = await fetch("/support_ticket/reported", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order_id: orderId })
+            });
+            if (!res.ok) return;
+            const body = await res.json();
+            if (body && body.success) reportedByOrder[orderId] = body.reported || {};
+        } catch (e) { /* the server still blocks duplicates on submit */ }
+    }
+
+    function markReported(orderId, category, ticketId) {
+        if (!reportedByOrder[orderId]) reportedByOrder[orderId] = {};
+        reportedByOrder[orderId][category] = ticketId || "";
     }
 
     function accordion(items, textKey) {
@@ -307,8 +426,21 @@
         return bits.length ? `<div class="support-contact">${bits.join("")}</div>` : "";
     }
 
+    // Tiny style for the only new element (the per-reason hint line).
+    function ensureExtraStyle() {
+        if (document.getElementById("supportExtraStyle")) return;
+        const style = document.createElement("style");
+        style.id = "supportExtraStyle";
+        style.textContent = `
+            .support-hint { margin: 0; font-size: 13px; line-height: 1.4; color: #6b5f58; }
+            .support-hint:empty { display: none; }
+        `;
+        document.head.appendChild(style);
+    }
+
     function build() {
         if (sheet && document.body.contains(sheet)) return;
+        ensureExtraStyle();
 
         overlay = document.createElement("div");
         overlay.className = "support-overlay";
@@ -328,7 +460,7 @@
 
             <div class="support-tabs" role="tablist">
                 <button type="button" role="tab" class="support-tab active" data-tab="faq" aria-selected="true">FAQ</button>
-                <button type="button" role="tab" class="support-tab" data-tab="report" aria-selected="false" hidden>Get help with this order</button>
+                <button type="button" role="tab" class="support-tab" data-tab="report" aria-selected="false" hidden>Report a problem</button>
                 <button type="button" role="tab" class="support-tab" data-tab="policies" aria-selected="false">Policies</button>
             </div>
 
@@ -337,15 +469,17 @@
 
                 <div class="support-panel" data-panel="report">
                     <form class="support-form" novalidate>
-                        <label>What is this about?
-                            <select name="category">
-                                ${CATEGORIES.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}
-                            </select>
-                        </label>
                         <div class="support-order" aria-live="polite"></div>
+                        <label>What went wrong?
+                            <select name="category"></select>
+                        </label>
+                        <p class="support-hint" aria-live="polite"></p>
                         <input name="order_id" type="hidden">
-                        <label>Tell us what happened
+                        <label><span class="support-msg-label">Tell us what happened</span>
                             <textarea name="message" maxlength="1000" placeholder="Describe the problem..."></textarea>
+                        </label>
+                        <label class="support-photo-wrap" hidden>Photo of the shop <span class="opt">(required)</span>
+                            <input name="photo" type="file" accept="image/*" capture="environment">
                         </label>
                         <label>Phone number <span class="opt">(optional, so we can call you)</span>
                             <input name="phone" type="tel" maxlength="13" autocomplete="tel">
@@ -374,11 +508,52 @@
             if (tab) selectTab(tab.dataset.tab);
         });
 
-        sheet.querySelector(".support-form").addEventListener("submit", onSubmit);
+        const form = sheet.querySelector(".support-form");
+        form.addEventListener("submit", onSubmit);
+        form.elements.category.addEventListener("change", onCategoryChange);
         sheet.querySelector(".support-again").addEventListener("click", () => showForm());
 
         document.body.appendChild(overlay);
         document.body.appendChild(sheet);
+    }
+
+    function selectedCategory() {
+        const form = sheet.querySelector(".support-form");
+        return CATEGORIES.find((c) => c.id === form.elements.category.value) || null;
+    }
+
+    // Updates the hint line + whether typing details is required.
+    function onCategoryChange() {
+        const cat = selectedCategory();
+        const form = sheet.querySelector(".support-form");
+        sheet.querySelector(".support-hint").textContent = cat ? cat.hint : "";
+        const required = !!(cat && cat.messageRequired);
+        sheet.querySelector(".support-msg-label").textContent = required
+            ? "Tell us what happened"
+            : "Anything else we should know? (optional)";
+        form.elements.message.placeholder = required ? "Describe the problem..." : "Optional details...";
+        const needPhoto = !!(cat && cat.photoRequired);
+        const photoWrap = sheet.querySelector(".support-photo-wrap");
+        photoWrap.hidden = !needPhoto;
+        if (!needPhoto) form.elements.photo.value = "";
+        showError("");
+    }
+
+        function fillCategories(ctx) {
+        const form = sheet.querySelector(".support-form");
+        const reported = reportedByOrder[ctx.orderId] || {};
+        const isDone = (id) => Object.prototype.hasOwnProperty.call(reported, id);
+        const list = categoriesFor(ctx);
+        const previous = form.elements.category.value;
+
+        form.elements.category.innerHTML = list
+            .map((c) => `<option value="${esc(c.id)}"${isDone(c.id) ? " disabled" : ""}>${esc(c.label)}${isDone(c.id) ? " (already reported)" : ""}</option>`)
+            .join("");
+
+        const keep = list.find((c) => c.id === previous && !isDone(c.id));
+        const firstFree = list.find((c) => !isDone(c.id));
+        form.elements.category.value = keep ? keep.id : (firstFree ? firstFree.id : "");
+        onCategoryChange();
     }
 
     function selectTab(name) {
@@ -398,13 +573,16 @@
         showError("");
     }
 
-    function showDone(ticketId) {
+    function showDone(ticketId, category) {
         sheet.querySelector(".support-form").hidden = true;
         const done = sheet.querySelector(".support-done");
         done.hidden = false;
-        done.querySelector(".support-done-text").textContent = ticketId
-            ? `Thanks, we have received your request. Your reference is ${ticketId}.`
-            : "Thanks, we have received your request.";
+        const ref = ticketId ? ` Your reference is ${ticketId}.` : "";
+        const extra = category && category.id === "shop_closed"
+            ? " We'll check with the shop. You can also cancel this order from the Orders page."
+            : "";
+        done.querySelector(".support-done-text").textContent =
+            `Thanks, we have received your request.${ref}${extra}`;
     }
 
     // html=true only for strings built here from escaped parts.
@@ -421,8 +599,8 @@
 
     function mailtoFallback(data) {
         if (!SUPPORT_EMAIL) return "";
-        const subject = `Support request: ${data.category}`;
-        const body = `Order ID: ${data.order_id || "-"}\nPhone: ${data.phone || "-"}\n\n${data.message}`;
+        const subject = `Support request: ${data.category_label || data.category}`;
+        const body = `Order ID: ${data.order_id || "-"}\nOrder status: ${data.status || "-"}\nPhone: ${data.phone || "-"}\n\n${data.message}`;
         const href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         return ` <a href="${esc(href)}">Email us instead</a>`;
     }
@@ -431,12 +609,24 @@
         e.preventDefault();
         const form = e.currentTarget;
         const btn = form.querySelector(".support-submit");
+        const cat = selectedCategory();
 
+        if (!cat) {
+            showError("Please choose what went wrong.");
+            return;
+        }
+
+        const typed = form.elements.message.value.trim();
         const data = {
             user_id: currentUserId(),
-            category: form.elements.category.value,
+            category: cat.id,
+            category_label: cat.label,
             order_id: form.elements.order_id.value.trim(),
-            message: form.elements.message.value.trim(),
+            order_type: currentCtx.orderType || "",
+            status: currentCtx.status || "",
+            res_ids: currentCtx.resIds || [],
+            // If the reason alone says it all (e.g. "Shop is closed"), no typing needed.
+            message: typed || cat.label,
             phone: normalizePhone(form.elements.phone.value),
             page: document.body.dataset.page || ""
         };
@@ -445,7 +635,7 @@
             showError("Please open this form from an order in Orders.");
             return;
         }
-        if (data.message.length < 10) {
+        if (cat.messageRequired && typed.length < 10) {
             showError("Please describe the problem in a few words (at least 10 characters).");
             return;
         }
@@ -453,17 +643,27 @@
             showError("Please enter a valid 10-digit phone number, or leave it empty.");
             return;
         }
+        const photo = form.elements.photo.files[0];
+        if (cat.photoRequired) {
+            if (!photo) { showError("Please take a photo of the shop with its name visible."); return; }
+            if (!photo.type.startsWith("image/")) { showError("Please upload an image."); return; }
+            if (photo.size > 8 * 1024 * 1024) { showError("Photo is too large (max 8 MB)."); return; }
+        }
+
+        
 
         showError("");
         btn.disabled = true;
         btn.textContent = "Sending...";
 
         try {
-            const res = await fetch(TICKET_ENDPOINT, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data)
-            });
+            const fd = new FormData();
+            fd.append("order_id", data.order_id);
+            fd.append("category", data.category);
+            fd.append("message", data.message);
+            fd.append("phone", data.phone);
+            if (cat.photoRequired) fd.append("photo", photo);
+            const res = await fetch(TICKET_ENDPOINT, { method: "POST", body: fd });
 
             if (res.status === 401) {
                 alert("Unauthorized user. Please log in");
@@ -475,9 +675,16 @@
             try { body = await res.json(); } catch (err) { /* non-JSON error page */ }
 
             if (res.ok && body && body.success) {
+                markReported(data.order_id, data.category, body.ticket_id);
                 form.reset();
-                showDone(body.ticket_id);
+                fillCategories(currentCtx);
+                showDone(body.ticket_id, cat);
             } else {
+                if (res.status === 409 && body && body.ticket_id) {
+                    // server says it's a duplicate: reflect that in the dropdown
+                    markReported(data.order_id, data.category, body.ticket_id);
+                    fillCategories(currentCtx);
+                }
                 const msg = (body && body.message) || "We couldn't send your request right now.";
                 showError(esc(msg) + mailtoFallback(data), true);
             }
@@ -494,17 +701,38 @@
         build();
         lastFocus = document.activeElement;
 
-        const orderId = opts && opts.orderId ? String(opts.orderId) : "";
+        const o = opts || {};
+        const orderId = o.orderId ? String(o.orderId) : "";
         const form = sheet.querySelector(".support-form");
         const reportTab = sheet.querySelector('.support-tab[data-tab="report"]');
 
         // The report form only exists in the context of one order.
         reportTab.hidden = !orderId;
         if (orderId) {
-            if (form.elements.order_id.value !== orderId) form.reset();
+            const ctx = {
+                orderId,
+                storeName: o.storeName || "",
+                status: String(o.status || "").toLowerCase(),
+                orderType: String(o.orderType || "").toLowerCase(),
+                resIds: Array.isArray(o.resIds) ? o.resIds.map(String) : []
+            };
+
+            const changed = form.elements.order_id.value !== orderId
+                || currentCtx.status !== ctx.status
+                || currentCtx.orderType !== ctx.orderType;
+            currentCtx = ctx;
+
+            if (changed) form.reset();
             form.elements.order_id.value = orderId;
-            const store = opts.storeName ? ` \u00b7 ${opts.storeName}` : "";
-            sheet.querySelector(".support-order").textContent = `Order #${orderId}${store}`;
+            fillCategories(ctx);
+            // pull which reasons were already reported from the server, then refresh the dropdown
+            loadReported(orderId).then(() => {
+                if (currentCtx.orderId === orderId) fillCategories(currentCtx);
+            });
+            const store = ctx.storeName ? ` \u00b7 ${ctx.storeName}` : "";
+            const st = statusLabel(ctx.status) ? ` \u00b7 ${statusLabel(ctx.status)}` : "";
+            sheet.querySelector(".support-order").textContent = `Order #${orderId}${store}${st}`;
+            reportTab.textContent = ctx.status === "placed" ? "Report a problem" : "Get help with this order";
         }
 
         const wanted = tab === "report" && !orderId ? "faq" : (tab || "faq");

@@ -3452,7 +3452,124 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
                 $("#se-note").innerHTML = `<div class="pg-note">Couldn't load saved settings (${H(e.message)}).</div>`;
             }
         });
+        /* ===== COMPLAINTS ===== */
+    let complaints = [];
+    let cmFilter = "open";
+    const CM_STATUS = {
+        open: { cls: "warn", label: "Open" },
+        resolved: { cls: "ok", label: "Resolved" },
+        dismissed: { cls: "off", label: "Dismissed" }
+    };
 
+    function setComplaintBadge() {
+        const n = complaints.filter(c => c.status === "open").length;
+        const b = document.getElementById("complaints_badge");
+        if (!b) return;
+        b.textContent = n;
+        b.style.display = n ? "" : "none";
+    }
+
+    async function fetchComplaints() {
+        try {
+            complaints = (await api("/seller/complaints")).complaints || [];
+            const note = $("#cm-note");
+            if (note) note.innerHTML = "";
+        } catch (e) {
+            complaints = [];
+            const note = $("#cm-note");
+            if (note) note.innerHTML = `<div class="pg-note">Couldn't load complaints (${H(e.message)}).</div>`;
+        }
+        setComplaintBadge();
+        if ($("#cm-table")) drawComplaints();
+    }
+
+    function drawComplaints() {
+        const open = complaints.filter(c => c.status === "open");
+        $("#cm-kpis").innerHTML =
+            kpi(open.length, "Open") +
+            kpi(open.filter(c => c.priority === "high").length, "High priority (open)") +
+            kpi(complaints.filter(c => c.status === "resolved").length, "Resolved") +
+            kpi(complaints.length, "Total");
+
+        const list = complaints.filter(c => cmFilter === "all" || c.status === cmFilter);
+
+        const rows = list.map(c => {
+            const st = CM_STATUS[c.status] || CM_STATUS.open;
+            const safePhoto = c.photo_url && /^https:\/\//.test(c.photo_url) ? c.photo_url : null;
+            const shopLine = c.shop_online === true || c.shop_online === false
+                ? `<div style="font-size:11px;color:var(--muted)">Your store was ${c.shop_online ? "online" : "offline"} when this was reported</div>` : "";
+            const actions = c.status === "open"
+                ? `<button class="btn-outline btn-sm" data-cm="resolved" data-id="${H(c.ticket_id)}">Resolve</button>
+                   <button class="btn-outline btn-sm btn-danger" data-cm="dismissed" data-id="${H(c.ticket_id)}">Dismiss</button>`
+                : `<button class="btn-outline btn-sm" data-cm="open" data-id="${H(c.ticket_id)}">Reopen</button>`;
+
+            return `<tr>
+                <td><div class="coupon">${H(c.ticket_id)}</div>
+                    <div style="font-size:11px;color:var(--muted)">${c.created_at ? timeAgo(c.created_at) : ""}</div></td>
+                <td style="max-width:320px;white-space:normal">
+                    <div style="font-weight:600">${H(c.category_label)}
+                        ${c.priority === "high" ? '<span class="tag warn" style="margin-left:6px">High</span>' : ""}</div>
+                    <div style="font-size:13px;margin-top:2px;overflow-wrap:anywhere">${H(c.message)}</div>
+                    ${c.seller_note ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">Your note: ${H(c.seller_note)}</div>` : ""}
+                    ${shopLine}
+                    ${safePhoto ? `<a href="${H(safePhoto)}" target="_blank" rel="noopener" style="font-size:12px">View photo</a>` : ""}
+                </td>
+                <td style="white-space:normal">
+                    ${c.token_no ? `<div>Token <b>${H(c.token_no)}</b> · ${H(c.order_type)}</div>` : `<div>${H(c.order_type)}</div>`}
+                    <div style="font-size:12px;color:var(--muted)">${H(c.items_summary || "—")}</div>
+                    <div style="font-size:12px;color:var(--muted)">${c.total ? money(c.total) : ""} ${c.order_status ? "· " + H(c.order_status) : ""}</div>
+                </td>
+                <td>${H(custName(c.customer_id))}
+                    ${c.phone ? `<div><a href="tel:${H(c.phone)}" style="font-size:12px">${H(c.phone)}</a></div>` : ""}</td>
+                <td><span class="tag ${st.cls}">${st.label}</span></td>
+                <td class="num">${actions}</td></tr>`;
+        });
+
+        $("#cm-table").innerHTML = table(
+            [["Ticket"], ["Issue"], ["Order"], ["Customer"], ["Status"], [""]],
+            rows,
+            cmFilter === "open" ? "No open complaints 🎉" : "Nothing here."
+        );
+    }
+
+    async function complaintAction(id, status) {
+        let note = "";
+        if (status !== "open") {
+            note = prompt(
+                status === "resolved" ? "Add a note for the customer (optional):" : "Why are you dismissing this? (optional)",
+                ""
+            );
+            if (note === null) return;
+        }
+        try {
+            await api("/seller/complaints/update", { ticket_id: id, status, note: note.trim() });
+            toast(status === "resolved" ? "Marked as resolved" : status === "dismissed" ? "Complaint dismissed" : "Complaint reopened",
+                status === "dismissed" ? "warn" : "success");
+            await fetchComplaints();
+        } catch (e) { toast(e.message, "error"); }
+    }
+
+    page("complaints", "Complaints", "Issues your customers reported about their orders", "",
+        `<div id="cm-note"></div>
+         <div class="pg-kpis" id="cm-kpis"></div>
+         <div class="pg-filters">
+            <button class="chip active" data-f="open">Open</button>
+            <button class="chip" data-f="resolved">Resolved</button>
+            <button class="chip" data-f="dismissed">Dismissed</button>
+            <button class="chip" data-f="all">All</button>
+         </div>
+         <div class="widget" id="cm-table"><div class="pg-empty">Loading…</div></div>`,
+        async () => {
+            document.querySelectorAll("#view-complaints .chip").forEach(ch => {
+                ch.classList.toggle("active", ch.dataset.f === cmFilter);
+                ch.onclick = () => {
+                    cmFilter = ch.dataset.f;
+                    document.querySelectorAll("#view-complaints .chip").forEach(c => c.classList.toggle("active", c === ch));
+                    drawComplaints();
+                };
+            });
+            await fetchComplaints();
+        });
     /* ---------------- build the views ---------------- */
     const host = $(".main-content");
     const anchor = $("#edBackdrop");
@@ -3472,6 +3589,20 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     if (window.lucide) lucide.createIcons();
 
     // Offer table buttons (delegated)
+        // Complaint action buttons (delegated)
+    document.addEventListener("click", e => {
+        const b = e.target.closest("[data-cm]");
+        if (b) complaintAction(b.dataset.id, b.dataset.cm);
+    });
+
+    // Live: a customer just reported something
+    socket.on("support_ticket", () => {
+        toast("New complaint received", "warn");
+        fetchComplaints();   // refreshes the sidebar badge and the table if it's on screen
+    });
+
+    // Show the badge count right after load
+    fetchComplaints();
     document.addEventListener("click", e => {
         const b = e.target.closest("[data-of]");
         if (b) offerAction(b.dataset.of, b.dataset.id);

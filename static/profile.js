@@ -142,7 +142,7 @@ async function initProfilePage() {
             method:"POST"
         })
         console.log(res)
-        window.location.replace("/login/user");
+        window.location.replace("/landing");
     });
 
     try {

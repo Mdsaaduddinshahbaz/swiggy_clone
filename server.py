@@ -1,4 +1,4 @@
-from database import fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
+from database import get_seller_complaints,update_complaint,fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer,create_support_ticket,get_reported_categories, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
 from flask import Flask, request, render_template, redirect, url_for, jsonify, g, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, get_cart_restaurant
@@ -55,6 +55,7 @@ app.config["MAIL_USE_SSL"] = mail_use_ssl
 app.config["MAIL_USERNAME"] = mail_username
 app.config["MAIL_PASSWORD"] = mail_password
 app.config["SECRET_KEY"] = secret_key
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 print("SERVER:", mail_sever_name, flush=True)
 print("PORT:", mail_port, flush=True)
@@ -2443,5 +2444,128 @@ def seller_settings_save():
     if not update_store_settings(g.res_id, clean):
         return jsonify({"success": False, "message": "Restaurant not found"}), 404
     return jsonify({"success": True})
+################# support tickets / complaints #########################
+
+@app.post("/support_ticket")
+@login_required
+def support_ticket():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.form if request.form else (request.get_json(silent=True) or {})
+    photo = request.files.get("photo")
+    order_id = data.get("order_id")
+    category = data.get("category")
+    if not isinstance(order_id, str) or not isinstance(category, str):
+        return jsonify({"success": False, "message": "order_id and category are required"}), 400
+
+    # one submission at a time per user, so double-taps can't create duplicate tickets
+    lock_key = f"lock:ticket:{g.user_id}"
+    token = acquire_lock(lock_key, ttl_seconds=10)
+    if not token:
+        return jsonify({"success": False, "message": "Your request is already being sent"}), 409
+
+    try:
+        photo_url = None
+        if category == "shop_closed":
+            if not photo or not photo.filename or not allowed_file(photo.filename):
+                return jsonify({"success": False, "message": "A photo of the shop (png, jpg, jpeg, webp) is required"}), 400
+            file_id = upload_image(photo)
+            photo_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+
+        result = create_support_ticket(
+            g.user_id, order_id, category,
+            data.get("message"), data.get("phone"),
+            photo_url=photo_url,
+        )
+    except Exception as e:
+        print("support_ticket error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+    finally:
+        release_lock(lock_key, token)
+
+    if not result["success"]:
+        body = {"success": False, "message": result["message"]}
+        if result.get("ticket_id"):
+            body["ticket_id"] = result["ticket_id"]
+        return jsonify(body), result.get("status", 400)
+
+    # let the shop(s) know right away (sellers can listen for "support_ticket")
+    for rid in result["restaurant_ids"]:
+        socketio.emit(
+            "support_ticket",
+            {"ticket_id": result["ticket_id"], "category": result["category"], "priority": result["priority"]},
+            room=rid
+        )
+
+    return jsonify({"success": True, "ticket_id": result["ticket_id"]})
+
+
+@app.post("/support_ticket/reported")
+@login_required
+def support_ticket_reported():
+    """Which reasons this user already reported for an order (replaces the old localStorage check)."""
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
+    if not isinstance(order_id, str) or not order_id:
+        return jsonify({"success": False, "message": "order_id is required"}), 400
+    try:
+        return jsonify({"success": True, "reported": get_reported_categories(g.user_id, order_id)})
+    except Exception as e:
+        print("support_ticket_reported error:", e)
+        return jsonify({"success": False, "message": "Something went wrong"}), 500
+################# seller: complaints #########################
+
+@app.get("/seller/complaints")
+@login_required
+def seller_complaints_list():
+    err = _seller_guard()
+    if err:
+        return err
+    try:
+        return jsonify({"success": True, "complaints": get_seller_complaints(g.res_id)})
+    except Exception as e:
+        print("complaints list error:", e)
+        return jsonify({"success": False, "message": "Couldn't load complaints"}), 500
+
+
+@app.post("/seller/complaints/update")
+@login_required
+def seller_complaints_update():
+    err = _seller_guard()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    ticket_id = str(data.get("ticket_id", "")).strip()
+    status = data.get("status")
+    note = str(data.get("note", "")).strip()[:300]
+
+    if not ticket_id:
+        return jsonify({"success": False, "message": "ticket_id is required"}), 400
+    if status not in ("open", "resolved", "dismissed"):
+        return jsonify({"success": False, "message": "Invalid status"}), 400
+
+    try:
+        result = update_complaint(g.res_id, ticket_id, status, note or None)
+    except Exception as e:
+        print("complaints update error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+
+    if not result["success"]:
+        return jsonify({"success": False, "message": result["message"]}), result.get("status", 400)
+
+    # let the customer know their report was handled (listen on the user pages if you want)
+    socketio.emit(
+        "support_ticket_updated",
+        {
+            "ticket_id": result["ticket_id"],
+            "status": result["status"],
+            "note": result.get("seller_note") or ""
+        },
+        room=result["user_id"]
+    )
+    return jsonify({"success": True, "status": result["status"]})
 if __name__ == "__main__":
     socketio.run(app, debug=True)
