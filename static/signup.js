@@ -1,21 +1,17 @@
-// const BASEURL="https://productivity-ai-agent.onrender.com"
-// import { BASEURL } from "../my_extension/config";
-// async function loadConfig() {
-//   const { BASEURL } = await import("../my_extension/config");
-//   console.log(BASEURL);
-//   return BASEURL
-// }
-// const BASEURL="http://127.0.0.1:5000"
+// Needs /static/ui.js loaded before this file (spinner + toast helpers).
 
 const pathParts = window.location.pathname.split("/");
-
 const role = pathParts[pathParts.length - 1];
+
 document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signupform");
-  const loginBtn=document.getElementById("loginBtn")
-  loginBtn.addEventListener("click",()=>{
-    window.location.href=`/login/${role}`
-  })
+  const loginBtn = document.getElementById("loginBtn");
+  const submitBtn = signupForm.querySelector('button[type="submit"]');
+
+  loginBtn.addEventListener("click", () => {
+    window.location.href = `/login/${role}`;
+  });
+
   signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -25,43 +21,45 @@ document.addEventListener("DOMContentLoaded", () => {
     const confirmPassword = document.getElementById("confirm_password").value;
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      PickitUI.toast("Passwords do not match!", "error");
       return;
     }
+
+    PickitUI.setLoading(submitBtn, "Creating account…");
 
     try {
       const res = await fetch(`/signup_user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email,username, password,role }),
+        body: JSON.stringify({ email, username, password, role }),
       });
 
       const data = await res.json();
-      console.log("in signup",data)
+      console.log("in signup", data);
+
       if (data.success) {
-        alert(data.message || "Signup successful! Please login.");
-        // window.location.href = "/login";
-        if (role === "user") {
-          alert("An Email is sent to you, please Check Your Inbox or spam Folder")
-          // window.location.href = `http://127.0.0.1:5000/user/${data.user_id}`
-          window.location.href = `/login/user`
-        }
-        else {
-          // window.location.href = `http://127.0.0.1:5000/seller/${data.user_id}`
-          alert("An Email is sent to you, please Check Your Inbox or spam Folder")
-          // window.location.href = `/seller/resturantSetup/${data.user_id}`
-          window.location.href=`/login/seller`
-        }
-      }
-      else if(!data.success){
-        alert(data.msg || "User already exists");
-      }
-       else {
-        alert(data.msg || "Signup failed, try again.");
+        PickitUI.setSuccess(submitBtn, "Account created");
+        PickitUI.toast(
+          "Account created! We emailed you, please check your inbox or spam folder.",
+          "success",
+          3800
+        );
+        // short pause so the success state is visible before leaving the page
+        setTimeout(() => {
+          if (role === "user") {
+            window.location.href = `/login/user`;
+          } else {
+            window.location.href = `/login/seller`;
+          }
+        }, 1800);
+      } else {
+        PickitUI.setLoading(submitBtn, false);
+        PickitUI.toast(data.msg || "User already exists", "error");
       }
     } catch (err) {
       console.error("Signup error:", err);
-      alert("Something went wrong!");
+      PickitUI.setLoading(submitBtn, false);
+      PickitUI.toast("Something went wrong. Please try again.", "error");
     }
   });
 });
