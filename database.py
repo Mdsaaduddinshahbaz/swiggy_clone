@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError, OperationFailure
 from dotenv import load_dotenv
 import re
 from bson import ObjectId
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 import math
 import time
@@ -554,10 +554,67 @@ def _combined_status(statuses):
     return "completed"
 
 
+# ---------------------------------------------------------
+# Customer edit window: items can be changed until 30 min before the
+# scheduled pickup / delivery time.
+# pickup_time arrives from the client as a string. Supported formats:
+#   "14:30", "2:30 PM", "tomorrow 14:30", "14:00-14:30" (start is used),
+#   or a full ISO datetime ("2026-11-04T14:30", naive = India time).
+# Orders with no parseable scheduled time (e.g. "deliver now") are NOT editable.
+# ---------------------------------------------------------
+IST_OFFSET = timedelta(hours=5, minutes=30)
+USER_EDIT_CUTOFF = timedelta(minutes=30)
+
+
+def _parse_scheduled_time(pickup_time, created_at):
+    """Returns the scheduled time as a naive UTC datetime, or None."""
+    if not pickup_time or not isinstance(created_at, datetime):
+        return None
+    s = str(pickup_time).strip()
+    if not s:
+        return None
+
+    # full ISO datetime
+    if re.match(r"^\d{4}-\d{2}-\d{2}", s):
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if dt.tzinfo is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt - IST_OFFSET
+
+    low = s.lower()
+    m = re.search(r"(\d{1,2}):(\d{2})\s*([ap]m)?", low)
+    if not m:
+        return None
+    h, mi, ap = int(m.group(1)), int(m.group(2)), m.group(3)
+    if ap:
+        if h < 1 or h > 12:
+            return None
+        h = h % 12 + (12 if ap == "pm" else 0)
+    if h > 23 or mi > 59:
+        return None
+
+    created_local = created_at + IST_OFFSET
+    sched_local = created_local.replace(hour=h, minute=mi, second=0, microsecond=0)
+    if "tomorrow" in low:
+        sched_local += timedelta(days=1)
+    elif sched_local < created_local - timedelta(minutes=5):
+        sched_local += timedelta(days=1)       # time already passed today -> tomorrow
+    return sched_local - IST_OFFSET
+
+
+def _edit_deadline(doc):
+    sched = _parse_scheduled_time(doc.get("pickup_time"), doc.get("time"))
+    return sched - USER_EDIT_CUTOFF if sched else None
+
+
 def get_orders(userid):
     """
     Customer order history, rebuilt from seller_orders by grouping on checkout_id.
     Same shape as before: one entry per checkout, "resturants" holds the per-restaurant items.
+    Now also returns "edit_deadline" (UTC ISO string or None).
     """
     groups = {}
     for doc in seller_orders.find({"user_id": userid}).sort("time", 1):
@@ -565,6 +622,7 @@ def get_orders(userid):
 
         group = groups.get(key)
         if group is None:
+            deadline = _edit_deadline(doc)
             group = {
                 "order_id": key,
                 "token_no": doc.get("token_no"),
@@ -574,7 +632,8 @@ def get_orders(userid):
                 "date": doc.get("time"),
                 "pickup_time": doc.get("pickup_time"),
                 "order_type": doc.get("order_type", "pickup"),
-                "delivery_address": doc.get("delivery_address")
+                "delivery_address": doc.get("delivery_address"),
+                "edit_deadline": (deadline.isoformat() + "Z") if deadline else None
             }
             groups[key] = group
 
@@ -593,12 +652,163 @@ def get_orders(userid):
     for group in groups.values():
         group["status"] = _combined_status(group.pop("statuses"))
         stamps = group.pop("updated_ats")
-        # used by orders.js to close the 24h help window on finished orders
         group["status_updated_at"] = max(stamps) if stamps else group.get("date")
         final_orders.append(group)
     return final_orders
 
+def edit_user_order_items(order_id, user_id, new_qtys):
+    """
+    Customer changes quantities of a checkout, allowed until 30 min before the
+    scheduled time. new_qtys = { item_id: new_qty } (0 removes the item).
+    - increases check stock + that the price hasn't changed
+    - decreases give stock back
+    - a restaurant whose items are all removed gets that part canceled
+    - at least one item must remain overall
+    One transaction, same stock math as store_orders().
+    """
+    for attempt in range(MAX_RETRIES):
+        try:
+            with client.start_session() as session:
+                with session.start_transaction():
+                    docs = list(seller_orders.find(
+                        {"checkout_id": order_id, "user_id": user_id}, session=session
+                    ))
+                    if not docs:
+                        return {"success": False, "message": "Order not found", "status": 404}
 
+                    deadline = _edit_deadline(docs[0])
+                    if deadline is None:
+                        return {"success": False, "status": 403,
+                                "message": "This order has no scheduled time, so it can't be edited"}
+                    if datetime.utcnow() > deadline:
+                        return {"success": False, "status": 403,
+                                "message": "Editing is closed. Items can only be changed up to 30 minutes before your scheduled time."}
+
+                    owner = {}
+                    for d in docs:
+                        for iid in (d.get("items") or {}):
+                            owner[iid] = d
+                    for iid in new_qtys:
+                        if iid not in owner:
+                            return {"success": False, "message": "Unknown item in order", "status": 400}
+
+                    grow_ids = [
+                        iid for iid, q in new_qtys.items()
+                        if q > int(owner[iid]["items"][iid].get("qty", 0))
+                    ]
+                    fresh = {}
+                    if grow_ids:
+                        for f in resturants_items.find(
+                            {"_id": {"$in": [ObjectId(i) for i in grow_ids]}},
+                            {"price": 1}, session=session
+                        ):
+                            fresh[str(f["_id"])] = f
+
+                    grow_ops, shrink_ops, plans = [], [], []
+                    changed = False
+
+                    for d in docs:
+                        old_items = d.get("items") or {}
+                        updated = {}
+                        doc_changed = False
+
+                        for iid, item in old_items.items():
+                            old_qty = int(item.get("qty", 0))
+                            new_qty = new_qtys.get(iid, old_qty)
+
+                            if new_qty == old_qty:
+                                if new_qty > 0:
+                                    updated[iid] = item
+                                continue
+
+                            if d.get("status") != "placed":
+                                return {"success": False, "status": 409,
+                                        "message": "Part of your order is already completed or canceled and can't be edited"}
+
+                            if new_qty > old_qty:
+                                f = fresh.get(iid)
+                                if not f:
+                                    return {"success": False, "status": 400,
+                                            "message": f"{item.get('name', 'An item')} is no longer available"}
+                                if f["price"] != item.get("price"):
+                                    return {"success": False, "status": 409,
+                                            "message": f"Price changed for {item.get('name', 'an item')}. Please place a new order for extra quantity."}
+                                diff = new_qty - old_qty
+                                grow_ops.append(UpdateOne(
+                                    {"_id": ObjectId(iid), "item_qty": {"$gte": diff}},
+                                    {"$inc": {"item_qty": -diff, "sold": diff}}
+                                ))
+                            else:
+                                diff = old_qty - new_qty
+                                shrink_ops.append(UpdateOne(
+                                    {"_id": ObjectId(iid)},
+                                    {"$inc": {"item_qty": diff, "sold": -diff}}
+                                ))
+
+                            doc_changed = True
+                            if new_qty > 0:
+                                kept = dict(item)
+                                kept["qty"] = new_qty
+                                updated[iid] = kept
+
+                        plans.append((d, updated, doc_changed))
+                        changed = changed or doc_changed
+
+                    # something must remain in a part of the order that is still alive
+                    if not any(upd for (d, upd, _) in plans if d.get("status") != "canceled"):
+                        return {"success": False, "status": 400,
+                                "message": "At least one item must remain. Cancel the order instead."}
+
+                    restaurant_ids = []
+                    if changed:
+                        if grow_ops:
+                            r = resturants_items.bulk_write(grow_ops, session=session)
+                            if r.modified_count != len(grow_ops):
+                                raise InventoryError("Not enough stock")
+                        if shrink_ops:
+                            resturants_items.bulk_write(shrink_ops, session=session)
+
+                        now = datetime.utcnow()
+                        for d, updated, doc_changed in plans:
+                            if not doc_changed:
+                                continue
+                            set_fields = {"edited": True, "edited_by": "user", "edited_at": now}
+                            if "original_items" not in d:
+                                set_fields["original_items"] = d.get("items")
+                            if updated:
+                                set_fields["items"] = updated
+                            else:
+                                set_fields.update({
+                                    "status": "canceled",
+                                    "status_updated_at": now,
+                                    "reason": "All items removed by customer",
+                                    "canceled_by": "user"
+                                })
+                            seller_orders.update_one(
+                                {"_id": d["_id"], "status": "placed"},
+                                {"$set": set_fields},
+                                session=session
+                            )
+                            restaurant_ids.append(d["restaurant_id"])
+
+            total = sum(
+                int(i.get("price", 0)) * int(i.get("qty", 0))
+                for (d, upd, _) in plans if upd
+                for i in upd.values()
+            )
+            return {"success": True, "changed": changed, "restaurant_ids": restaurant_ids, "total": total}
+
+        except InventoryError:
+            return {"success": False, "status": 409,
+                    "message": "Not enough stock for the extra quantity you asked for"}
+
+        except OperationFailure as e:
+            if "TransientTransactionError" in (e.details or {}).get("errorLabels", []):
+                time.sleep(0.05)
+                continue
+            raise
+
+    return {"success": False, "message": "Please try again", "status": 500}
 def store_seller_orders(res_id, items, userid):
     seller_orders.insert_one({"res_id": res_id, "items": items, "user_id": userid, "time": datetime.utcnow()})
 
@@ -722,22 +932,30 @@ def update_order_status_seller(order_id, status, userid, res_id, **kwargs):
 
 
 
-def update_order_status_user(order_id, status, userid):
+def update_order_status_user(order_id, status, userid, reason=None):
     """
-    order_id is the checkout_id (what get_orders() returns as "order_id").
-    Updates every restaurant's part of that checkout, scoped to this user.
+    order_id is the checkout_id. The customer can only CANCEL, and only the parts
+    of the checkout that are still "placed". A reason is stored on every part.
     """
+    if status != "canceled":
+        return {"success": False, "message": "Invalid status"}
+
     with client.start_session() as session:
         with session.start_transaction():
             result = seller_orders.update_many(
-                {"checkout_id": order_id, "user_id": userid},
-                {"$set": {"status": status, "status_updated_at": datetime.utcnow()}},
+                {"checkout_id": order_id, "user_id": userid, "status": "placed"},
+                {"$set": {
+                    "status": "canceled",
+                    "status_updated_at": datetime.utcnow(),
+                    "reason": reason,
+                    "canceled_by": "user"
+                }},
                 session=session
             )
             if result.matched_count == 0:
                 return {
                     "success": False,
-                    "message": "Order not found or unauthorized"
+                    "message": "Order not found, already processed, or unauthorized"
                 }
             return {"success": True}
 

@@ -315,7 +315,7 @@ body {
 .cancelBtn,
 button.cancelBtn {
     display: block;
-    margin: 14px 0 0 auto !important;
+    /* margin: 14px 0 0 auto !important; */
     background: var(--white) !important;
     color: var(--red) !important;
     padding: 8px 16px !important;

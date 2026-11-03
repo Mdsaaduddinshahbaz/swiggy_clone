@@ -1,4 +1,4 @@
-from database import get_seller_complaints,update_complaint,fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer,create_support_ticket,get_reported_categories, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
+from database import edit_user_order_items,get_seller_complaints,update_complaint,fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer,create_support_ticket,get_reported_categories, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
 from flask import Flask, request, render_template, redirect, url_for, jsonify, g, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, get_cart_restaurant
@@ -1389,11 +1389,22 @@ def update_status():
 #@limiter.limit("30 per minute")
 def update_status_user():
     try:
+        if g.type != "user":
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
         userid = g.user_id
-        data = request.get_json()
-        order_id = data["order_id"]
-        status = data["status"]
-        result = update_order_status_user(order_id, status, userid)
+        data = request.get_json(silent=True) or {}
+        order_id = data.get("order_id")
+        status = data.get("status")
+        reason = str(data.get("reason") or "").strip()[:300]
+
+        if not order_id:
+            return jsonify({"success": False, "message": "order_id is required"}), 400
+        if status != "canceled":
+            return jsonify({"success": False, "message": "Invalid status"}), 400
+        if len(reason) < 3:
+            return jsonify({"success": False, "message": "Please tell us why you're cancelling"}), 400
+
+        result = update_order_status_user(str(order_id), status, userid, reason=reason)
         if result["success"]:
             return jsonify(result)
 
@@ -1401,7 +1412,40 @@ def update_status_user():
     except Exception as e:
         print(e)
         return ({"success": False})
+@app.post("/edit_order_user")
+@login_required
+def edit_order_user():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
 
+    data = request.get_json(silent=True) or {}
+    order_id = data.get("order_id")
+    items = data.get("items")
+
+    if not order_id or not isinstance(items, dict) or not items:
+        return jsonify({"success": False, "message": "order_id and items are required"}), 400
+
+    clean = {}
+    for item_id, qty in items.items():
+        if isinstance(qty, bool) or not isinstance(qty, int) or qty < 0 or qty > 99:
+            return jsonify({"success": False, "message": "Quantities must be whole numbers from 0 to 99"}), 400
+        clean[str(item_id)] = qty
+
+    try:
+        result = edit_user_order_items(str(order_id), g.user_id, clean)
+    except Exception as e:
+        print("edit_order_user error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
+
+    if not result["success"]:
+        return jsonify({"success": False, "message": result["message"]}), result.get("status", 400)
+
+    if result["changed"]:
+        # make the shop(s) reload their orders list (same event store_order uses)
+        for rid in set(result["restaurant_ids"]):
+            socketio.emit("new_order", {"msg": "refresh"}, room=rid)
+
+    return jsonify({"success": True, "total": result["total"]})
 
 @app.post("/stats")
 @login_required

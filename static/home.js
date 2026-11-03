@@ -575,8 +575,8 @@
                             <img class="support-cam-preview" alt="Shop photo" hidden>
                             <div class="support-cam-actions">
                                 <button type="button" class="support-cam-open" style="font: inherit;font-size: 14px;font-weight: 500;color: var(--ink);background: var(--surface-2);border: 1px solid transparent;border-radius: var(--radius-sm);padding: 11px 12px;width: 100%;">Open camera</button>
-                                <button type="button" class="support-cam-snap" hidden>Capture</button>
-                                <button type="button" class="support-cam-retake" hidden>Retake</button>
+                                <button type="button" class="support-cam-snap" hidden style="font: inherit;font-size: 14px;font-weight: 500;color: var(--ink);background: var(--surface-2);border: 1px solid transparent;border-radius: var(--radius-sm);padding: 11px 12px;width: 100%;">Capture</button>
+                                <button type="button" class="support-cam-retake" hidden style="font: inherit;font-size: 14px;font-weight: 500;color: var(--ink);background: var(--surface-2);border: 1px solid transparent;border-radius: var(--radius-sm);padding: 11px 12px;width: 100%;">Retake</button>
                             </div>
                         </div>
                         <label>Phone number <span class="opt">(optional, so we can call you)</span>
