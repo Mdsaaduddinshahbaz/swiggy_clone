@@ -39,6 +39,53 @@ async function cartJson(response) {
     try { return await response.json(); } catch (e) { return null; }
 }
 
+// ---------------------------------------------------------------
+// Button loading state (spinner + label). Styles are injected once,
+// so no stylesheet change is needed. The spinner uses currentColor,
+// so it always matches the button's text colour.
+// ---------------------------------------------------------------
+function ensureSpinnerStyle() {
+    if (document.getElementById("btnSpinnerStyle")) return;
+    const style = document.createElement("style");
+    style.id = "btnSpinnerStyle";
+    style.textContent = `
+        .btn-loading { display: inline-flex; align-items: center; justify-content: center; gap: 10px; cursor: progress; pointer-events: none; }
+        .btn-spinner { width: 1.1em; height: 1.1em; flex: 0 0 auto; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: btnSpin .7s linear infinite; }
+        @keyframes btnSpin { to { transform: rotate(360deg); } }
+    `;
+    document.head.appendChild(style);
+}
+
+function setButtonLoading(btn, text) {
+    if (!btn) return;
+    ensureSpinnerStyle();
+    if (btn.dataset.loadingOrig === undefined) {
+        btn.dataset.loadingOrig = btn.innerHTML;
+        btn.style.minWidth = btn.offsetWidth + "px"; // keep the button from shrinking when the label changes
+    }
+    btn.classList.add("btn-loading");
+    btn.setAttribute("aria-busy", "true");
+    btn.setAttribute("aria-disabled", "true");
+    btn.innerHTML = "";
+
+    const spinner = document.createElement("span");
+    spinner.className = "btn-spinner";
+    spinner.setAttribute("aria-hidden", "true");
+    const label = document.createElement("span");
+    label.textContent = text;
+    btn.append(spinner, label);
+}
+
+function clearButtonLoading(btn) {
+    if (!btn || btn.dataset.loadingOrig === undefined) return;
+    btn.innerHTML = btn.dataset.loadingOrig;
+    btn.style.minWidth = "";
+    delete btn.dataset.loadingOrig;
+    btn.classList.remove("btn-loading");
+    btn.removeAttribute("aria-busy");
+    btn.removeAttribute("aria-disabled");
+}
+
 // Prefer the app's toast (defined in home.js); fall back to alert if it isn't there.
 function notify(message) {
     if (typeof showToast === "function" && document.getElementById("toast")) {
@@ -261,6 +308,7 @@ async function initCartPage() {
     let deliveryMode = "now";     // "now" | "scheduled"
     let slotDay = "today";        // "today" | "tomorrow"
     let selectedSlot = null;      // { date: "YYYY-MM-DD", time: "HH:MM", label }
+    let isSubmitting = false;     // true while /store_orders is in flight
 
     // ---------------------------------------------------------------
     // Cart helpers
@@ -475,7 +523,7 @@ async function initCartPage() {
         }
 
         const online = isStoreOnline();
-        if (placeorder) {
+        if (placeorder && !isSubmitting) {
             // Remember the button's original markup so we can restore it.
             if (placeorder.dataset.origHtml === undefined) placeorder.dataset.origHtml = placeorder.innerHTML;
             placeorder.innerHTML = online ? placeorder.dataset.origHtml : "Store is offline";
@@ -1014,6 +1062,7 @@ async function initCartPage() {
 
     // One overlay handler closes whichever panel is open
     on(overlay, "click", () => {
+        if (isSubmitting) return; // keep the sheet (and its spinner) up while the order is going through
         closeAddressPanel();
         closePickupSheet();
     });
@@ -1172,7 +1221,11 @@ async function initCartPage() {
     // Place order (pickup or delivery)
     // ---------------------------------------------------------------
 
-    async function submitOrder(pickupTime) {
+    async function submitOrder(pickupTime, triggerBtn) {
+        if (isSubmitting) return; // ignore double taps / Enter while a request is running
+        isSubmitting = true;
+
+        const btn = triggerBtn || confirmPickupBtn;
         const type = getOrderType();
         const body = {
             user_id: userId,
@@ -1188,8 +1241,7 @@ async function initCartPage() {
             body.delivery_slot = deliveryMode === "scheduled" ? (selectedSlot?.label ?? null) : null;
         }
 
-        if (placeorder) placeorder.disabled = true;
-        if (confirmPickupBtn) confirmPickupBtn.disabled = true;
+        setButtonLoading(btn, "Placing order…");
 
         try {
             const orderRes = await fetch("/store_orders", {
@@ -1223,7 +1275,7 @@ async function initCartPage() {
                 overlay?.classList.remove("show");
                 safeStorageRemove(sessionStorage, CART_CACHE_KEY);
                 safeStorageRemove(sessionStorage, `cachedOrders_${userId}`);
-                alert("Order placed");
+                // alert("Order placed");
                 goToPage("orders");
             } else {
                 alert(orderData.message || "Error while placing order");
@@ -1233,12 +1285,15 @@ async function initCartPage() {
             console.error("place order failed", err);
             alert("Network error while placing order. Please try again.");
         } finally {
-            if (confirmPickupBtn) confirmPickupBtn.disabled = false;
+            isSubmitting = false;
+            clearButtonLoading(btn);
             updateOrderTypeUI(); // re-evaluates whether Place Order should be enabled
         }
     }
 
     on(placeorder, "click", () => {
+        if (isSubmitting) return;
+
         if (isCartEmpty(restaurants)) {
             alert("Your cart is empty");
             return;
@@ -1261,7 +1316,7 @@ async function initCartPage() {
                 deliveryTimeCard?.scrollIntoView({ behavior: "smooth", block: "center" });
                 return;
             }
-            submitOrder(null); // delivery uses a slot (or "now"), not the pickup-time sheet
+            submitOrder(null, placeorder); // delivery uses a slot (or "now"), not the pickup-time sheet
             return;
         }
 
@@ -1271,6 +1326,8 @@ async function initCartPage() {
     });
 
     on(confirmPickupBtn, "click", async () => {
+        if (isSubmitting) return;
+
         if (!isStoreOnline()) {
             closePickupSheet();
             overlay?.classList.remove("show");
@@ -1299,7 +1356,7 @@ async function initCartPage() {
             return;
         }
 
-        await submitOrder(pickupTime);
+        await submitOrder(pickupTime, confirmPickupBtn);
     });
 
     on(orderBtn, "click", () => goToPage("orders"));
