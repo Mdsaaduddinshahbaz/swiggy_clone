@@ -1260,6 +1260,7 @@ async function postAddToCart(payload) {
         body: JSON.stringify(payload)
     });
     const data = await readJsonSafe(response);
+    refreshCartBadgeSoon();
     return { response, data };
 }
 
@@ -2298,6 +2299,7 @@ function scheduleMenuCartUpdate(itemId, resId, userId, delta, onSuccess, onFailu
             if (inFlightMenuControllers.get(itemId) === controller) {
                 inFlightMenuControllers.delete(itemId);
             }
+            refreshCartBadgeSoon();
         }
 
     }, 400);
@@ -2537,6 +2539,7 @@ async function initMenuPage() {
 
     // opts: { add: true } from an add_to_cart reply, { update: true } from an update_cart reply
     function syncTotal(serverTotal, opts = {}) {
+        refreshCartBadgeSoon();
         if (serverTotal === undefined || serverTotal === null || serverTotal === "") return;
         const t = Number(serverTotal);
         if (!Number.isFinite(t)) return;
@@ -3006,11 +3009,13 @@ async function initMenuPage() {
         setLocalQty(itemId, 1);
         setItemControls(itemId, 1);
         bumpTotal(itemPrice);
+        adjustCartBadge(1);
 
         const revert = () => {
             setLocalQty(itemId, 0);
             setItemControls(itemId, 0); // back to ADD
             bumpTotal(-itemPrice);
+            adjustCartBadge(-1);
         };
 
         try {
@@ -3103,12 +3108,14 @@ async function initMenuPage() {
         const previousTotal = cartTotal;
         cartTotal = parseInt(cartItem.price) || 0;
         renderFooterTotal();
+        setCartBadge(1);
 
         const revert = () => {
             setLocalQty(itemId, 0);
             setItemControls(itemId, 0); // back to ADD
             cartTotal = previousTotal;
             renderFooterTotal();
+            refreshCartBadgeSoon();
         };
 
         try {
@@ -3189,6 +3196,7 @@ async function initMenuPage() {
             qtyEl.textContent = previousQty + 1;
             setLocalQty(itemId, previousQty + 1);
             bumpTotal(unitPrice);
+            adjustCartBadge(1);
 
             scheduleMenuCartUpdate(itemId, resId, userId, 1,
                 (data) => {
@@ -3198,6 +3206,7 @@ async function initMenuPage() {
                     setLocalQty(itemId, previousQty);
                     setItemControls(itemId, previousQty);
                     bumpTotal(-unitPrice);
+                    adjustCartBadge(-1);
                     showToast(errorMessage);
                 },
                 () => {
@@ -3206,6 +3215,7 @@ async function initMenuPage() {
                     setLocalQty(itemId, previousQty);
                     setItemControls(itemId, previousQty);
                     bumpTotal(-unitPrice);
+                    adjustCartBadge(-1);
                     applyStoreStatus(resId, false, { live: true });
                 }
             );
@@ -3218,7 +3228,7 @@ async function initMenuPage() {
             const unitPrice = priceOf(itemId);
 
             setLocalQty(itemId, newQty);
-            if (previousQty > 0) bumpTotal(-unitPrice);
+            if (previousQty > 0) { bumpTotal(-unitPrice); adjustCartBadge(-1); }
 
             if (newQty === 0) {
                 setItemControls(itemId, 0); // shows ADD instead of "0"
@@ -3240,7 +3250,7 @@ async function initMenuPage() {
                 (errorMessage) => {
                     setLocalQty(itemId, previousQty);
                     setItemControls(itemId, previousQty);
-                    if (previousQty > 0) bumpTotal(unitPrice);
+                    if (previousQty > 0) { bumpTotal(unitPrice); adjustCartBadge(1); }
                     showToast(errorMessage);
                 }
             );
@@ -3418,3 +3428,92 @@ const KIRANA_CASH_RULES = {
     paintBalance();
     paintRules();
 })();
+
+
+/* ============================================================
+   CART COUNT BADGE (red circle on the Cart icon in the bottom nav)
+   Shows the total quantity of items in the cart. Source of truth is
+   /get_cart_items; the menu adjusts it instantly on every tap and the
+   server value reconciles it. Refreshes on load, on every SPA
+   navigation (e.g. coming back from the Cart page) and when the tab
+   becomes visible again.
+============================================================ */
+var cartBadgeCount = 0;
+var cartBadgeTimer = null;
+
+function paintCartBadge() {
+    const link = document.querySelector('.app-navbar .nav-item[data-page="cart"]');
+    if (!link) return;
+
+    let badge = link.querySelector(".cart-count-badge");
+    if (!badge) {
+        if (!document.getElementById("cartBadgeStyle")) {
+            const st = document.createElement("style");
+            st.id = "cartBadgeStyle";
+            st.textContent = `
+                .app-navbar .nav-item[data-page="cart"] { position: relative; }
+                .cart-count-badge {
+                    position: absolute; top: 2px; left: 50%; margin-left: 6px;
+                    min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+                    border-radius: 999px; background: #e53935; color: #fff;
+                    font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+                    box-shadow: 0 0 0 2px #fff; pointer-events: none;
+                }
+                .cart-count-badge[hidden] { display: none; }
+            `;
+            document.head.appendChild(st);
+        }
+        badge = document.createElement("span");
+        badge.className = "cart-count-badge";
+        badge.setAttribute("aria-hidden", "true");
+        link.appendChild(badge);
+    }
+
+    const n = Math.max(0, cartBadgeCount);
+    badge.hidden = n === 0;
+    badge.textContent = n > 99 ? "99+" : String(n);
+    link.setAttribute("aria-label", n ? `Cart, ${n} item${n === 1 ? "" : "s"}` : "Cart");
+}
+
+function setCartBadge(n) {
+    cartBadgeCount = Math.max(0, Math.floor(Number(n) || 0));
+    paintCartBadge();
+}
+
+function adjustCartBadge(delta) {
+    setCartBadge(cartBadgeCount + delta);
+}
+
+async function refreshCartBadge() {
+    try {
+        const res = await fetch("/get_cart_items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userid: currentUserId() })
+        });
+        if (!res.ok) return;
+        const data = await readJsonSafe(res);
+        if (!data || !data.success) return;
+
+        // Skip while taps are still settling, so a stale reply can't undo them.
+        if (pendingMenuUpdates.size > 0 || inFlightMenuControllers.size > 0) return;
+
+        let count = 0;
+        Object.values((data.results && data.results.cart) || {}).forEach((r) => {
+            Object.values((r && r.items) || {}).forEach((it) => { count += Number(it.qty) || 0; });
+        });
+        setCartBadge(count);
+    } catch (e) {
+        console.warn("cart badge refresh failed", e);
+    }
+}
+
+function refreshCartBadgeSoon() {
+    clearTimeout(cartBadgeTimer);
+    cartBadgeTimer = setTimeout(refreshCartBadge, 350);
+}
+
+document.addEventListener("spa:pageload", refreshCartBadgeSoon);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshCartBadgeSoon(); });
+paintCartBadge();
+refreshCartBadge();
