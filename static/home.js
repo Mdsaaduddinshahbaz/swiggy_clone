@@ -1435,6 +1435,33 @@ function productThumbsMarkup(items) {
     return thumbs + seeMore;
 }
 
+// ---- Skeleton loading helpers ----------------------------------------
+// Shimmering placeholders shown until an API call returns. The CSS for
+// .kh-sk lives in home.html. Store-card skeletons reuse the existing
+// .skeleton-card styles from home.css.
+function restaurantSkeletonMarkup(n = 4) {
+    const card = `
+        <div class="skeleton-card" data-kh-sk aria-hidden="true">
+            <div class="skeleton-img"></div>
+            <div class="skeleton-line w-70"></div>
+            <div class="skeleton-line w-40"></div>
+            <div class="skeleton-line w-55"></div>
+        </div>`;
+    return card.repeat(n);
+}
+
+function showRestaurantSkeleton(display_resturants, no_results_container) {
+    if (!display_resturants) return;
+    if (no_results_container) no_results_container.style.display = "none";
+    display_resturants.innerHTML = restaurantSkeletonMarkup();
+}
+
+// Remove any skeleton left behind (error paths), keeping real content.
+function clearKhSkeleton(el) {
+    if (!el) return;
+    el.querySelectorAll("[data-kh-sk], .skeleton-card").forEach(n => n.remove());
+}
+
 // Store cards start with skeleton item-thumbs (unless we already have that
 // restaurant's items cached from an earlier render) and get their real
 // products filled in by loadPreviewItems() right after, via a single
@@ -1620,6 +1647,7 @@ async function change(latt, long) {
         localStorage.setItem("userLocation", JSON.stringify(userLocation));
         if (loading) loading.style.visibility = "visible";
 
+        showRestaurantSkeleton(display_resturants, no_results_container);
         const res = await fetch("/list_resturants", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1635,10 +1663,12 @@ async function change(latt, long) {
             sessionStorage.setItem(getRestaurantCacheKey(userId), JSON.stringify(data.results));
             if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
         } else {
+            clearKhSkeleton(display_resturants);
             alert("error loading resturants");
         }
     } catch (e) {
         console.error("change() failed", e);
+        clearKhSkeleton(display_resturants);
         if (access_denied_container) access_denied_container.style.visibility = "visible";
         if (Note) Note.style.display = "none";
     }
@@ -1727,6 +1757,8 @@ async function initHomePage() {
 
     addListenerOnce(select_options, "change", async (e) => {
         const storedLocation = JSON.parse(localStorage.getItem("userLocation"));
+        const previousCards = display_resturants.innerHTML;
+        showRestaurantSkeleton(display_resturants, no_results_container);
         try {
             const res = await fetch("/list_resturants", {
                 method: "POST",
@@ -1741,10 +1773,12 @@ async function initHomePage() {
                 sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.results));
                 if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
             } else {
+                display_resturants.innerHTML = previousCards;
                 alert("error loading resturants");
             }
         } catch (err) {
             console.error("distance filter failed", err);
+            display_resturants.innerHTML = previousCards;
             alert("error loading resturants");
         }
     });
@@ -1846,6 +1880,7 @@ async function initHomePage() {
                 return;
             }
             const data = await addressRes.json();
+            clearKhSkeleton(savedAddress);
 
             if (data.success && data.address.length > 0) {
                 if (locationFound === false) {
@@ -1897,6 +1932,7 @@ async function initHomePage() {
             renderRestaurants(data.results, renderContainers);
             sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.results));
         } else if (!cachedRestaurants) {
+            clearKhSkeleton(display_resturants);
             alert("error loading resturants");
         }
 
@@ -1909,6 +1945,8 @@ async function initHomePage() {
         if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
     } catch (e) {
         console.error("initHomePage location/restaurant load failed", e);
+        clearKhSkeleton(savedAddress);
+        if (!cachedRestaurants) clearKhSkeleton(display_resturants);
         if (!cachedRestaurants && Note) Note.style.display = "none";
     }
 
@@ -2339,6 +2377,20 @@ async function initMenuPage() {
     if (sortSelect) sortSelect.value = "default";
     if (footer) footer.classList.remove("show");
 
+    // The menu template ships with skeleton rows; if loading fails we replace
+    // them with a message instead of leaving them shimmering forever.
+    function showMenuLoadError() {
+        if (categoryTabs) categoryTabs.innerHTML = "";
+        const info = document.querySelector(".res-delivery-info");
+        if (info) info.innerHTML = "";
+        menuContainer.innerHTML = `
+            <div class="empty-menu">
+                <h3>Couldn't load the menu</h3>
+                <p>Please check your connection and try again.</p>
+            </div>
+        `;
+    }
+
     let cartData;
 
     try {
@@ -2365,6 +2417,7 @@ async function initMenuPage() {
 
     } catch (error) {
         console.error("Cart loading error:", error);
+        showMenuLoadError();
         alert("Error loading cart");
         return;
     }
@@ -2390,6 +2443,7 @@ async function initMenuPage() {
 
     } catch (error) {
         console.error("Menu loading error:", error);
+        showMenuLoadError();
         alert("Error loading menu");
         return;
     }
@@ -2458,6 +2512,42 @@ async function initMenuPage() {
     let stockOnly = false;
     let pendingCartItem = null;
     const addingItems = new Set(); // items with an add_to_cart request in flight
+
+    // ---- Footer total: updated instantly, server value only reconciles ----
+    // cartTotal starts from the server's total (the cart may hold items that
+    // aren't on this page). Every tap adjusts it right away by the item's
+    // price; the API response then just confirms it, and is ignored while
+    // other taps are still pending so a stale reply can't make it jump back.
+    let cartTotal = Number(cartData?.results?.total) || 0;
+
+    function renderFooterTotal() {
+        if (totalAmount) totalAmount.textContent = cartTotal;
+        if (footer) footer.classList.toggle("show", cartTotal > 0);
+    }
+
+    function bumpTotal(delta) {
+        cartTotal = Math.max(0, Math.round((cartTotal + delta) * 100) / 100);
+        renderFooterTotal();
+    }
+
+    function priceOf(itemId) {
+        const m = menuItems.find(i => i.id === String(itemId));
+        return m ? Number(m.price) || 0 : 0;
+    }
+
+    // opts: { add: true } from an add_to_cart reply, { update: true } from an update_cart reply
+    function syncTotal(serverTotal, opts = {}) {
+        if (serverTotal === undefined || serverTotal === null || serverTotal === "") return;
+        const t = Number(serverTotal);
+        if (!Number.isFinite(t)) return;
+
+        const otherAdds = addingItems.size - (opts.add ? 1 : 0);
+        const otherUpdates = pendingMenuUpdates.size + inFlightMenuControllers.size - (opts.update ? 1 : 0);
+        if (otherAdds > 0 || otherUpdates > 0) return; // newer taps still settling
+
+        cartTotal = t;
+        renderFooterTotal();
+    }
 
     const wishlist = new Set();
 
@@ -2911,13 +3001,16 @@ async function initMenuPage() {
 
         addingItems.add(itemId);
 
-        // Optimistic: show quantity 1 immediately
+        // Optimistic: show quantity 1 and the new total immediately
+        const itemPrice = parseInt(price) || 0;
         setLocalQty(itemId, 1);
         setItemControls(itemId, 1);
+        bumpTotal(itemPrice);
 
         const revert = () => {
             setLocalQty(itemId, 0);
             setItemControls(itemId, 0); // back to ADD
+            bumpTotal(-itemPrice);
         };
 
         try {
@@ -2955,8 +3048,7 @@ async function initMenuPage() {
 
             if (data && data.success) {
 
-                footer.classList.add("show");
-                totalAmount.textContent = data.Total ?? data.total ?? 0;
+                syncTotal(data.Total ?? data.total, { add: true });
 
             } else if (data && /different store/i.test(data.message || "")) {
 
@@ -3007,9 +3099,16 @@ async function initMenuPage() {
         setLocalQty(itemId, 1);
         setItemControls(itemId, 1);
 
+        // The old cart is being replaced, so the total is just this item.
+        const previousTotal = cartTotal;
+        cartTotal = parseInt(cartItem.price) || 0;
+        renderFooterTotal();
+
         const revert = () => {
             setLocalQty(itemId, 0);
             setItemControls(itemId, 0); // back to ADD
+            cartTotal = previousTotal;
+            renderFooterTotal();
         };
 
         try {
@@ -3036,8 +3135,7 @@ async function initMenuPage() {
 
             if (data && data.success) {
 
-                footer.classList.add("show");
-                totalAmount.textContent = data.Total ?? data.total ?? 0;
+                syncTotal(data.Total ?? data.total, { add: true });
 
             } else {
                 revert();
@@ -3087,20 +3185,19 @@ async function initMenuPage() {
                 return;
             }
 
+            const unitPrice = priceOf(itemId);
             qtyEl.textContent = previousQty + 1;
             setLocalQty(itemId, previousQty + 1);
+            bumpTotal(unitPrice);
 
             scheduleMenuCartUpdate(itemId, resId, userId, 1,
                 (data) => {
-                    const total = data.total ?? data.Total ?? 0;
-                    if (total > 0) {
-                        footer.classList.add("show");
-                        totalAmount.textContent = total;
-                    }
+                    syncTotal(data.total ?? data.Total, { update: true });
                 },
                 (errorMessage) => {
                     setLocalQty(itemId, previousQty);
                     setItemControls(itemId, previousQty);
+                    bumpTotal(-unitPrice);
                     showToast(errorMessage);
                 },
                 () => {
@@ -3108,6 +3205,7 @@ async function initMenuPage() {
                     // then flip the whole page into its offline state.
                     setLocalQty(itemId, previousQty);
                     setItemControls(itemId, previousQty);
+                    bumpTotal(-unitPrice);
                     applyStoreStatus(resId, false, { live: true });
                 }
             );
@@ -3117,8 +3215,10 @@ async function initMenuPage() {
             const qtyEl = item.querySelector(".item_qty");
             const previousQty = Number(qtyEl.textContent);
             const newQty = Math.max(0, previousQty - 1);
+            const unitPrice = priceOf(itemId);
 
             setLocalQty(itemId, newQty);
+            if (previousQty > 0) bumpTotal(-unitPrice);
 
             if (newQty === 0) {
                 setItemControls(itemId, 0); // shows ADD instead of "0"
@@ -3129,14 +3229,7 @@ async function initMenuPage() {
             scheduleMenuCartUpdate(itemId, resId, userId, -1,
                 (data) => {
 
-                    const total = data.total ?? data.Total ?? 0;
-
-                    if (total > 0) {
-                        footer.classList.add("show");
-                        totalAmount.textContent = total;
-                    } else {
-                        footer.classList.remove("show");
-                    }
+                    syncTotal(data.total ?? data.Total, { update: true });
 
                     if (data.removed) {
 
@@ -3147,6 +3240,7 @@ async function initMenuPage() {
                 (errorMessage) => {
                     setLocalQty(itemId, previousQty);
                     setItemControls(itemId, previousQty);
+                    if (previousQty > 0) bumpTotal(unitPrice);
                     showToast(errorMessage);
                 }
             );
@@ -3175,3 +3269,152 @@ document.addEventListener("spa:pageload", (e) => {
     if (e.detail.page === "home") initHomePage();
     if (e.detail.page === "menu") initMenuPage();
 });
+
+
+/* ============================================================
+   KIRANA CASH
+   Header badge (#kiranaCashBadge) -> full-screen "how it works" page
+   (#kcpPage in home.html). Everything lives in this file + home.html.
+
+   - Edit KIRANA_CASH_RULES below to change the numbers shown on the page.
+   - The balance defaults to 0. Until your backend credits it, it is read
+     from localStorage ("kiranaCash_<userId>"). When you add an API, call
+     KiranaCash.set(amount) with the real balance and the badge + page update.
+   - Earning and redeeming are NOT wired to orders/checkout yet; this is the
+     customer-facing page and the balance display.
+============================================================ */
+const KIRANA_CASH_RULES = {
+    earnPercent: 5,     // % of the bill returned as Kirana Cash
+    minOrder: 100,      // smallest order (₹) that earns cash
+    maxPerOrder: 50,    // most cash (₹) one order can earn
+    expiryDays: 90      // how long a credit stays valid
+};
+
+(function () {
+    "use strict";
+
+    const R = KIRANA_CASH_RULES;
+    const fmt = (n) => Number(n || 0).toLocaleString("en-IN");
+
+    function kcUserId() {
+        const parts = window.location.pathname.split("/").filter(Boolean);
+        return window.APP_USER_ID || parts[parts.length - 1] || "guest";
+    }
+    const storageKey = () => `kiranaCash_${kcUserId()}`;
+
+    function getBalance() {
+        try {
+            const v = Number(localStorage.getItem(storageKey()));
+            return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+        } catch (e) { return 0; }
+    }
+
+    function paintBalance() {
+        const bal = getBalance();
+        const badge = document.getElementById("kiranaCashAmount");
+        if (badge) badge.textContent = fmt(bal);
+        const big = document.getElementById("kcpBalance");
+        if (big) big.textContent = fmt(bal);
+        const worth = document.getElementById("kcpBalanceValue");
+        if (worth) worth.textContent = fmt(bal); // 1 Kirana Cash = ₹1
+    }
+
+    function setBalance(amount) {
+        const v = Math.max(0, Math.floor(Number(amount) || 0));
+        try { localStorage.setItem(storageKey(), String(v)); } catch (e) { /* storage blocked */ }
+        paintBalance();
+    }
+
+    // Fill the rule numbers from KIRANA_CASH_RULES
+    function paintRules() {
+        document.querySelectorAll("[data-kc-rule]").forEach((el) => {
+            const key = el.dataset.kcRule;
+            const map = { percent: R.earnPercent, minOrder: R.minOrder, maxPerOrder: R.maxPerOrder, expiryDays: R.expiryDays };
+            if (key in map) el.textContent = fmt(map[key]);
+        });
+    }
+
+    function earnFor(orderValue) {
+        const v = Number(orderValue) || 0;
+        if (v < R.minOrder) return 0;
+        return Math.min(Math.floor((v * R.earnPercent) / 100), R.maxPerOrder);
+    }
+
+    function paintCalc() {
+        const input = document.getElementById("kcpCalcInput");
+        const out = document.getElementById("kcpCalcOut");
+        const note = document.getElementById("kcpCalcNote");
+        if (!input || !out || !note) return;
+
+        const v = Number(input.value);
+        const earn = earnFor(v);
+        out.textContent = `You earn ₹${fmt(earn)}`;
+
+        if (!input.value || !Number.isFinite(v) || v <= 0) {
+            note.textContent = "Enter an order value to see your Kirana Cash.";
+        } else if (v < R.minOrder) {
+            note.textContent = `Add ₹${fmt(R.minOrder - v)} more to reach the ₹${fmt(R.minOrder)} minimum.`;
+        } else if (earn >= R.maxPerOrder) {
+            note.textContent = `That's the most one order can earn (₹${fmt(R.maxPerOrder)}).`;
+        } else {
+            note.textContent = `${fmt(R.earnPercent)}% of ₹${fmt(v)}, credited after your order is completed.`;
+        }
+    }
+
+    let lastFocus = null;
+
+    function openPage() {
+        const page = document.getElementById("kcpPage");
+        if (!page) return;
+        lastFocus = document.activeElement;
+        paintBalance();
+        paintRules();
+        paintCalc();
+        page.classList.add("show");
+        page.setAttribute("aria-hidden", "false");
+        document.body.classList.add("kcp-open");
+        const scroller = page.querySelector(".kcp-scroll");
+        if (scroller) scroller.scrollTop = 0;
+        document.getElementById("kcpBack")?.focus();
+    }
+
+    function closePage() {
+        const page = document.getElementById("kcpPage");
+        if (!page || !page.classList.contains("show")) return;
+        page.classList.remove("show");
+        page.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("kcp-open");
+        if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+    }
+
+    // Badge + page controls (delegated, so they survive any DOM swaps)
+    document.addEventListener("click", (e) => {
+        if (e.target.closest("#kiranaCashBadge")) { openPage(); return; }
+        if (e.target.closest("#kcpBack")) { closePage(); return; }
+        if (e.target.closest("#kcpShop")) {
+            closePage();
+            goToPage("home");
+        }
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { closePage(); return; }
+        if ((e.key === "Enter" || e.key === " ") && e.target && e.target.id === "kiranaCashBadge") {
+            e.preventDefault();
+            openPage();
+        }
+    });
+
+    document.addEventListener("input", (e) => {
+        if (e.target && e.target.id === "kcpCalcInput") paintCalc();
+    });
+
+    // Navigating anywhere else in the app closes the page
+    document.addEventListener("spa:pageload", closePage);
+    window.addEventListener("hashchange", closePage);
+
+    window.KiranaCash = { get: getBalance, set: setBalance, open: openPage, close: closePage, earnFor };
+
+    paintBalance();
+    paintRules();
+})();

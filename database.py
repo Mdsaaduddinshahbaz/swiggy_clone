@@ -366,11 +366,12 @@ def generate_token():
 #   {
 #     _id, checkout_id, user_id, token_no,
 #     restaurant_id, restaurant_name, items,
-#     status, time, pickup_time, order_type, delivery_address
+#     status, time, pickup_time, order_type, delivery_address,
+#     subtotal, discount, coupon (snapshot of the rules used), total
 #   }
 # =========================================================
 
-def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None):
+def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None, coupon_code=None):
     token = generate_token()
     items = get_cart(userid)
 
@@ -422,6 +423,8 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
     seller_docs = []
     inventory_updates = []
     restaurant_ids = []
+    coupon_code = str(coupon_code or "").strip().upper() or None
+    coupon_used = False
 
     for restaurant_id, restaurant in items["cart"].items():
         item_ids = [ObjectId(iid) for iid in restaurant["items"].keys()]
@@ -462,6 +465,23 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
                 )
             )
 
+        # ---- coupon (server decides the discount, never the client) ----
+        subtotal = sum(v["price"] * int(v["qty"]) for v in verified_items.values())
+        discount, coupon_snapshot = 0, None
+
+        if coupon_code and not coupon_used:
+            offer = offers.find_one({"restaurant_id": restaurant_id, "code": coupon_code})
+            if offer:   # a code only belongs to one restaurant
+                err = _offer_error(offer, subtotal)
+                if err:
+                    return {"success": False, "code": "COUPON_INVALID", "message": err}
+                discount = _discount_for(offer, subtotal)
+                coupon_snapshot = {
+                    "code": offer["code"], "type": offer["type"],
+                    "value": offer["value"], "min_order": offer.get("min_order", 0),
+                }
+                coupon_used = True
+
         seller_docs.append({
             "checkout_id": checkout_id,
             "user_id": userid,
@@ -473,8 +493,15 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None)
             "time": current_time,
             "pickup_time": pickup_time,
             "order_type": order_type,
+            "subtotal": subtotal,
+            "discount": discount,
+            "coupon": coupon_snapshot,
+            "total": round(subtotal - discount, 2),
             "delivery_address": delivery_address
         })
+
+    if coupon_code and not coupon_used:
+        return {"success": False, "code": "COUPON_INVALID", "message": "Invalid coupon code"}
 
     for attempt in range(MAX_RETRIES):
 
@@ -641,7 +668,11 @@ def get_orders(userid):
             "name": doc.get("restaurant_name"),
             "items": doc.get("items", {}),
             "status": doc.get("status"),
-            "seller_order_id": str(doc["_id"])
+            "seller_order_id": str(doc["_id"]),
+            "subtotal": doc.get("subtotal"),
+            "discount": doc.get("discount", 0),
+            "coupon_code": (doc.get("coupon") or {}).get("code"),
+            "total": doc.get("total"),
         }
         group["statuses"].append(doc.get("status", "placed"))
         stamp = doc.get("status_updated_at") or doc.get("time")
@@ -656,6 +687,7 @@ def get_orders(userid):
         final_orders.append(group)
     return final_orders
 
+
 def edit_user_order_items(order_id, user_id, new_qtys):
     """
     Customer changes quantities of a checkout, allowed until 30 min before the
@@ -664,6 +696,7 @@ def edit_user_order_items(order_id, user_id, new_qtys):
     - decreases give stock back
     - a restaurant whose items are all removed gets that part canceled
     - at least one item must remain overall
+    - coupon discount is recalculated from the snapshot stored on the order
     One transaction, same stock math as store_orders().
     """
     for attempt in range(MAX_RETRIES):
@@ -777,6 +810,9 @@ def edit_user_order_items(order_id, user_id, new_qtys):
                                 set_fields["original_items"] = d.get("items")
                             if updated:
                                 set_fields["items"] = updated
+                                sub, disc, cpn = _reprice(d, updated, enforce_min=True)
+                                set_fields.update({"subtotal": sub, "discount": disc,
+                                                   "coupon": cpn, "total": round(sub - disc, 2)})
                             else:
                                 set_fields.update({
                                     "status": "canceled",
@@ -791,11 +827,18 @@ def edit_user_order_items(order_id, user_id, new_qtys):
                             )
                             restaurant_ids.append(d["restaurant_id"])
 
-            total = sum(
-                int(i.get("price", 0)) * int(i.get("qty", 0))
-                for (d, upd, _) in plans if upd
-                for i in upd.values()
-            )
+            total = 0
+            for (d, upd, changed_flag) in plans:
+                if not upd or d.get("status") == "canceled":
+                    continue
+                if changed_flag:
+                    sub, disc, _ = _reprice(d, upd, enforce_min=True)
+                    total += sub - disc
+                elif d.get("total") is not None:
+                    total += d["total"]
+                else:
+                    total += sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in upd.values())
+            total = round(total, 2)
             return {"success": True, "changed": changed, "restaurant_ids": restaurant_ids, "total": total}
 
         except InventoryError:
@@ -809,6 +852,8 @@ def edit_user_order_items(order_id, user_id, new_qtys):
             raise
 
     return {"success": False, "message": "Please try again", "status": 500}
+
+
 def store_seller_orders(res_id, items, userid):
     seller_orders.insert_one({"res_id": res_id, "items": items, "user_id": userid, "time": datetime.utcnow()})
 
@@ -824,6 +869,10 @@ def get_seller_ordes(res_id):
             "user_id": order['user_id'],
             "items": order["items"],
             "status": order["status"],
+            "subtotal": order.get("subtotal"),
+            "discount": order.get("discount", 0),
+            "coupon_code": (order.get("coupon") or {}).get("code"),
+            "total": order.get("total"),
             "time": t,
             "created_at": t.isoformat() if isinstance(t, datetime) else None,
             "edited": bool(order.get("edited", False)),
@@ -902,7 +951,6 @@ def check_existing_owner(email, password):
         return {"success": 404}
 
 
-
 def update_order_status_seller(order_id, status, userid, res_id, **kwargs):
     """
     order_id is the seller_orders _id. A seller only changes THEIR restaurant's part
@@ -929,7 +977,6 @@ def update_order_status_seller(order_id, status, userid, res_id, **kwargs):
         return {"success": False, "message": "Order not found or unauthorized"}
 
     return {"success": True}
-
 
 
 def update_order_status_user(order_id, status, userid, reason=None):
@@ -1093,20 +1140,22 @@ def return_res_analytics(res_id):
 
 def _order_amount(order: dict, item_index: dict) -> float:
     """
-    seller_orders docs don't store a total_amount field - "items" is a dict
-    keyed by item_id (see store_orders: data["items"].items()), e.g.
-    {"<item_id>": {"qty": 2, ...}}. Price isn't guaranteed to be in the cart
-    snapshot, so we look it up from the item's current price in resturants_items.
-    NOTE: this uses *current* price, not the price at time of order - if you
-    ever change a price after orders exist, historical revenue will drift.
+    Amount the seller actually earns for this order (after coupon discount).
+    New orders store "total" (price snapshot minus discount), so use that.
+    Old orders (before coupons) have no "total": fall back to qty x the item's
+    CURRENT price, minus any discount.
+    NOTE: the fallback uses *current* price, not the price at time of order.
     """
+    if order.get("total") is not None:
+        return float(order["total"])
+
     order_items = order.get("items", {}) or {}
     total = 0
     for item_id, line in order_items.items():
         price = item_index.get(str(item_id), {}).get("price", 0)
         qty = line.get("qty", 0) if isinstance(line, dict) else 0
         total += int(price) * int(qty)
-    return total
+    return max(total - float(order.get("discount") or 0), 0)
 
 
 def get_preview_items(res_ids, limit=4):
@@ -1455,6 +1504,7 @@ def save_category(res_id, category, subcats):
             "error": str(e)
         }
 
+
 def edit_seller_order_items(order_id, res_id, new_qtys):
     """
     Seller trims an order he can't fully serve.
@@ -1464,6 +1514,8 @@ def edit_seller_order_items(order_id, res_id, new_qtys):
       - at least one item must remain
     Stock removed from the order is given back (item_qty += diff, sold -= diff),
     the exact reverse of store_orders(). Everything runs in one transaction.
+    The coupon is kept (even if the order drops below its minimum) because the
+    seller made the cut, not the customer; the discount is recalculated.
     """
     try:
         oid = ObjectId(order_id)
@@ -1518,11 +1570,17 @@ def edit_seller_order_items(order_id, res_id, new_qtys):
                                 "message": "At least one item must remain. Cancel the order instead.",
                                 "status": 400}
 
+                    sub, disc, cpn = _reprice(order, updated_items, enforce_min=False)
+
                     if changed:
                         set_fields = {
                             "items": updated_items,
                             "edited": True,
-                            "edited_at": datetime.utcnow()
+                            "edited_at": datetime.utcnow(),
+                            "subtotal": sub,
+                            "discount": disc,
+                            "coupon": cpn,
+                            "total": round(sub - disc, 2),
                         }
                         # keep the customer's original order for the first edit only
                         if "original_items" not in order:
@@ -1536,7 +1594,7 @@ def edit_seller_order_items(order_id, res_id, new_qtys):
                         if inventory_ops:
                             resturants_items.bulk_write(inventory_ops, session=session)
 
-            total = sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in updated_items.values())
+            total = round(sub - disc, 2)
             return {
                 "success": True,
                 "changed": changed,
@@ -1553,6 +1611,7 @@ def edit_seller_order_items(order_id, res_id, new_qtys):
             raise
 
     return {"success": False, "message": "Please try again", "status": 500}
+
 
 # =========================================================
 # Store settings (stored on the restaurant document)
@@ -1653,39 +1712,75 @@ def delete_offer(res_id, offer_id):
     return result.deleted_count == 1
 
 
+def _offer_error(offer, subtotal):
+    """None if the offer can be used on this subtotal, else the message to show."""
+    if not offer or not offer.get("active", True):
+        return "Invalid coupon code"
+    today = (datetime.utcnow() + IST_OFFSET).strftime("%Y-%m-%d")   # India date, not UTC
+    if offer.get("expires") and offer["expires"] < today:
+        return "This coupon has expired"
+    min_order = offer.get("min_order", 0) or 0
+    if subtotal < min_order:
+        return f"Add items worth ₹{min_order} or more to use this coupon"
+    return None
+
+
+def _discount_for(rule, subtotal):
+    """rule = offer doc OR the coupon snapshot stored on an order (both have type/value)."""
+    raw = subtotal * float(rule["value"]) / 100 if rule["type"] == "percent" else float(rule["value"])
+    return round(min(raw, subtotal), 2)
+
+
 def validate_coupon(res_id, code, subtotal):
     """
     Customer side: check a code against a server-computed subtotal.
     Returns {"success": True, "discount": x, "total": y, ...} or {"success": False, "message": ...}
     """
-    offer = offers.find_one({"restaurant_id": res_id, "code": str(code).strip().upper()})
-    if not offer or not offer.get("active", True):
-        return {"success": False, "message": "Invalid coupon code"}
-
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    if offer.get("expires") and offer["expires"] < today:
-        return {"success": False, "message": "This coupon has expired"}
-
-    min_order = offer.get("min_order", 0) or 0
-    if subtotal < min_order:
-        return {"success": False, "message": f"Add items worth ₹{min_order} or more to use this coupon"}
-
-    if offer["type"] == "percent":
-        discount = round(subtotal * offer["value"] / 100, 2)
-    else:
-        discount = min(float(offer["value"]), float(subtotal))
-
+    code = str(code).strip().upper()
+    offer = offers.find_one({"restaurant_id": res_id, "code": code})
+    err = _offer_error(offer, subtotal)
+    if err:
+        return {"success": False, "message": err}
+    discount = _discount_for(offer, subtotal)
     return {
         "success": True,
         "code": offer["code"],
+        "type": offer["type"],            # the cart uses these to recompute live
+        "value": offer["value"],
+        "min_order": offer.get("min_order", 0),
         "discount": discount,
         "total": round(subtotal - discount, 2),
     }
 
 
+def list_public_offers(res_id):
+    """Active, non-expired offers a customer can see for a store."""
+    today = (datetime.utcnow() + IST_OFFSET).strftime("%Y-%m-%d")
+    out = []
+    for d in offers.find({"restaurant_id": res_id, "active": {"$ne": False}}).sort("created_at", -1):
+        if d.get("expires") and d["expires"] < today:
+            continue
+        o = _offer_out(d)
+        o.pop("id", None)
+        out.append(o)
+    return out
+
+
+def _reprice(doc, new_items, enforce_min):
+    """After an edit: (subtotal, discount, coupon). Rules come from the snapshot on the order,
+    so later changes to the seller's offer don't alter an existing order."""
+    subtotal = sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in new_items.values())
+    coupon = doc.get("coupon")
+    if coupon and enforce_min and subtotal < (coupon.get("min_order") or 0):
+        coupon = None                      # customer shrank the order below the minimum
+    discount = _discount_for(coupon, subtotal) if coupon else 0
+    return subtotal, discount, coupon
+
+
 # =========================================================
 # Payouts
-#   Earnings = completed orders (price snapshot stored on each order line).
+#   Earnings = completed orders (price snapshot stored on each order line,
+#   minus the coupon discount - the seller funds the discount).
 #   seller_payouts docs are created by YOU (admin / script) when you pay a
 #   seller: create_payout(res_id, amount). Pending balance = earnings - payouts.
 # =========================================================
@@ -1693,9 +1788,14 @@ def validate_coupon(res_id, code, subtotal):
 def _lifetime_earnings(res_id):
     pipeline = [
         {"$match": {"restaurant_id": res_id, "status": "completed"}},
-        {"$project": {"i": {"$objectToArray": "$items"}}},
-        {"$unwind": "$i"},
-        {"$group": {"_id": None, "total": {"$sum": {"$multiply": ["$i.v.price", "$i.v.qty"]}}}},
+        {"$project": {
+            "discount": {"$ifNull": ["$discount", 0]},
+            "gross": {"$sum": {"$map": {
+                "input": {"$objectToArray": "$items"}, "as": "i",
+                "in": {"$multiply": ["$$i.v.price", "$$i.v.qty"]}
+            }}},
+        }},
+        {"$group": {"_id": None, "total": {"$sum": {"$subtract": ["$gross", "$discount"]}}}},
     ]
     rows = list(seller_orders.aggregate(pipeline))
     return float(rows[0]["total"]) if rows else 0.0
@@ -1939,7 +2039,7 @@ def get_seller_complaints(res_id, limit=200):
     orders = {}
     for o in seller_orders.find(
         {"restaurant_id": res_id, "checkout_id": {"$in": checkout_ids}},
-        {"checkout_id": 1, "token_no": 1, "items": 1, "status": 1}
+        {"checkout_id": 1, "token_no": 1, "items": 1, "status": 1, "total": 1}
     ):
         orders[o["checkout_id"]] = o
 
@@ -1950,7 +2050,10 @@ def get_seller_complaints(res_id, limit=200):
         items_summary = ", ".join(
             f"{i.get('name', 'Item')} x{i.get('qty', 0)}" for i in items
         )
-        total = sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in (o.get("items") or {}).values())
+        if o.get("total") is not None:
+            total = o["total"]          # already after coupon discount
+        else:
+            total = sum(int(i.get("price", 0)) * int(i.get("qty", 0)) for i in (o.get("items") or {}).values())
         created = t.get("created_at")
         out.append({
             "ticket_id": t["ticket_id"],

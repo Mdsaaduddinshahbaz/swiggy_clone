@@ -1,4 +1,298 @@
 /* =====================================================================
+   0. SKELETON LOADING
+   Shimmering placeholders until each API endpoint has returned and its
+   data has been rendered. Wraps window.fetch, so it MUST stay at the very
+   top of this file (before any fetch is made). No other code depends on it.
+     POST /seller/stats      -> dashboard
+     POST /list_items        -> inventory
+     POST /seller/orders     -> orders + Customers / Sales / Analytics / Payouts
+     GET  /seller/offers     -> Offers & coupons
+     GET  /seller/settings   -> Settings
+     GET  /seller/complaints -> Complaints
+===================================================================== */
+(function () {
+  "use strict";
+
+  /* ---------------- styles ---------------- */
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes skShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .sk, .sk-text, .sk-input {
+      background: linear-gradient(90deg, #ECE8DB 25%, #F8F6EF 50%, #ECE8DB 75%);
+      background-size: 200% 100%;
+      animation: skShimmer 1.3s linear infinite;
+    }
+    .sk { display: block; border-radius: 8px; max-width: 100%; }
+    .sk-text {
+      display: inline-block !important;
+      min-width: 4ch; min-height: 1em;
+      color: transparent !important;
+      border-radius: 6px;
+      pointer-events: none; user-select: none;
+    }
+    .sk-text * { visibility: hidden; }
+    .sk-input {
+      color: transparent !important;
+      border-color: transparent !important;
+      pointer-events: none;
+    }
+    .sk-hide { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { .sk, .sk-text, .sk-input { animation: none; } }
+  `;
+  document.head.appendChild(style);
+
+  /* ---------------- skeleton markup helpers ---------------- */
+  const L = (w, h = 12, x = "") => `<span class="sk" style="width:${w};height:${h}px;${x}"></span>`;
+  const rep = (n, f) => Array.from({ length: n }, (_, i) => f(i)).join("");
+  const gap = h => `<div style="height:${h}px"></div>`;
+  const flexRow = (inner, x = "") => `<div style="display:flex;align-items:center;gap:12px;${x}">${inner}</div>`;
+
+  const MK = {
+    chart: () => `<div class="sk" style="height:220px;width:100%;border-radius:12px"></div>`,
+
+    dashOrders: () => rep(5, () => `<tr>
+        <td style="padding:14px 8px">${L("56px", 14)}</td>
+        <td style="padding:14px 8px">${L("120px", 14)}${gap(6)}${L("170px", 10)}</td>
+        <td style="padding:14px 8px">${L("56px", 14)}</td>
+        <td style="padding:14px 8px">${L("72px", 22, "border-radius:999px")}</td>
+        <td style="padding:14px 8px">${L("56px", 12)}</td></tr>`),
+
+    topProducts: () => rep(4, () => flexRow(
+      `${L("36px", 36, "border-radius:10px;flex-shrink:0")}
+       <div style="flex:1">${L("65%", 13)}${gap(6)}${L("40%", 10)}</div>
+       <div style="width:60px">${L("100%", 13)}${gap(6)}${L("70%", 10)}</div>`, "padding:10px 0")),
+
+    stockAlerts: () => rep(4, () => flexRow(
+      `<div style="flex:1">${L("60%", 13)}${gap(6)}${L("35%", 10)}</div>${L("70px", 22, "border-radius:999px")}`,
+      "padding:10px 0;justify-content:space-between")),
+
+    feed: () => rep(4, () => flexRow(
+      `${L("10px", 10, "border-radius:50%;flex-shrink:0")}
+       <div style="flex:1">${L("80%", 13)}${gap(6)}${L("30%", 10)}</div>`, "padding:10px 0")),
+
+    invGrid: () => rep(6, () => `<div class="card" style="position:relative;min-height:190px">
+        ${L("90px", 10)}${gap(14)}${L("55%", 16)}${gap(8)}${L("30%", 12)}${gap(10)}
+        ${L("80%", 11)}${gap(6)}${L("60%", 11)}${gap(14)}${L("50px", 18)}
+        <span class="sk" style="position:absolute;right:18px;top:48px;width:86px;height:86px;border-radius:20px"></span>
+      </div>`),
+
+    tree: () => rep(5, () => `<div style="padding:11px 20px">${L("75%", 14)}</div>`),
+
+    orderCards: () => rep(3, () => `<div class="order-card">
+        <div style="display:flex;justify-content:space-between">${L("70px", 16)}${L("70px", 20, "border-radius:999px")}</div>${gap(12)}
+        ${L("110px", 14)}${gap(8)}${L("150px", 11)}${gap(8)}${L("130px", 11)}${gap(16)}
+        <div style="display:flex;justify-content:space-between">${L("45%", 13)}${L("50px", 13)}</div>${gap(8)}
+        <div style="display:flex;justify-content:space-between">${L("40%", 13)}${L("50px", 13)}</div>${gap(16)}
+        ${L("90px", 16)}${gap(14)}
+        <div style="display:flex;gap:10px">${L("90px", 30, "border-radius:7px")}${L("90px", 30, "border-radius:7px")}${L("100px", 30, "border-radius:7px")}</div>
+      </div>`),
+
+    pgKpis: () => rep(4, () => `<div class="pg-kpi"><div class="v">${L("80px", 24)}</div>${gap(8)}<div class="l">${L("100px", 11)}</div></div>`),
+
+    pgTable: () => `<div style="padding:16px 20px">${rep(5, () => flexRow(
+      `${L("25%", 14)}${L("20%", 14)}${L("20%", 14)}${L("15%", 14)}`, "padding:11px 0;justify-content:space-between"))}</div>`,
+
+    bars: () => rep(5, () => flexRow(`${L("60px", 11)}${L("100%", 10, "flex:1")}${L("24px", 11)}`, "padding:7px 0")),
+
+    hours: () => `<div style="display:flex;align-items:flex-end;gap:4px;height:130px">${
+      rep(24, i => `<span class="sk" style="flex:1;height:${25 + ((i * 37) % 70)}%;border-radius:4px 4px 0 0"></span>`)}</div>`,
+  };
+
+  /* ---------------- region + group definitions ----------------
+     kind : sibling = hide the element, show a skeleton next to it
+            text    = shimmer over text that is already in the element
+            input   = shimmer over form fields
+            hide    = just hide the element
+     when : first = until the first successful response
+            empty = only if the element has no content yet
+            always = every request                                   */
+  const R = (sel, kind, when, make) => ({ sel, kind, when, make, active: false, nodes: [] });
+
+  const GROUPS = {
+    stats: {
+      hold: true,
+      regions: [
+        R("#kpiRevenue, #kpiOrders, #kpiToday, #kpiStock, #pendingOrders, #todayRevenue, #kpiTodayBtm, #kpiTotalSold, #todayAvg, #active_orders", "text", "first"),
+        R("#salesChart", "sibling", "first", MK.chart),
+        R("#ordersBody", "sibling", "first", MK.dashOrders),
+        R("#topProducts", "sibling", "first", MK.topProducts),
+        R("#stockAlerts", "sibling", "first", MK.stockAlerts),
+        R("#activityFeed", "sibling", "first", MK.feed),
+      ],
+    },
+    inventory: {
+      hold: true,
+      regions: [
+        R("#totalItems, #listedItems, #lowItems, #outItems", "text", "first"),
+        R("#categoryTree", "sibling", "first", MK.tree),
+        R("#itemsGrid", "sibling", "first", MK.invGrid),
+      ],
+    },
+    orders: {
+      hold: true,
+      regions: [
+        R("#orders-list", "sibling", "first", MK.orderCards),
+        R("#noOrdersMessage", "hide", "first"),
+        // pages built from the orders list (Customers, Sales, Analytics)
+        R("#cu-kpis", "sibling", "empty", MK.pgKpis),
+        R("#cu-table", "sibling", "empty", MK.pgTable),
+        R("#sr-kpis", "sibling", "empty", MK.pgKpis),
+        R("#sr-daily", "sibling", "empty", MK.pgTable),
+        R("#sr-items", "sibling", "empty", MK.pgTable),
+        R("#an-kpis", "sibling", "empty", MK.pgKpis),
+        R("#an-hours", "sibling", "empty", MK.hours),
+        R("#an-week", "sibling", "empty", MK.bars),
+        R("#an-top", "sibling", "empty", MK.bars),
+        R("#an-status", "sibling", "empty", MK.bars),
+        R("#po-kpis", "sibling", "empty", MK.pgKpis),
+      ],
+    },
+    offers: { regions: [R("#of-table", "sibling", "always", MK.pgTable)] },
+    settings: {
+      regions: [R("#se-store_name, #se-phone, #se-address, #se-opens, #se-closes, #se-prep_time, #se-min_order", "input", "first")],
+    },
+    complaints: {
+      regions: [
+        R("#cm-kpis", "sibling", "first", MK.pgKpis),
+        R("#cm-table", "sibling", "first", MK.pgTable),
+      ],
+    },
+  };
+
+  Object.values(GROUPS).forEach(g => { g.pending = 0; g.loaded = false; g.held = false; });
+
+  function groupFor(input, init) {
+    let url, method;
+    if (typeof input === "string") url = input;
+    else if (input instanceof URL) url = input.href;
+    else if (input && input.url) { url = input.url; method = input.method; }
+    else return null;
+    method = String((init && init.method) || method || "GET").toUpperCase();
+    let path;
+    try { path = new URL(url, location.href).pathname; } catch (e) { return null; }
+
+    if (method === "POST") {
+      if (path === "/seller/stats") return GROUPS.stats;
+      if (path === "/list_items") return GROUPS.inventory;
+      if (path === "/seller/orders") return GROUPS.orders;
+    } else if (method === "GET") {
+      if (path === "/seller/offers") return GROUPS.offers;
+      if (path === "/seller/settings") return GROUPS.settings;
+      if (path === "/seller/complaints") return GROUPS.complaints;
+    }
+    return null;
+  }
+
+  /* ---------------- show / clear ---------------- */
+  function makeNode(el, html) {
+    const n = document.createElement(el.tagName.toLowerCase());
+    if (el.tagName !== "CANVAS") {
+      n.className = el.className.replace(/\bsk-hide\b/g, "").trim();
+      n.style.cssText = el.style.cssText;
+    }
+    n.setAttribute("aria-hidden", "true");
+    n.setAttribute("data-sk", "");
+    n.innerHTML = html;
+    return n;
+  }
+
+  function showRegion(g, r) {
+    if (r.active) return;
+    const els = Array.from(document.querySelectorAll(r.sel));
+    if (!els.length) return;
+
+    if (r.when === "first" && g.loaded) return;
+    if (r.when === "empty" && els[0].innerHTML.trim() !== "") return;
+
+    r.nodes = [];
+    els.forEach(el => {
+      if (r.kind === "text") el.classList.add("sk-text");
+      else if (r.kind === "input") el.classList.add("sk-input");
+      else if (r.kind === "hide") el.classList.add("sk-hide");
+      else {
+        el.classList.add("sk-hide");
+        const n = makeNode(el, r.make());
+        el.after(n);
+        r.nodes.push(n);
+      }
+    });
+    r.els = els;
+    r.active = true;
+  }
+
+  function showGroup(g) { g.regions.forEach(r => showRegion(g, r)); }
+
+  function clearGroup(g) {
+    g.regions.forEach(r => {
+      if (!r.active) return;
+      r.els.forEach(el => el.classList.remove("sk-text", "sk-input", "sk-hide"));
+      r.nodes.forEach(n => n.remove());
+      r.nodes = [];
+      r.els = [];
+      r.active = false;
+    });
+  }
+
+  function release(g) {
+    // runs after the render code that follows res.json() has executed
+    setTimeout(() => { if (g.pending <= 0) { g.pending = 0; clearGroup(g); } }, 0);
+  }
+
+  function startRequest(g) {
+    if (g.held) g.held = false;          // the page-load hold turns into this request
+    else g.pending++;
+    showGroup(g);                        // also covers elements built after page load
+  }
+
+  function finishRequest(g, ok) {
+    if (ok) g.loaded = true;
+    g.pending--;
+    release(g);
+  }
+
+  /* ---------------- fetch wrapper ---------------- */
+  const origFetch = window.fetch.bind(window);
+
+  window.fetch = function (input, init) {
+    const g = groupFor(input, init);
+    if (!g) return origFetch(input, init);
+
+    startRequest(g);
+    let done = false;
+    const finish = ok => { if (!done) { done = true; finishRequest(g, ok); } };
+
+    return origFetch(input, init).then(res => {
+      if (!res.ok) { finish(false); return res; }
+
+      // Wait until the body is parsed: the caller renders right after json()
+      const json = res.json.bind(res);
+      res.json = () => json().then(
+        v => { finish(true); return v; },
+        e => { finish(false); throw e; }
+      );
+      setTimeout(() => finish(true), 8000);   // fallback if json() is never called
+      return res;
+    }, err => { finish(false); throw err; });
+  };
+
+  /* ---------------- initial paint (before any fetch fires) ---------------- */
+  function init() {
+    ["stats", "inventory", "orders"].forEach(name => {
+      const g = GROUPS[name];
+      g.held = true;
+      g.pending = 1;
+      showGroup(g);
+      // safety: never get stuck if no request is ever made
+      setTimeout(() => {
+        if (g.held) { g.held = false; g.pending--; release(g); }
+      }, 10000);
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+
+/* =====================================================================
    seller.js  —  merged from:
      base.js + sidebar.js + seller_dashboard.js + menu_seller.js + seller_orders.js
 
@@ -31,6 +325,39 @@ function escapeSellerHtml(str) {
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     })[c]);
 }
+
+/* ---------------------------------------------------------------------
+   Order bill: subtotal, coupon discount and the amount the customer pays.
+   The server stores subtotal / discount / total / coupon on every order
+   (older orders have none of them, so they fall back to price x qty).
+   Every screen that shows an order amount goes through these helpers.
+--------------------------------------------------------------------- */
+function orderBill(o) {
+    const items = Object.values((o && o.items) || {}).filter(i => Number(i.qty) > 0);
+    const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
+    const discount = Math.min(Math.max(Number(o && o.discount) || 0, 0), subtotal);
+    const hasTotal = o && o.total !== null && o.total !== undefined && !isNaN(o.total);
+    const total = hasTotal ? Number(o.total) : Math.max(subtotal - discount, 0);
+    const code = (o && (o.coupon_code || (o.coupon && o.coupon.code))) || null;
+    return { subtotal, discount, total, code };
+}
+
+// Subtotal + coupon lines for an order card (nothing when no coupon was used)
+function billRowsHtml(b) {
+    if (!(b.discount > 0)) return "";
+    return `
+        <div class="item bill-line"><span>Subtotal</span><span>₹${b.subtotal}</span></div>
+        <div class="item bill-line discount-line"><span>Coupon${b.code ? " " + escapeSellerHtml(b.code) : ""}</span><span>− ₹${b.discount}</span></div>`;
+}
+
+(function addBillStyle() {
+    const s = document.createElement("style");
+    s.textContent = `
+        .discount-line { color: #2E6F4E; font-weight: 600; }
+        .bill-line { font-size: 13px; }
+    `;
+    document.head.appendChild(s);
+})();
 
 /* =====================================================================
    2. NAVIGATION
@@ -2261,13 +2588,12 @@ async function loadOrders() {
     ordersList.innerHTML = "";
 
     data.orders.forEach(order => {
-        let total = 0;
+        const bill = orderBill(order);
 
         let restaurantsHTML = "";
 
         Object.entries(order.items).forEach(([itemName, detail]) => {
             const itemTotal = detail.price * detail.qty;
-            total += itemTotal;
 
             restaurantsHTML += `
                     <div class="item" item_id="${escapeSellerHtml(itemName)}">
@@ -2289,8 +2615,9 @@ async function loadOrders() {
                 <div class="order-date">${escapeSellerHtml(order.time)}</div>
                 <div class="order-date">Pickup Time: ${escapeSellerHtml(order.pickup_time)}</div>
                 ${restaurantsHTML}
+                ${billRowsHtml(bill)}
 
-                <div class="total">Total: ₹${total}</div>
+                <div class="total">Total: ₹${bill.total}</div>
                 <button class="editOrderBtn" data-order-id="${escapeSellerHtml(order.order_id)}">✎ Edit items</button>
                 <button class="completeBtn statusBtn" style="
                     background: green;
@@ -2379,6 +2706,7 @@ document.addEventListener("click", async (e) => {
    EDIT ORDER ITEMS
    Seller can reduce / remove items he doesn't have, then Save ->
    POST /seller/edit_order. Server restores stock and notifies the customer.
+   The preview total keeps the order's coupon (the server does the same).
 ===================================================================== */
 const edSheet = document.getElementById("edSheet");
 const edBackdrop = document.getElementById("edBackdrop");
@@ -2417,20 +2745,28 @@ function editHasChanges() {
     return Object.keys(edit.orig).some(id => edit.qtys[id] !== Number(edit.orig[id].qty));
 }
 
+// Discount for the edited subtotal, using the coupon rules stored on the order
+function editDiscount(subtotal) {
+    const c = edit.order && edit.order.coupon;
+    if (!c || !(subtotal > 0)) return { discount: 0, code: null };
+    const raw = c.type === "percent" ? subtotal * Number(c.value) / 100 : Number(c.value);
+    return { discount: Math.round(Math.min(raw, subtotal) * 100) / 100, code: c.code || null };
+}
+
 function renderEditSheet() {
     const o = edit.order;
     if (!o) return;
 
     document.getElementById("edSub").textContent = `Token ${o.token_no} · Order #${o.order_id}`;
 
-    let total = 0;
+    let subtotal = 0;
     let kept = 0;
 
     edList.innerHTML = Object.entries(edit.orig).map(([id, it]) => {
         const orig = Number(it.qty) || 0;
         const q = edit.qtys[id];
         const price = Number(it.price) || 0;
-        total += price * q;
+        subtotal += price * q;
         if (q > 0) kept++;
 
         const right = q === 0
@@ -2451,6 +2787,25 @@ function renderEditSheet() {
                 ${right}
             </div>`;
     }).join("");
+
+    const { discount, code } = editDiscount(subtotal);
+    const total = Math.max(subtotal - discount, 0);
+
+    // coupon line above the "New total" row (created once)
+    let discRow = document.getElementById("edDiscount");
+    if (!discRow) {
+        discRow = document.createElement("div");
+        discRow.id = "edDiscount";
+        discRow.className = "ed-total";
+        discRow.style.cssText = "color:#2E6F4E;font-size:13px;font-weight:600;";
+        document.getElementById("edTotal").parentElement.before(discRow);
+    }
+    if (discount > 0) {
+        discRow.style.display = "";
+        discRow.innerHTML = `<span>Coupon${code ? " " + escapeSellerHtml(code) : ""}</span><span>− ₹${discount}</span>`;
+    } else {
+        discRow.style.display = "none";
+    }
 
     document.getElementById("edTotal").textContent = "₹" + total.toLocaleString("en-IN");
 
@@ -2682,6 +3037,7 @@ function ensureScannerUI() {
         #scanResult .srToken { margin: 0 0 6px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; }
         #scanResult .srItems { margin: 12px 0 6px; border-top: 1px dashed #E7D8C3; }
         #scanResult .srItem { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed #E7D8C3; font-size: 14px; }
+        #scanResult .srItem.srDiscount { color: #1F8A4C; font-weight: 600; }
         #scanResult .srTotal { display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; padding: 10px 0 14px; }
         #scanResult button { width: 100%; border: none; border-radius: 12px; padding: 14px 0; font-weight: 700; font-size: 15px; cursor: pointer; margin-top: 8px; }
         #scanResult .srPrimary { background: #1F8A4C; color: #fff; }
@@ -2933,12 +3289,16 @@ function showScanResult(kind, order, token) {
     let html = "";
 
     if (kind === "ok") {
-        let total = 0;
+        const bill = orderBill(order);
         const rows = Object.values(order.items || {}).map(it => {
             const line = (Number(it.price) || 0) * (Number(it.qty) || 0);
-            total += line;
             return `<div class="srItem"><span>${escapeSellerHtml(it.name)} x ${escapeSellerHtml(it.qty)}</span><span>₹${line}</span></div>`;
         }).join("");
+
+        const couponRows = bill.discount > 0
+            ? `<div class="srItem"><span>Subtotal</span><span>₹${bill.subtotal}</span></div>
+               <div class="srItem srDiscount"><span>Coupon${bill.code ? " " + escapeSellerHtml(bill.code) : ""}</span><span>− ₹${bill.discount}</span></div>`
+            : "";
 
         let fulfil;
         if (order.order_type === "delivery" && order.delivery_address) {
@@ -2954,8 +3314,8 @@ function showScanResult(kind, order, token) {
             <p class="srToken">Token ${escapeSellerHtml(order.token_no)}</p>
             <p class="srMeta">Order #${escapeSellerHtml(order.order_id)}</p>
             <p class="srMeta">${fulfil}</p>
-            <div class="srItems">${rows}</div>
-            <div class="srTotal"><span>Total</span><span>₹${total}</span></div>
+            <div class="srItems">${rows}${couponRows}</div>
+            <div class="srTotal"><span>Total</span><span>₹${bill.total}</span></div>
             <button type="button" class="srPrimary" data-act="complete">Mark as Completed</button>
             <button type="button" class="srGhost" data-act="again">Scan another</button>
         `;
@@ -3111,9 +3471,9 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     // ----- order accessors (tolerant of the payload shape) -----
     const allOrders = () => sellerOrders || [];
     const oItems = o => Object.values(o.items || {}).filter(i => Number(i.qty) > 0);
+    // Amount actually paid (after any coupon). Falls back to price x qty for old orders.
     function oTotal(o) {
-        if (o.total_amount != null && !isNaN(o.total_amount)) return Number(o.total_amount);
-        return oItems(o).reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
+        return orderBill(o).total;
     }
     // Uses created_at (UTC) when the API sends it, otherwise the `time` string.
     function oDate(o) {
@@ -3183,7 +3543,7 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     }
     const srOrders = () => allOrders().filter(o => { const d = oDate(o); return d && d >= sr.from && d <= sr.to; });
 
-    page("sales", "Sales report", "Revenue counts completed orders only",
+    page("sales", "Sales report", "Revenue counts completed orders only, after coupon discounts",
         `<button class="btn-outline" id="sr-export"><i data-lucide="download" width="14" height="14"></i> Export CSV</button>`,
         `<div class="pg-filters">
             <button class="chip" data-days="1">Today</button><button class="chip" data-days="7">7 days</button>
@@ -3211,9 +3571,12 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
                 };
                 $("#sr-from").onchange = custom; $("#sr-to").onchange = custom;
                 $("#sr-export").onclick = () => {
-                    const rows = [["Token", "Order ID", "Date", "Status", "Items", "Total"]];
-                    srOrders().forEach(o => rows.push([o.token_no, o.order_id, o.time || o.created_at, o.status,
-                        oItems(o).map(i => `${i.name} x${i.qty}`).join("; "), oTotal(o)]));
+                    const rows = [["Token", "Order ID", "Date", "Status", "Items", "Subtotal", "Discount", "Coupon", "Total"]];
+                    srOrders().forEach(o => {
+                        const b = orderBill(o);
+                        rows.push([o.token_no, o.order_id, o.time || o.created_at, o.status,
+                            oItems(o).map(i => `${i.name} x${i.qty}`).join("; "), b.subtotal, b.discount, b.code || "", b.total]);
+                    });
                     downloadCSV(`sales_${fmtDay(sr.from)}_${fmtDay(sr.to)}.csv`, rows);
                 };
             }
@@ -3292,7 +3655,7 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
         });
 
     /* ===== PAYOUTS ===== */
-    page("payouts", "Payouts", "Your earnings and transfers to your bank", "",
+    page("payouts", "Payouts", "Your earnings (after coupon discounts) and transfers to your bank", "",
         `<div class="pg-kpis" id="po-kpis"></div><div id="po-note"></div>
          <div class="widget"><div class="widget-head"><span class="widget-title">Payout history</span></div><div id="po-table"></div></div>`,
         async () => {
@@ -3626,9 +3989,12 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     const exportOrders = Array.from(document.querySelectorAll(".action-btn"))
         .find(b => /export orders/i.test(b.textContent));
     if (exportOrders) exportOrders.addEventListener("click", () => {
-        const rows = [["Token", "Order ID", "Date", "Status", "Items", "Total"]];
-        allOrders().forEach(o => rows.push([o.token_no, o.order_id, o.time || o.created_at, o.status,
-            oItems(o).map(i => `${i.name} x${i.qty}`).join("; "), oTotal(o)]));
+        const rows = [["Token", "Order ID", "Date", "Status", "Items", "Subtotal", "Discount", "Coupon", "Total"]];
+        allOrders().forEach(o => {
+            const b = orderBill(o);
+            rows.push([o.token_no, o.order_id, o.time || o.created_at, o.status,
+                oItems(o).map(i => `${i.name} x${i.qty}`).join("; "), b.subtotal, b.discount, b.code || "", b.total]);
+        });
         downloadCSV("orders.csv", rows);
     });
 
@@ -3765,10 +4131,9 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
 
     // build everything once, assign once
     const html = sellerOrders.map(order => {
-      let total = 0;
+      const bill = orderBill(order);   // subtotal, coupon discount, amount to pay
       const rows = Object.entries(order.items).map(([key, d]) => {
         const line = d.price * d.qty;
-        total += line;
         return `<div class="item" item_id="${H(key)}">
                   <span>${H(d.name)} x ${H(d.qty)}</span><span>₹${line}</span></div>`;
       }).join("");
@@ -3785,7 +4150,8 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
           ${order.pickup_time!== null ? `<div class="order-date">Pickup Time: ${H(order.pickup_time)}</div>`:`<div class="order-date">Delivery to: ${H(order.delivery_address.adrs_type)} - ${H(order.delivery_address.address)}</div>`}
           ${order.pickup_time!==null ? "":`<div class="order-date">Phone: ${H(order.delivery_address.phone)}</div>`}
           ${rows}
-          <div class="total">Total: ₹${total}</div>
+          ${billRowsHtml(bill)}
+          <div class="total">Total: ₹${bill.total}</div>
           ${order.cancel_reason ? `<div class="cancel-reason">Reason: ${H(order.cancel_reason)}</div>` : ""}
           <button class="editOrderBtn" data-order-id="${H(order.order_id)}">✎ Edit items</button>
           <button class="printBtn" data-order-id="${H(order.order_id)}">🖨 Print slip</button>
@@ -3940,12 +4306,17 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
   function printSlip(orderId) {
     const o = sellerOrders.find(x => String(x.order_id) === String(orderId));
     if (!o) return;
-    let total = 0;
+    const bill = orderBill(o);
     const rows = Object.values(o.items || {}).filter(i => Number(i.qty) > 0).map(i => {
       const line = (Number(i.price) || 0) * (Number(i.qty) || 0);
-      total += line;
       return `<tr><td>${H(i.name)} x ${H(i.qty)}</td><td style="text-align:right">₹${line}</td></tr>`;
     }).join("");
+
+    // subtotal + coupon lines only when a coupon was used
+    const couponRows = bill.discount > 0
+      ? `<tr><td>Subtotal</td><td style="text-align:right">₹${bill.subtotal}</td></tr>
+         <tr><td>Coupon${bill.code ? " " + H(bill.code) : ""}</td><td style="text-align:right">- ₹${bill.discount}</td></tr>`
+      : "";
 
     const store = document.querySelector(".seller-name")?.textContent || "Store";
     const doc = `<html><head><title>Order ${H(o.token_no)}</title>
@@ -3958,8 +4329,8 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
       <h2>${H(store)}</h2><hr>
       <h3>TOKEN ${H(o.token_no)}</h3>
       <p>Order #${H(o.order_id)}</p><p>${H(o.time || "")}</p><p>Pickup: ${H(o.pickup_time || "-")}</p><hr>
-      <table>${rows}</table><hr>
-      <table><tr class="t"><td>Total</td><td style="text-align:right">₹${total}</td></tr></table>
+      <table>${rows}${couponRows}</table><hr>
+      <table><tr class="t"><td>Total</td><td style="text-align:right">₹${bill.total}</td></tr></table>
       <p>Thank you!</p></body></html>`;
 
     const frame = document.createElement("iframe");

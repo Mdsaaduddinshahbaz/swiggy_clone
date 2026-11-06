@@ -86,6 +86,31 @@ function clearButtonLoading(btn) {
     btn.removeAttribute("aria-disabled");
 }
 
+// ---------------------------------------------------------------
+// Coupon UI styles (injected once, so no stylesheet change is needed)
+// ---------------------------------------------------------------
+function ensureCouponStyle() {
+    if (document.getElementById("couponStyle")) return;
+    const style = document.createElement("style");
+    style.id = "couponStyle";
+    style.textContent = `
+        .coupon-box input { text-transform: uppercase; }
+        .coupon-apply-btn { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: none; color: inherit; cursor: pointer; padding: 6px 4px; white-space: nowrap; }
+        .coupon-apply-btn:disabled { opacity: .5; cursor: progress; }
+        .coupon-msg { margin: 6px 2px 0; font-size: 13px; line-height: 1.35; }
+        .coupon-msg:empty { display: none; }
+        .coupon-msg.error { color: #c62828; }
+        .coupon-msg.success { color: #2e7d32; }
+        .offer-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+        .offer-chips:empty { display: none; }
+        .offer-chip { font: inherit; font-size: 12px; text-align: left; line-height: 1.3; background: none; color: inherit; border: 1px dashed currentColor; border-radius: 8px; padding: 6px 10px; cursor: pointer; opacity: .85; }
+        .offer-chip:hover { opacity: 1; }
+        .coupon-remove-btn { font: inherit; font-size: 12px; margin-left: 6px; border: 0; background: none; color: #c62828; cursor: pointer; text-decoration: underline; padding: 0; }
+        .bill-row.discount { color: #2e7d32; }
+    `;
+    document.head.appendChild(style);
+}
+
 // Prefer the app's toast (defined in home.js); fall back to alert if it isn't there.
 function notify(message) {
     if (typeof showToast === "function" && document.getElementById("toast")) {
@@ -228,6 +253,8 @@ async function initCartPage() {
     const cart_items_container = document.getElementById("cart_items");
     if (!cart_items_container) return;
 
+    ensureCouponStyle();
+
     // Tear down any previous init so listeners are never attached twice
     if (activeInit) activeInit.abort();
     const ac = new AbortController();
@@ -285,9 +312,37 @@ async function initCartPage() {
     const slotGrid = document.getElementById("slotGrid");
     const slotError = document.getElementById("slotError");
 
+    // coupon elements
+    const couponInput = document.getElementById("couponInput");
+    const applyCouponBtn = document.getElementById("applyCouponBtn");
+    const removeCouponBtn = document.getElementById("removeCouponBtn");
+    const couponMsg = document.getElementById("couponMsg");
+    const discountRow = document.getElementById("discountRow");
+    const discountAmount = document.getElementById("discountAmount");
+    const appliedCode = document.getElementById("appliedCode");
+    const offerChips = document.getElementById("offerChips");
+
+    // ---------------------------------------------------------------
+    // Skeleton loading. The cart template ships with shimmering placeholders
+    // (styles live in home.html); these helpers remove them once the API
+    // has answered, including on failure.
+    // ---------------------------------------------------------------
+    function endCartSkeleton() {
+        totalPrice?.classList.remove("kh-sk-text");
+        toPay?.classList.remove("kh-sk-text");
+        cart_items_container.querySelectorAll("[data-kh-sk]").forEach((n) => n.remove());
+    }
+
+    function endAddressSkeleton() {
+        typeaddrs?.classList.remove("kh-sk-text");
+        deliveryAdrs?.classList.remove("kh-sk-text");
+        savedAddressList?.querySelectorAll("[data-kh-sk]").forEach((n) => n.remove());
+    }
+
     const CART_CACHE_KEY = `cachedCart_${userId}`;
     const SELECTED_ADDR_KEY = `selectedAddress_${userId}`;
     const ORDER_TYPE_KEY = `orderType_${userId}`;
+    const COUPON_KEY = `coupon_${userId}`;
 
     /*
         restaurants = {
@@ -309,6 +364,11 @@ async function initCartPage() {
     let slotDay = "today";        // "today" | "tomorrow"
     let selectedSlot = null;      // { date: "YYYY-MM-DD", time: "HH:MM", label }
     let isSubmitting = false;     // true while /store_orders is in flight
+
+    // Applied coupon: { code, type, value, min_order, resId }. UI preview only;
+    // the server re-validates it when the order is placed.
+    let appliedCoupon = null;
+    try { appliedCoupon = JSON.parse(safeStorageGet(sessionStorage, COUPON_KEY)); } catch (e) { appliedCoupon = null; }
 
     // ---------------------------------------------------------------
     // Cart helpers
@@ -334,6 +394,131 @@ async function initCartPage() {
 
     function persistCart() {
         safeStorageSet(sessionStorage, CART_CACHE_KEY, JSON.stringify(restaurants));
+    }
+
+    // ---------------------------------------------------------------
+    // Coupons (UI preview only; the server decides in /store_orders)
+    // ---------------------------------------------------------------
+
+    function showCouponMsg(text, kind) {
+        if (!couponMsg) return;
+        couponMsg.textContent = text || "";
+        couponMsg.className = "coupon-msg" + (text && kind ? " " + kind : "");
+    }
+
+    function calcDiscount(c, subtotal) {
+        if (!c) return 0;
+        const raw = c.type === "percent" ? (subtotal * Number(c.value)) / 100 : Number(c.value);
+        return Math.round(Math.min(raw, subtotal) * 100) / 100;
+    }
+
+    function clearCoupon() {
+        appliedCoupon = null;
+        safeStorageRemove(sessionStorage, COUPON_KEY);
+    }
+
+    // Called from renderCart: drops a coupon that no longer fits the cart,
+    // updates the discount row, and returns the current discount.
+    function syncCoupon(subtotal) {
+        if (appliedCoupon) {
+            if (appliedCoupon.resId !== getStoreId()) {
+                clearCoupon();
+            } else if (subtotal < Number(appliedCoupon.min_order || 0)) {
+                const min = appliedCoupon.min_order;
+                clearCoupon();
+                showCouponMsg(`Coupon removed. Add items worth ₹${min} or more to use it.`, "error");
+            }
+        }
+
+        const discount = calcDiscount(appliedCoupon, subtotal);
+        if (discountRow) discountRow.style.display = appliedCoupon ? "" : "none";
+        if (appliedCoupon) {
+            if (appliedCode) appliedCode.textContent = appliedCoupon.code;
+            if (discountAmount) discountAmount.textContent = discount;
+            if (couponInput) couponInput.value = appliedCoupon.code;
+        }
+        return discount;
+    }
+
+    // /validate_coupon reads the SERVER cart, so wait for debounced qty updates to land first.
+    async function waitForCartSync(timeout = 4000) {
+        const start = Date.now();
+        while ((pendingUpdates.size || inFlightRequests.size) && Date.now() - start < timeout) {
+            await new Promise((r) => setTimeout(r, 100));
+        }
+    }
+
+    async function applyCoupon(rawCode) {
+        const code = String(rawCode || "").trim().toUpperCase();
+        const resId = getStoreId();
+        if (!code) { showCouponMsg("Enter a coupon code", "error"); return; }
+        if (!resId) return;
+
+        if (applyCouponBtn) applyCouponBtn.disabled = true;
+        showCouponMsg("Checking…");
+        try {
+            await waitForCartSync();
+            if (signal.aborted) return;
+
+            const res = await fetch("/validate_coupon", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ res_id: resId, code })
+            });
+
+            if (res.status === 401) {
+                alert("Unauthorized user, please log in");
+                window.location.href = "/login/user";
+                return;
+            }
+
+            const data = await cartJson(res);
+            if (signal.aborted) return;
+
+            if (!data || !data.success) {
+                showCouponMsg((data && data.message) || "Couldn't apply coupon", "error");
+                return;
+            }
+
+            appliedCoupon = { code: data.code, type: data.type, value: data.value, min_order: data.min_order, resId };
+            safeStorageSet(sessionStorage, COUPON_KEY, JSON.stringify(appliedCoupon));
+            renderCart(restaurants);
+            showCouponMsg(`${data.code} applied. You save ₹${data.discount}`, "success");
+        } catch (err) {
+            console.error("apply coupon failed", err);
+            showCouponMsg("Network error, please try again", "error");
+        } finally {
+            if (applyCouponBtn) applyCouponBtn.disabled = false;
+        }
+    }
+
+    async function loadOffers() {
+        if (!offerChips) return;
+        offerChips.innerHTML = "";
+        const storeId = getStoreId();
+        if (!storeId) return;
+
+        // skeleton chips until the offers arrive
+        offerChips.innerHTML = '<span class="kh-sk kh-sk-offer" data-kh-sk aria-hidden="true"></span>'.repeat(2);
+
+        try {
+            const res = await fetch(`/available_offers/${encodeURIComponent(storeId)}`);
+            const data = await cartJson(res);
+            if (signal.aborted || !data || !data.success) {
+                offerChips.innerHTML = "";
+                return;
+            }
+
+            offerChips.innerHTML = data.offers.map((o) => {
+                const what = o.type === "percent" ? `${o.value}% off` : `₹${o.value} off`;
+                const min = o.min_order ? ` on orders above ₹${o.min_order}` : "";
+                return `<button type="button" class="offer-chip" data-code="${escapeHtml(o.code)}">
+                            <b>${escapeHtml(o.code)}</b><br>${escapeHtml(what + min)}</button>`;
+            }).join("");
+        } catch (err) {
+            console.error("could not load offers", err);
+            offerChips.innerHTML = "";
+        }
     }
 
     // ---------------------------------------------------------------
@@ -537,6 +722,7 @@ async function initCartPage() {
 
     function renderCart(cart) {
         if (!cartContainer) return 0;
+        endCartSkeleton();
 
         const cl = cartContainer.querySelector(".cart-left");
         const cr = cartContainer.querySelector(".cart-right");
@@ -551,6 +737,8 @@ async function initCartPage() {
             cartContainer.style.display = "block";
             if (no_order_container) no_order_container.classList.add("show");
 
+            clearCoupon();
+            syncCoupon(0);
             if (totalPrice) totalPrice.innerText = 0;
             if (toPay) toPay.innerText = 0;
             renderStoreBanner();
@@ -609,8 +797,9 @@ async function initCartPage() {
         }).join("");
 
         cart_items_container.innerHTML = html;
+        const discount = syncCoupon(total);
         if (totalPrice) totalPrice.innerText = total;
-        if (toPay) toPay.innerText = total;
+        if (toPay) toPay.innerText = Math.max(Number((total - discount).toFixed(2)), 0);
         renderStoreBanner();
         renderStoreHeader();
         updateOrderTypeUI();
@@ -893,6 +1082,27 @@ async function initCartPage() {
         }
     });
 
+    // Coupon events
+    on(applyCouponBtn, "click", () => applyCoupon(couponInput?.value));
+    on(couponInput, "keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            applyCoupon(couponInput.value);
+        }
+    });
+    on(removeCouponBtn, "click", () => {
+        clearCoupon();
+        if (couponInput) couponInput.value = "";
+        showCouponMsg("");
+        renderCart(restaurants);
+    });
+    on(offerChips, "click", (e) => {
+        const chip = e.target.closest(".offer-chip");
+        if (!chip) return;
+        if (couponInput) couponInput.value = chip.dataset.code;
+        applyCoupon(chip.dataset.code);
+    });
+
     // Live store status. These events are dispatched by home.js (socket push,
     // reconnect, tab becoming visible); removed automatically when this init is torn down.
     on(document, "store:status", (e) => {
@@ -904,6 +1114,8 @@ async function initCartPage() {
 
     await loadCart();
     if (signal.aborted) return;
+
+    loadOffers(); // coupon suggestions for this store (not awaited, never blocks the page)
 
     // ---------------------------------------------------------------
     // Address management
@@ -1195,6 +1407,7 @@ async function initCartPage() {
         console.error("could not fetch addresses", err);
     }
 
+    endAddressSkeleton();
     if (signal.aborted) return;
 
     // Restore previously selected address if it still exists, else first saved one
@@ -1213,7 +1426,7 @@ async function initCartPage() {
         applySelectedAddress(stillSaved); // use fresh server data, not the stale copy
     } else if (addresses.length) {
         applySelectedAddress(addresses[0]);
-    } else if (restoredSelection) {
+    } else if (restoredSelection || !selectedAddress) {
         clearSelectedAddress();
     }
 
@@ -1231,7 +1444,8 @@ async function initCartPage() {
             user_id: userId,
             items: restaurants,
             pickup_time: type === "pickup" ? pickupTime : null,
-            order_type: type
+            order_type: type,
+            coupon_code: appliedCoupon ? appliedCoupon.code : null
         };
         if (type === "delivery") {
             body.address_id = selectedAddress?._id;
@@ -1270,10 +1484,24 @@ async function initCartPage() {
                 return;
             }
 
+            if (orderData.code === "COUPON_INVALID") {
+                // The server rejected the coupon (expired, deactivated, below minimum...).
+                // Nothing was ordered: drop the coupon so the customer sees the real total.
+                closePickupSheet();
+                if (!box?.classList.contains("show")) overlay?.classList.remove("show");
+                clearCoupon();
+                if (couponInput) couponInput.value = "";
+                showCouponMsg("");
+                renderCart(restaurants);
+                alert((orderData.message || "That coupon is no longer valid.") + " Your order wasn't placed. Please review the total and try again.");
+                return;
+            }
+
             if (orderData.success) {
                 closePickupSheet();
                 overlay?.classList.remove("show");
                 safeStorageRemove(sessionStorage, CART_CACHE_KEY);
+                safeStorageRemove(sessionStorage, COUPON_KEY);
                 safeStorageRemove(sessionStorage, `cachedOrders_${userId}`);
                 // alert("Order placed");
                 goToPage("orders");

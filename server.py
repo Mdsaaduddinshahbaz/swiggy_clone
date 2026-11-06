@@ -1,4 +1,4 @@
-from database import edit_user_order_items,get_seller_complaints,update_complaint,fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer,create_support_ticket,get_reported_categories, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
+from database import list_public_offers,edit_user_order_items,get_seller_complaints,update_complaint,fetch_profiles,edit_seller_order_items, list_offers, save_offer, delete_offer,create_support_ticket,get_reported_categories, get_payout_summary, get_store_settings, update_store_settings, validate_coupon,get_preview_items, serialize_address,update_address, save_category, get_seller_analytics, get_resturantItem_price, add_subcategory, add_resturant_items, check_existing_owner, set_verified, fetch_address, add_resturants, list_resturant_items, list_resturants, add_customer_items, update_profiles, update_resturant_item, remove_itemss, store_orders, get_orders, store_seller_orders, get_seller_ordes, check_existing_user, create_new_user, update_order_status_seller, update_order_status_user, resturant_stats, return_res_analytics, check_existing_owner, save_address, verify_order, get_restaurant_delivery, is_restaurant_online, set_restaurant_online
 from flask import Flask, request, render_template, redirect, url_for, jsonify, g, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from redis_db import add_cart, get_cart, update_cart_qty, acquire_lock, release_lock, get_cart_restaurant
@@ -728,7 +728,16 @@ def seller_page(name, seller_id):
         print(e)
         return ({"success": False})
 
-
+@app.get("/available_offers/<res_id>")
+@login_required
+def available_offers(res_id):
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    try:
+        return jsonify({"success": True, "offers": list_public_offers(res_id)})
+    except Exception as e:
+        print("available_offers error:", e)
+        return jsonify({"success": False, "message": "Couldn't load offers"}), 500
 @app.post("/store_orders")
 #@limiter.limit("5 per minute")
 @login_required
@@ -750,9 +759,10 @@ def store_order():
         if order_type not in ("pickup", "delivery"):
             return jsonify({"success": False, "message": "Invalid order type"}), 400
         address_id = data.get("address_id")
+        coupon_code = data.get("coupon_code")
         print(pickup_time, order_type, address_id)
 
-        resids = store_orders(user_id, pickup_time, order_type, address_id)
+        resids = store_orders(user_id, pickup_time, order_type, address_id,coupon_code)
         print(resids)
 
         # store_orders returns a dict on validation failure, 404 for an empty cart,

@@ -15,6 +15,116 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        /* Skeleton loading (shimmer) — used by the menu page, saved addresses
+           and the home grid while the API is still responding. */
+        @keyframes khShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .kh-sk {
+            display: block;
+            border-radius: 8px;
+            background: linear-gradient(90deg, #ececec 25%, #f7f7f7 50%, #ececec 75%);
+            background-size: 200% 100%;
+            animation: khShimmer 1.3s linear infinite;
+        }
+        .kh-sk-circle { border-radius: 50%; }
+        .kh-sk-line { height: 12px; }
+        .kh-sk-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; margin-right: 14px; flex-shrink: 0; }
+        .kh-sk-item .item-media { overflow: hidden; }
+        .kh-sk-item .item-media .kh-sk { width: 100%; aspect-ratio: 1 / 1; border-radius: 14px; }
+        .kh-sk-item .item-body { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+        .kh-sk-address { padding: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+        .res-delivery-info .kh-sk-line { display: inline-block; margin-right: 14px; }
+        .kh-sk-text {
+            display: inline-block;
+            min-width: 6ch;
+            color: transparent !important;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #ececec 25%, #f7f7f7 50%, #ececec 75%);
+            background-size: 200% 100%;
+            animation: khShimmer 1.3s linear infinite;
+            pointer-events: none;
+            user-select: none;
+        }
+        .kh-sk-cart-item { display: flex !important; align-items: center; gap: 12px; padding: 12px 0; }
+        .kh-sk-offer { display: inline-block; width: 130px; height: 44px; border-radius: 8px; }
+        @media (prefers-reduced-motion: reduce) { .kh-sk, .kh-sk-text { animation: none; } }
+        /* ---------- Kirana Cash page (full-screen sheet, opened from the header badge) ---------- */
+        #kiranaCashBadge { cursor: pointer; }
+        #kiranaCashBadge:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+        body.kcp-open { overflow: hidden; }
+        .kcp-page {
+            position: fixed; inset: 0; z-index: 5000;
+            background: #faf7f2; color: #1f2937;
+            display: flex; flex-direction: column;
+            transform: translateY(100%); visibility: hidden;
+            transition: transform .3s ease, visibility 0s linear .3s;
+        }
+        .kcp-page.show { transform: none; visibility: visible; transition: transform .3s ease; }
+        .kcp-topbar {
+            display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+            padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+            background: #fff; border-bottom: 1px solid #eee;
+        }
+        .kcp-topbar h1 { margin: 0; font-size: 18px; font-weight: 700; }
+        .kcp-back {
+            width: 38px; height: 38px; border: 0; border-radius: 50%;
+            background: #f3f4f6; color: inherit; font-size: 15px; cursor: pointer;
+        }
+        .kcp-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+        .kcp-inner { max-width: 560px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+        .kcp-hero {
+            text-align: center; color: #fff; border-radius: 20px; padding: 26px 18px 22px;
+            background: linear-gradient(135deg, #ffb627 0%, #f57c00 100%);
+            box-shadow: 0 12px 28px -14px rgba(245, 124, 0, .7);
+        }
+        .kcp-coin {
+            width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 26px;
+            background: rgba(255, 255, 255, .25); border: 3px solid rgba(255, 255, 255, .55);
+        }
+        .kcp-balance { font-size: 44px; font-weight: 800; line-height: 1; }
+        .kcp-hero p { margin: 6px 0 0; font-size: 14px; opacity: .95; }
+        .kcp-hero .kcp-value { font-weight: 600; }
+        .kcp-card { background: #fff; border: 1px solid #eee; border-radius: 16px; padding: 16px; }
+        .kcp-card h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
+        .kcp-card p { margin: 0; font-size: 14px; line-height: 1.5; color: #4b5563; }
+        .kcp-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+        .kcp-steps li { display: flex; gap: 12px; align-items: flex-start; }
+        .kcp-step-n {
+            flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+            background: #fff3e0; color: #e65100; font-weight: 700; font-size: 13px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .kcp-steps strong { display: block; font-size: 14px; margin-bottom: 2px; }
+        .kcp-steps span.kcp-sub { font-size: 13px; color: #6b7280; line-height: 1.45; }
+        .kcp-rules { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+        .kcp-rules li { display: flex; gap: 10px; font-size: 14px; color: #374151; line-height: 1.45; }
+        .kcp-rules i { color: #f57c00; margin-top: 3px; width: 16px; text-align: center; }
+        .kcp-calc { background: #fff8ee; border: 1px dashed #f5b971; border-radius: 12px; padding: 12px; }
+        .kcp-calc label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+        .kcp-calc-row { display: flex; align-items: center; gap: 10px; }
+        .kcp-calc input {
+            flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px;
+            border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;
+        }
+        .kcp-calc-out { font-size: 14px; font-weight: 700; color: #e65100; white-space: nowrap; }
+        .kcp-calc-note { margin-top: 8px !important; font-size: 12.5px !important; }
+        .kcp-empty { text-align: center; padding: 10px 0 4px; }
+        .kcp-empty .kcp-empty-icon { font-size: 28px; margin-bottom: 6px; }
+        .kcp-faq details { border-top: 1px solid #f0f0f0; padding: 11px 0; }
+        .kcp-faq details:first-of-type { border-top: 0; padding-top: 0; }
+        .kcp-faq summary { cursor: pointer; font-size: 14px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+        .kcp-faq summary::-webkit-details-marker { display: none; }
+        .kcp-faq summary::after { content: "+"; color: #9ca3af; font-weight: 700; }
+        .kcp-faq details[open] summary::after { content: "–"; }
+        .kcp-faq details p { margin-top: 8px; }
+        .kcp-cta {
+            width: 100%; border: 0; border-radius: 12px; padding: 14px 0; cursor: pointer;
+            font: inherit; font-size: 15px; font-weight: 700; color: #fff; background: #f57c00;
+        }
+        @media (prefers-reduced-motion: reduce) { .kcp-page, .kcp-page.show { transition: none; } }
+
+    </style>
 </head>
 
 <body data-page="home" data-theme="all">
@@ -60,10 +170,10 @@
                     <span class="delivery-pill" id="deliveryEtaPill" style="display:none"></span>
                 </div>
 
-                <div class="kirana-cash-badge" id="kiranaCashBadge">
+                <div class="kirana-cash-badge" id="kiranaCashBadge" role="button" tabindex="0" aria-label="Open Kirana Cash">
                     <span class="coin"><i class="fa-solid fa-indian-rupee-sign"></i></span>
                     <span class="kc-text">
-                        <span class="kc-amount" id="kiranaCashAmount">150</span>
+                        <span class="kc-amount" id="kiranaCashAmount">0</span>
                         <span class="kc-label">KiranaCash</span>
                     </span>
                 </div>
@@ -179,6 +289,14 @@
 
                 <div id="savedAddress">
                     <h2>Saved address</h2>
+                    <div class="kh-sk-address" data-kh-sk aria-hidden="true">
+                        <span class="kh-sk kh-sk-line" style="width:35%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:80%"></span>
+                    </div>
+                    <div class="kh-sk-address" data-kh-sk aria-hidden="true">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:70%"></span>
+                    </div>
                 </div>
 
                 <button id="liveLocationBtn" class="live-location-btn">
@@ -397,8 +515,8 @@
                         <i class="fa-solid fa-location-dot"></i>
                         <div>
                             <h3>Delivery Address</h3>
-                            <p id="type">Home -</p>
-                            <p id="Deliveryaddress">Home - Madhapur, Hyderabad, Telangana 500081</p>
+                            <p id="type" class="kh-sk-text">Home -</p>
+                            <p id="Deliveryaddress" class="kh-sk-text">Home - Madhapur, Hyderabad, Telangana 500081</p>
                         </div>
                     </div>
                     <div id="deliveryWarning" class="delivery-warning"></div>
@@ -410,7 +528,16 @@
                     </div>
 
                     <div id="addressOptions" class="address-options">
-                        <div id="savedAddressList" class="saved-address-list"></div>
+                        <div id="savedAddressList" class="saved-address-list">
+                            <div class="kh-sk-address" data-kh-sk aria-hidden="true">
+                                <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                                <span class="kh-sk kh-sk-line" style="width:85%"></span>
+                            </div>
+                            <div class="kh-sk-address" data-kh-sk aria-hidden="true">
+                                <span class="kh-sk kh-sk-line" style="width:25%"></span>
+                                <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                            </div>
+                        </div>
 
                         <button type="button" id="addAddressBtn" class="add-address-btn">
                             + Add New Address
@@ -476,19 +603,53 @@
                                 <h4 id="cartStoreName">Your order</h4>
                             </div>
                         </div>
-                        <div class="cart-items" id="cart_items"></div>
+                        <div class="cart-items" id="cart_items">
+                            <div data-kh-sk aria-hidden="true">
+                                <span class="kh-sk kh-sk-line" style="width:40%;height:14px"></span>
+                            </div>
+                            <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
+                                <span class="kh-sk kh-sk-circle" style="width:16px;height:16px;flex-shrink:0"></span>
+                                <span class="kh-sk kh-sk-line" style="flex:1;max-width:55%"></span>
+                                <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
+                                <span class="kh-sk kh-sk-line" style="width:44px;flex-shrink:0"></span>
+                            </div>
+                            <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
+                                <span class="kh-sk kh-sk-circle" style="width:16px;height:16px;flex-shrink:0"></span>
+                                <span class="kh-sk kh-sk-line" style="flex:1;max-width:55%"></span>
+                                <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
+                                <span class="kh-sk kh-sk-line" style="width:44px;flex-shrink:0"></span>
+                            </div>
+                            <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
+                                <span class="kh-sk kh-sk-circle" style="width:16px;height:16px;flex-shrink:0"></span>
+                                <span class="kh-sk kh-sk-line" style="flex:1;max-width:55%"></span>
+                                <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
+                                <span class="kh-sk kh-sk-line" style="width:44px;flex-shrink:0"></span>
+                            </div>
+                        </div>
                     </div>
 
+                    <!-- Coupon: input + Apply, a status line, and tappable offers from this store.
+                         cart.js fills #offerChips and #couponMsg. -->
                     <div class="coupon-box">
                         <i class="fa-solid fa-percent"></i>
-                        <input type="text" placeholder="Apply Coupon">
+                        <input type="text" id="couponInput" placeholder="Apply Coupon" maxlength="20"
+                            autocomplete="off" autocapitalize="characters" spellcheck="false">
+                        <button type="button" id="applyCouponBtn" class="coupon-apply-btn">Apply</button>
                     </div>
+                    <p class="coupon-msg" id="couponMsg" role="status" aria-live="polite"></p>
+                    <div class="offer-chips" id="offerChips"></div>
 
                     <div class="bill-details">
                         <h5>Bill Details</h5>
-                        <div class="bill-row"><span>Item Total</span><span id="totalPrice">₹0</span></div>
+                        <div class="bill-row"><span>Item Total</span><span id="totalPrice" class="kh-sk-text">₹0</span></div>
+                        <div class="bill-row discount" id="discountRow" style="display:none">
+                            <span>Coupon <b id="appliedCode"></b>
+                                <button type="button" id="removeCouponBtn" class="coupon-remove-btn">Remove</button>
+                            </span>
+                            <span>− ₹<span id="discountAmount">0</span></span>
+                        </div>
                         <hr>
-                        <div class="bill-row total"><span>TO PAY</span><span id="toPay">₹0</span></div>
+                        <div class="bill-row total"><span>TO PAY</span><span id="toPay" class="kh-sk-text">₹0</span></div>
                     </div>
 
                     <button id="placeorder" class="pay-btn">Place Order</button>
@@ -507,8 +668,6 @@
     <template id="tpl-menu">
         <main class="menu-container">
 
-            <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
-
             <section class="res-strip">
 
                 <nav class="breadcrumbs">
@@ -523,7 +682,11 @@
                     </div>
                 </div>
 
-                <div class="res-delivery-info"></div>
+                <div class="res-delivery-info" data-kh-sk-box>
+                    <span class="kh-sk kh-sk-line" style="width:70px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:90px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:80px"></span>
+                </div>
 
             </section>
 
@@ -540,7 +703,28 @@
                 </div>
             </div>
 
-            <nav class="category-rail" id="categoryTabs" role="tablist" aria-label="Food categories"></nav>
+            <nav class="category-rail" id="categoryTabs" role="tablist" aria-label="Food categories">
+                <span class="kh-sk-chip" aria-hidden="true">
+                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
+                </span>
+                <span class="kh-sk-chip" aria-hidden="true">
+                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
+                </span>
+                <span class="kh-sk-chip" aria-hidden="true">
+                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
+                </span>
+                <span class="kh-sk-chip" aria-hidden="true">
+                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
+                </span>
+                <span class="kh-sk-chip" aria-hidden="true">
+                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
+                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
+                </span>
+            </nav>
 
             <div class="filter-row" id="filterRow">
                 <select class="filter-select" id="sortSelect" aria-label="Sort items">
@@ -562,7 +746,56 @@
 
             <p class="result-meta" id="resultMeta"></p>
 
-            <section class="menu-section" id="menu_container"></section>
+            <section class="menu-section" id="menu_container">
+                <div class="menu-item kh-sk-item" aria-hidden="true">
+                    <div class="item-media"><span class="kh-sk"></span></div>
+                    <div class="item-body">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
+                    </div>
+                </div>
+                <div class="menu-item kh-sk-item" aria-hidden="true">
+                    <div class="item-media"><span class="kh-sk"></span></div>
+                    <div class="item-body">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
+                    </div>
+                </div>
+                <div class="menu-item kh-sk-item" aria-hidden="true">
+                    <div class="item-media"><span class="kh-sk"></span></div>
+                    <div class="item-body">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
+                    </div>
+                </div>
+                <div class="menu-item kh-sk-item" aria-hidden="true">
+                    <div class="item-media"><span class="kh-sk"></span></div>
+                    <div class="item-body">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
+                    </div>
+                </div>
+                <div class="menu-item kh-sk-item" aria-hidden="true">
+                    <div class="item-media"><span class="kh-sk"></span></div>
+                    <div class="item-body">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
+                    </div>
+                </div>
+                <div class="menu-item kh-sk-item" aria-hidden="true">
+                    <div class="item-media"><span class="kh-sk"></span></div>
+                    <div class="item-body">
+                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
+                    </div>
+                </div>
+            </section>
 
             <div class="overlay" id="overlayContainer"></div>
 
@@ -643,6 +876,115 @@
          Router clones exactly one template's content in here.
     ============================================================= -->
     <div id="spa-content"></div>
+
+    <!-- ============================================================
+         KIRANA CASH PAGE — full-screen sheet opened from the header badge.
+         Rules shown here come from KIRANA_CASH_RULES at the top of the
+         Kirana Cash section in home.js (spans with data-kc-rule are filled in).
+    ============================================================= -->
+    <div class="kcp-page" id="kcpPage" role="dialog" aria-modal="true" aria-labelledby="kcpTitle" aria-hidden="true">
+        <div class="kcp-topbar">
+            <button type="button" class="kcp-back" id="kcpBack" aria-label="Back">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h1 id="kcpTitle">Kirana Cash</h1>
+        </div>
+
+        <div class="kcp-scroll">
+            <div class="kcp-inner">
+
+                <section class="kcp-hero">
+                    <div class="kcp-coin"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                    <div class="kcp-balance" id="kcpBalance">0</div>
+                    <p>Kirana Cash balance</p>
+                    <p class="kcp-value">Worth ₹<span id="kcpBalanceValue">0</span></p>
+                </section>
+
+                <section class="kcp-card">
+                    <h2>How it works</h2>
+                    <ol class="kcp-steps">
+                        <li>
+                            <span class="kcp-step-n">1</span>
+                            <div><strong>Place an order</strong>
+                                <span class="kcp-sub">Order from any kirana, restaurant or medical store on KiranaHub.</span></div>
+                        </li>
+                        <li>
+                            <span class="kcp-step-n">2</span>
+                            <div><strong>Get your order</strong>
+                                <span class="kcp-sub">Cash is earned once your order is completed (picked up or delivered).</span></div>
+                        </li>
+                        <li>
+                            <span class="kcp-step-n">3</span>
+                            <div><strong>Cash lands in your wallet</strong>
+                                <span class="kcp-sub"><span data-kc-rule="percent"></span>% of your bill comes back as Kirana Cash.</span></div>
+                        </li>
+                        <li>
+                            <span class="kcp-step-n">4</span>
+                            <div><strong>Save on your next order</strong>
+                                <span class="kcp-sub">Use your balance to pay less on future orders.</span></div>
+                        </li>
+                    </ol>
+                </section>
+
+                <section class="kcp-card">
+                    <h2>How to earn</h2>
+                    <ul class="kcp-rules">
+                        <li><i class="fa-solid fa-circle-check"></i>
+                            <span>Earn <b><span data-kc-rule="percent"></span>% back</b> on every completed order.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i>
+                            <span>Minimum order value: <b>₹<span data-kc-rule="minOrder"></span></b>.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i>
+                            <span>Earn up to <b>₹<span data-kc-rule="maxPerOrder"></span></b> on a single order.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i>
+                            <span><b>1 Kirana Cash = ₹1</b> when you use it.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i>
+                            <span>Cash is valid for <b><span data-kc-rule="expiryDays"></span> days</b> from the day it's credited.</span></li>
+                        <li><i class="fa-solid fa-circle-xmark"></i>
+                            <span>Cancelled orders don't earn Kirana Cash.</span></li>
+                    </ul>
+
+                    <div class="kcp-calc">
+                        <label for="kcpCalcInput">Try it: how much would you earn?</label>
+                        <div class="kcp-calc-row">
+                            <input type="number" id="kcpCalcInput" inputmode="numeric" min="0" step="1" placeholder="Order value in ₹">
+                            <span class="kcp-calc-out" id="kcpCalcOut">You earn ₹0</span>
+                        </div>
+                        <p class="kcp-calc-note" id="kcpCalcNote">Enter an order value to see your Kirana Cash.</p>
+                    </div>
+                </section>
+
+                <section class="kcp-card">
+                    <h2>Recent activity</h2>
+                    <div class="kcp-empty" id="kcpActivity">
+                        <div class="kcp-empty-icon">🪙</div>
+                        <p>No Kirana Cash activity yet. Place your first order to start earning!</p>
+                    </div>
+                </section>
+
+                <section class="kcp-card kcp-faq">
+                    <h2>Good to know</h2>
+                    <details>
+                        <summary>When will I receive my cash?</summary>
+                        <p>Right after your order is marked completed by the store.</p>
+                    </details>
+                    <details>
+                        <summary>Can I withdraw it as money?</summary>
+                        <p>No. Kirana Cash can only be used to save on future orders on KiranaHub.</p>
+                    </details>
+                    <details>
+                        <summary>What happens if I cancel an order?</summary>
+                        <p>Cancelled orders don't earn Kirana Cash.</p>
+                    </details>
+                    <details>
+                        <summary>Does it expire?</summary>
+                        <p>Yes, each credit is valid for <span data-kc-rule="expiryDays"></span> days, so use it before it runs out.</p>
+                    </details>
+                </section>
+
+                <button type="button" class="kcp-cta" id="kcpShop">Start shopping</button>
+            </div>
+        </div>
+    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
