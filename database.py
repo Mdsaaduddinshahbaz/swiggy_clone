@@ -23,18 +23,19 @@ from redis_db import (
 
 load_dotenv(override=True)
 api = os.getenv("MONGO_URI", None)
-client = MongoClient(
-    api,
-    maxPoolSize=int(os.getenv("MONGO_MAX_POOL", "50")),   # per worker; workers * this must stay under your Atlas connection limit
-    minPoolSize=int(os.getenv("MONGO_MIN_POOL", "5")),    # warm connections, no TLS handshake on the first requests
-    maxIdleTimeMS=60000,
-    waitQueueTimeoutMS=5000,       # fail fast instead of piling up threads when the pool is exhausted
-    serverSelectionTimeoutMS=5000,
-    connectTimeoutMS=5000,
-    socketTimeoutMS=30000,
-    retryWrites=True,
-    appname="kirana-api",
-)
+# client = MongoClient(
+#     api,
+#     maxPoolSize=int(os.getenv("MONGO_MAX_POOL", "50")),   # per worker; workers * this must stay under your Atlas connection limit
+#     minPoolSize=int(os.getenv("MONGO_MIN_POOL", "5")),    # warm connections, no TLS handshake on the first requests
+#     maxIdleTimeMS=60000,
+#     waitQueueTimeoutMS=5000,       # fail fast instead of piling up threads when the pool is exhausted
+#     serverSelectionTimeoutMS=5000,
+#     connectTimeoutMS=5000,
+#     socketTimeoutMS=30000,
+#     retryWrites=True,
+#     appname="kirana-api",
+# )
+client = MongoClient(api)
 try:
     client.admin.command('ping')
     print("Connected successfullyto MongoDB Atlas!")

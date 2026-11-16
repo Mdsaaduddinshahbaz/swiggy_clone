@@ -68,7 +68,7 @@ brevo_api = os.getenv("brevo_api_email")
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    message_queue=storage_uri,          # defined a few lines above in your file
+    # message_queue=storage_uri,          # defined a few lines above in your file
     async_mode="threading",
 )
 
