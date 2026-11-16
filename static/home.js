@@ -188,14 +188,6 @@
                 orderType: "pickup" | "delivery",
                 resIds: ["..."]
             })
-       (the report form only opens for a specific order, it is launched
-        from the "Report a problem" / "Get help with this order" button on Orders)
-
-   Complaint reasons depend on the order:
-     - PENDING order  -> shop closed, shop not responding, not ready,
-                         delivery late / rider unreachable, QR not accepted, ...
-     - FINISHED order -> missing/wrong item, quality, order marked done but not received, ...
-     - always         -> price mismatch, payment/refund, something else
    ============================================================ */
 (function () {
     "use strict";
@@ -204,12 +196,9 @@
     const SUPPORT_EMAIL = "";               // e.g. "help@yourdomain.com" (leave "" to hide)
     const SUPPORT_PHONE = "";               // e.g. "+91 98765 43210"      (leave "" to hide)
     const TICKET_ENDPOINT = "/support_ticket";
-    // const REPEAT_BLOCK_MS = 6 * 60 * 60 * 1000; // same order + same reason can't be re-sent for 6h
 
     // when: "active" = order still pending, "done" = completed/canceled, "any" = both
     // for:  "pickup" | "delivery" | "any"
-    // messageRequired: user must type details (otherwise the reason alone is enough,
-    //                  so someone standing outside a closed shop can report in two taps)
     const CATEGORIES = [
         {
             id: "shop_closed", label: "Shop is closed", when: "active", for: "any", photoRequired: true,
@@ -387,7 +376,6 @@
     }
 
     // ---- duplicate reports: the SERVER is the source of truth ----
-    // Memory only (no localStorage). Filled from /support_ticket/reported when the sheet opens.
     const reportedByOrder = {};   // orderId -> { categoryId: ticketId }
 
     async function loadReported(orderId) {
@@ -748,8 +736,6 @@
             return;
         }
 
-
-
         showError("");
         btn.disabled = true;
         btn.textContent = "Sending...";
@@ -826,7 +812,6 @@
                 || currentCtx.orderType !== ctx.orderType;
             currentCtx = ctx;
 
-            // if (changed) form.reset();
             if (changed) { form.reset(); resetCamUI(); }
             form.elements.order_id.value = orderId;
             fillCategories(ctx);
@@ -908,6 +893,45 @@ let userLong = null;
 let scrollTopHandler = null; // re-bound each initHomePage() run — see wiring below
 let toastTimer = null;
 
+/* ---- Home page tuning knobs ---- */
+const HOME_RADIUS_STEPS = [0.5, 1, 2, 5, 10];   // must match the slider (0-4) and the chips in home.html
+const HOME_DEFAULT_RADIUS_KM = 2;               // radius used on first load
+const HOME_FREE_DELIVERY_ABOVE = 199;           // ₹ — cart bar says "free delivery unlocked" above this. Set 0 to always show it.
+const HOME_TYPE_LABELS = { restaurant: "Restaurant", medical: "Medical", general_store: "General Store" };
+const HOME_HERO_BG = {
+    restaurant: "linear-gradient(135deg,#B5461C,#E8863A)",
+    medical: "linear-gradient(135deg,#0F6E5C,#3FA58F)",
+    general_store: "linear-gradient(135deg,#1F5FA8,#5B8FD0)"
+};
+const HOME_HERO_BG_DEFAULT = "linear-gradient(135deg,#2A7F4B,#6BB37F)";
+
+let homeRadiusKm = homeLoadRadius();
+let homeSortMode = "nearest";   // "nearest" | "open"
+let homeReloadId = 0;
+
+function homeLoadRadius() {
+    try {
+        const v = parseFloat(localStorage.getItem("homeRadiusKm"));
+        if (HOME_RADIUS_STEPS.includes(v)) return v;
+    } catch (e) { /* ignore */ }
+    return HOME_DEFAULT_RADIUS_KM;
+}
+
+function homeFormatKm(km) {
+    return km < 1 ? `${Math.round(km * 1000)} m` : `${km} km`;
+}
+
+function homeFormatCount(n) {
+    n = Number(n);
+    if (!Number.isFinite(n) || n <= 0) return "";
+    return n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(Math.round(n));
+}
+
+function homeFormatMoney(n) {
+    n = Number(n) || 0;
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
 function getRestaurantCacheKey(userId) {
     return `cachedRestaurants_${userId}`;
 }
@@ -945,8 +969,7 @@ function showToast(message) {
     toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
-// Basic HTML-escaping so restaurant/address/suggestion/menu data from the
-// API can never break out of the markup it's injected into (XSS guard).
+// Basic HTML-escaping so data from the API can never break out of the markup (XSS guard).
 function escapeHtml(str) {
     if (str === null || str === undefined) return "";
     return String(str)
@@ -958,8 +981,7 @@ function escapeHtml(str) {
 }
 
 // Normalizes Mongo-style ids ({ $oid: "..." }), nested { _id } / { id }
-// wrappers, and plain strings/numbers down to a single string. Used by the
-// menu page to compare category/subcategory ids consistently.
+// wrappers, and plain strings/numbers down to a single string.
 function normalizeId(value) {
     if (value === null || value === undefined) return null;
 
@@ -973,8 +995,7 @@ function normalizeId(value) {
 }
 
 // addListenerOnce(): prevents the same handler from being bound multiple
-// times when initHomePage() re-runs (SPA re-navigation, request_location
-// click, etc.) without the DOM node being recreated.
+// times when initHomePage() re-runs without the DOM node being recreated.
 function addListenerOnce(el, event, handler) {
     if (!el) return;
     const key = `bound_${event}`;
@@ -983,18 +1004,12 @@ function addListenerOnce(el, event, handler) {
     el.addEventListener(event, handler);
 }
 
-// spa_router.js only recognizes exact page names ("home", "orders", "menu",
-// "cart", "profile") — it doesn't parse extra hash segments, and it never
-// listens for hashchange (only .nav-item clicks and popstate). So menu
-// params can't ride along in the URL hash; they're stashed in
-// sessionStorage instead, and navigation goes through the router's own
-// renderPage() (a plain top-level function in spa_router.js, so it's
-// reachable as window.renderPage) rather than by touching location.hash.
+// spa_router.js only recognizes exact page names, so menu params are stashed
+// in sessionStorage and navigation goes through the router's renderPage().
 function goToPage(page) {
     if (typeof window.renderPage === "function") {
         window.renderPage(page);
     } else {
-        // Fallback if spa_router.js hasn't loaded for some reason.
         window.location.hash = page;
     }
 }
@@ -1009,15 +1024,158 @@ function navigateToMenu(resName, address, resId, userId, extra = {}) {
 }
 
 /* ============================================================
+   RADIUS CARD, SHOP STATS, SORTING, EXPRESS BANNER
+   ============================================================ */
+
+// Paints slider, chips, big "2 km", heading and the empty-state text from homeRadiusKm.
+function homePaintRadius() {
+    const idx = Math.max(0, HOME_RADIUS_STEPS.indexOf(homeRadiusKm));
+    const slider = document.getElementById("radiusSlider");
+    if (slider) {
+        slider.value = String(idx);
+        slider.style.setProperty("--fill", `${(idx / (HOME_RADIUS_STEPS.length - 1)) * 100}%`);
+    }
+    const kmEl = document.getElementById("rcKm");
+    if (kmEl) kmEl.textContent = homeFormatKm(homeRadiusKm);
+
+    document.querySelectorAll("#radiusChips button").forEach((b) => {
+        b.classList.toggle("active", parseFloat(b.dataset.km) === homeRadiusKm);
+    });
+
+    const note = document.getElementById("Note");
+    if (note) note.textContent = `Shops in ${homeFormatKm(homeRadiusKm)}`;
+
+    const sel = document.getElementById("distance_options");
+    if (sel) sel.value = String(homeRadiusKm);
+
+    const emptyText = document.querySelector("#no-results-container p");
+    if (emptyText) {
+        emptyText.textContent = `We don't have any partners within ${homeFormatKm(homeRadiusKm)} of your location. Try a wider radius or a different area.`;
+    }
+}
+
+// "• 12 shops • 4 open now", "Live: 12 shops near you" and the average ETA chip.
+function homeUpdateShopStats() {
+    const cards = document.querySelectorAll("#resturants_container .store-card");
+    const total = cards.length;
+    let open = 0;
+    const etas = [];
+
+    cards.forEach((card) => {
+        if (card.classList.contains("is-offline")) return;
+        open += 1;
+        if (card.dataset.delivery === "true") {
+            const r = KiranaUtils.etaRange(card.dataset.distance);
+            etas.push((r.lower + r.upper) / 2);
+        }
+    });
+
+    const meta = document.getElementById("rcMeta");
+    if (meta) meta.textContent = `• ${total} shop${total === 1 ? "" : "s"} • ${open} open now`;
+
+    const live = document.getElementById("liveShopCount");
+    if (live) live.textContent = String(total);
+
+    const avg = document.getElementById("avgEta");
+    if (avg && etas.length) avg.textContent = String(Math.round(etas.reduce((a, b) => a + b, 0) / etas.length));
+}
+
+function homeSortCards() {
+    const grid = document.getElementById("resturants_container");
+    if (!grid) return;
+    const cards = Array.from(grid.querySelectorAll(".store-card"));
+    const dist = (c) => parseFloat(c.dataset.distance) || 0;
+
+    cards.sort((a, b) => {
+        if (homeSortMode === "open") {
+            const ao = a.classList.contains("is-offline") ? 1 : 0;
+            const bo = b.classList.contains("is-offline") ? 1 : 0;
+            if (ao !== bo) return ao - bo;
+        }
+        return dist(a) - dist(b);
+    });
+    cards.forEach((c) => grid.appendChild(c));
+    homePlaceExpressBanner();
+}
+
+// "15-min Express Shelf" banner shown after the 2nd visible card.
+function homePlaceExpressBanner() {
+    const grid = document.getElementById("resturants_container");
+    if (!grid) return;
+    grid.querySelector(".express-banner")?.remove();
+
+    const searchBox = document.getElementById("searchInput");
+    const activeTab = document.querySelector("#typeTabs .pill-tab.active");
+    const filtering = (searchBox && searchBox.value.trim() !== "") || (activeTab && activeTab.dataset.type !== "all");
+    if (filtering) return;
+
+    const cards = Array.from(grid.querySelectorAll(".store-card")).filter((c) => c.style.display !== "none");
+    const near = cards.filter((c) => !c.classList.contains("is-offline") && parseFloat(c.dataset.distance) < 1).length;
+    if (cards.length < 2 || near === 0) return;
+
+    const banner = document.createElement("div");
+    banner.className = "express-banner";
+    banner.innerHTML = `
+        <span class="express-ico"><i class="fa-solid fa-bolt"></i></span>
+        <div class="express-text">
+            <strong>15-min Express Shelf</strong>
+            <span>Top items from shops under 1 km</span>
+        </div>
+        <button class="express-btn" type="button">Shop now</button>`;
+    cards[1].after(banner);
+}
+
+function homeSetRadius(km) {
+    if (!HOME_RADIUS_STEPS.includes(km)) return;
+    homeRadiusKm = km;
+    try { localStorage.setItem("homeRadiusKm", String(km)); } catch (e) { /* ignore */ }
+    homePaintRadius();
+    homeReloadRestaurants();
+}
+
+async function homeReloadRestaurants() {
+    const display_resturants = document.getElementById("resturants_container");
+    const no_results_container = document.getElementById("no-results-container");
+    if (!display_resturants || !no_results_container) return;
+
+    let loc = null;
+    try { loc = JSON.parse(localStorage.getItem("userLocation")); } catch (e) { /* ignore */ }
+    if (!loc) return;
+
+    const myId = ++homeReloadId;
+    const previous = display_resturants.innerHTML;
+    showRestaurantSkeleton(display_resturants, no_results_container);
+
+    try {
+        const res = await fetch("/list_resturants", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latt: loc.latt, long: loc.long, dist: homeRadiusKm })
+        });
+        if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
+        const data = await res.json();
+        if (myId !== homeReloadId) return; // a newer radius pick is already loading
+        if (!data.success) throw new Error("list_resturants returned success:false");
+
+        Object.entries(data.results).forEach(([id, detail]) => storeStatus.set(id, detail.is_online !== false));
+        renderRestaurants(data.results, { display_resturants, no_results_container });
+        sessionStorage.setItem(getRestaurantCacheKey(currentUserId()), JSON.stringify(data.results));
+    } catch (err) {
+        if (myId !== homeReloadId) return;
+        console.error("radius reload failed", err);
+        display_resturants.innerHTML = previous;
+        showToast("Couldn't load shops. Please try again.");
+    }
+}
+
+/* ============================================================
    STORE ONLINE / OFFLINE — shared state + realtime
 
    Source of truth is the server. The client keeps:
    - storeStatus:   resId -> boolean, last known state
    - a socket that joins "store:{resId}" rooms (server: watch_store) and
      receives "store_status" pushes the moment a seller toggles
-   - a resync (on socket reconnect and when the tab becomes visible again),
-     because mobile browsers suspend sockets and pushes sent while
-     disconnected are lost
+   - a resync (on socket reconnect and when the tab becomes visible again)
    ============================================================ */
 
 const storeStatus = new Map();      // resId -> boolean
@@ -1086,7 +1244,13 @@ function setCardOnline(card, online) {
     if (badge) {
         badge.classList.toggle("badge-open", online);
         badge.classList.toggle("badge-closed", !online);
-        badge.textContent = online ? "Open Now" : "Currently Offline";
+        if (!online) {
+            badge.textContent = "Offline";
+        } else if (card.dataset.delivery === "true" && card.dataset.eta) {
+            badge.textContent = `Open • ${card.dataset.eta} min`;
+        } else {
+            badge.textContent = "Open • Pickup";
+        }
     }
 }
 
@@ -1101,6 +1265,7 @@ function applyStoreStatus(resId, online, opts = {}) {
     const card = document.getElementById(resId);
     if (card && card.classList.contains("store-card")) setCardOnline(card, online);
     KiranaUtils.refreshHeaderPill();
+    homeUpdateShopStats();
 
     if (activeMenu && activeMenu.resId === resId && document.body.contains(activeMenu.container)) {
         activeMenu.onChange(online, opts);
@@ -1121,11 +1286,10 @@ async function refreshRestaurantList() {
     try { loc = JSON.parse(localStorage.getItem("userLocation")); } catch (e) { /* ignore */ }
     if (!loc) return;
 
-    const dist = document.getElementById("distance_options")?.value || 5;
     const res = await fetch("/list_resturants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latt: loc.latt, long: loc.long, dist })
+        body: JSON.stringify({ latt: loc.latt, long: loc.long, dist: homeRadiusKm })
     });
     if (!res.ok) return;
     const data = await res.json();
@@ -1133,7 +1297,6 @@ async function refreshRestaurantList() {
 
     renderRestaurants(data.results, { display_resturants, no_results_container });
     sessionStorage.setItem(getRestaurantCacheKey(currentUserId()), JSON.stringify(data.results));
-    if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
 }
 
 // Catch up on anything missed while the socket was down / tab was hidden.
@@ -1167,39 +1330,92 @@ function isOfflineResponse(response, data) {
     return response.status === 503 && !!data && data.code === "STORE_OFFLINE";
 }
 
-// Cache of already-fetched preview items, keyed by res_id. renderRestaurants()
-// re-runs on every cache-hit → fresh-fetch cycle and on every distance-filter
-// change, which would otherwise wipe already-loaded product rows back to a
-// skeleton and re-fetch them from scratch. Reusing the cache means a card
-// only ever shows the skeleton once, the first time it's seen.
+// Cache of already-fetched preview items, keyed by res_id, so a card only
+// ever shows the skeleton once, the first time it's seen.
 const previewItemsCache = new Map();
 
 /* ============================================================
-   HOME CARD "ADD" BUTTONS + "SEE MORE" TILE
+   HOME CARD "ADD" BUTTONS, "SEE MORE" TILE AND FLOATING CART BAR
 
-   The preview strip on each store card is fully interactive:
    - "Add" calls /add_to_cart (optimistic: flips to a - qty + stepper
      immediately, reverts if the server says no)
    - the stepper uses the same debounced /update_cart as the menu page
-   - the last tile ("See more") has no handler of its own: it sits inside
-     the .store-card, so the card click opens that store's menu page
+   - the last tile ("See more") sits inside .store-card, so the card
+     click opens that store's menu page
    homeCartQty mirrors the server cart: itemId -> qty.
+   homeItemInfo remembers price + store per item so the floating cart bar
+   can show a total instantly.
    ============================================================ */
 
 const homeCartQty = new Map();      // itemId -> qty currently in the user's cart
 const homeAdding = new Set();       // itemIds with an add_to_cart request in flight
+const homeItemInfo = new Map();     // itemId -> { price, resId }
+let homeCartServerTotal = NaN;
 let homeCartRefresh = null;
+
+function rememberHomeItem(itemId, price, resId) {
+    itemId = String(itemId);
+    const prev = homeItemInfo.get(itemId) || {};
+    const p = Number(price);
+    homeItemInfo.set(itemId, {
+        price: Number.isFinite(p) && p > 0 ? p : (prev.price || 0),
+        resId: resId ? String(resId) : (prev.resId || "")
+    });
+}
+
+function updateHomeCartBar() {
+    const bar = document.getElementById("homeCartBar");
+    if (!bar) return;
+
+    let count = 0;
+    let total = 0;
+    let allPriced = true;
+    const shops = new Set();
+
+    homeCartQty.forEach((qty, id) => {
+        count += qty;
+        const info = homeItemInfo.get(id);
+        if (info && info.price > 0) {
+            total += qty * info.price;
+            if (info.resId) shops.add(info.resId);
+        } else {
+            allPriced = false;
+        }
+    });
+
+    if (!allPriced && Number.isFinite(homeCartServerTotal)) total = homeCartServerTotal;
+
+    if (count <= 0) {
+        bar.hidden = true;
+        return;
+    }
+
+    const shopCount = Math.max(1, shops.size);
+    const countEl = document.getElementById("hcbCount");
+    const titleEl = document.getElementById("hcbTitle");
+    const subEl = document.getElementById("hcbSub");
+    if (countEl) countEl.textContent = String(count);
+    if (titleEl) titleEl.textContent = `${count} item${count === 1 ? "" : "s"} • ₹${homeFormatMoney(total)}`;
+    if (subEl) {
+        let tail = " • Free delivery unlocked";
+        if (HOME_FREE_DELIVERY_ABOVE > 0 && total < HOME_FREE_DELIVERY_ABOVE) {
+            tail = ` • Add ₹${homeFormatMoney(HOME_FREE_DELIVERY_ABOVE - total)} for free delivery`;
+        }
+        subEl.textContent = `from ${shopCount} shop${shopCount === 1 ? "" : "s"}${tail}`;
+    }
+    bar.hidden = false;
+}
 
 function thumbControlMarkup(qty) {
     if (qty > 0) {
         return `
             <div class="p-qty">
-                <button class="p-minus" type="button" aria-label="Remove one">-</button>
+                <button class="p-minus" type="button" aria-label="Remove one">−</button>
                 <span class="p-qty-num">${escapeHtml(qty)}</span>
                 <button class="p-plus" type="button" aria-label="Add one">+</button>
             </div>`;
     }
-    return `<button class="p-add" type="button">Add</button>`;
+    return `<button class="p-add" type="button">Add +</button>`;
 }
 
 // Update one item everywhere it's shown on the home page.
@@ -1209,6 +1425,7 @@ function setHomeQty(itemId, qty) {
     document
         .querySelectorAll(`.product-thumb[data-item-id="${CSS.escape(itemId)}"] .p-control`)
         .forEach(el => { el.innerHTML = thumbControlMarkup(qty); });
+    updateHomeCartBar();
 }
 
 function syncAllThumbControls() {
@@ -1216,11 +1433,11 @@ function syncAllThumbControls() {
         const ctl = thumb.querySelector(".p-control");
         if (ctl) ctl.innerHTML = thumbControlMarkup(homeCartQty.get(thumb.dataset.itemId) || 0);
     });
+    updateHomeCartBar();
 }
 
 // Pull the real cart from the server so the strip shows correct quantities.
-// Skipped while a local change is still settling (unless force), so an
-// in-flight optimistic update never gets overwritten by a stale response.
+// Skipped while a local change is still settling (unless force).
 function refreshHomeCart(force = false) {
     if (homeCartRefresh) return homeCartRefresh;
     homeCartRefresh = (async () => {
@@ -1237,12 +1454,17 @@ function refreshHomeCart(force = false) {
 
             homeCartQty.clear();
             const cart = data?.results?.cart || {};
-            Object.values(cart).forEach(entry => {
+            Object.entries(cart).forEach(([resKey, entry]) => {
                 Object.entries(entry?.items || {}).forEach(([id, it]) => {
                     const q = Number(it?.qty || 0);
-                    if (q > 0) homeCartQty.set(String(id), q);
+                    if (q > 0) {
+                        homeCartQty.set(String(id), q);
+                        rememberHomeItem(id, it?.price, resKey);
+                    }
                 });
             });
+            const t = Number(data?.results?.total);
+            homeCartServerTotal = Number.isFinite(t) ? t : NaN;
             syncAllThumbControls();
         } catch (e) {
             console.warn("home cart refresh failed", e);
@@ -1306,6 +1528,7 @@ async function homeAddToCart(thumb) {
         price: parseInt(thumb.dataset.price)
     };
 
+    rememberHomeItem(itemId, payload.price, resId);
     homeAdding.add(itemId);
     setHomeQty(itemId, 1);              // optimistic
 
@@ -1404,25 +1627,31 @@ function homeChangeQty(thumb, delta) {
     );
 }
 
-function productThumbsMarkup(items) {
+function productThumbsMarkup(items, resId) {
     if (!items || items.length === 0) {
         return `<div class="product-thumb empty-thumb"><p>No items listed yet</p></div>`;
     }
 
     const thumbs = items.map(item => {
+        rememberHomeItem(item.id, item.price, resId);
         const qty = homeCartQty.get(String(item.id)) || 0;
+        const price = Number(item.price) || 0;
+        const mrp = Number(item.mrp ?? item.original_price ?? 0);
+        const unit = item.unit || item.weight || item.unit_label || item.quantity_label || "";
         return `
         <div class="product-thumb"
              data-item-id="${escapeHtml(item.id)}"
              data-name="${escapeHtml(item.name)}"
              data-price="${escapeHtml(item.price)}"
              data-stock="${escapeHtml(item.item_qty ?? "")}">
-            <img src="${escapeHtml(item.file_url)}" alt="${escapeHtml(item.name)}">
+            <div class="p-media"><img src="${escapeHtml(item.file_url)}" alt="${escapeHtml(item.name)}" loading="lazy"></div>
             <p class="p-name">${escapeHtml(item.name)}</p>
-            <div class="p-row">
+            <p class="p-unit">${escapeHtml(unit)}</p>
+            <div class="p-price-row">
                 <span class="p-price">₹${escapeHtml(item.price)}</span>
-                <div class="p-control">${thumbControlMarkup(qty)}</div>
+                ${mrp > price ? `<s class="p-mrp">₹${escapeHtml(mrp)}</s>` : ""}
             </div>
+            <div class="p-control">${thumbControlMarkup(qty)}</div>
         </div>`;
     }).join("");
 
@@ -1437,9 +1666,6 @@ function productThumbsMarkup(items) {
 }
 
 // ---- Skeleton loading helpers ----------------------------------------
-// Shimmering placeholders shown until an API call returns. The CSS for
-// .kh-sk lives in home.html. Store-card skeletons reuse the existing
-// .skeleton-card styles from home.css.
 function restaurantSkeletonMarkup(n = 4) {
     const card = `
         <div class="skeleton-card" data-kh-sk aria-hidden="true">
@@ -1463,12 +1689,18 @@ function clearKhSkeleton(el) {
     el.querySelectorAll("[data-kh-sk], .skeleton-card").forEach(n => n.remove());
 }
 
-// Store cards start with skeleton item-thumbs (unless we already have that
-// restaurant's items cached from an earlier render) and get their real
-// products filled in by loadPreviewItems() right after, via a single
-// batched /preview_items call (see database.py's get_preview_items). Rating,
-// and delivery-time stay as presentational placeholders since
-// /list_resturants doesn't return them — same as before.
+// Store cards start with skeleton item-thumbs (unless that restaurant's items
+// are cached) and get real products from loadPreviewItems() via one batched
+// /preview_items call.
+//
+// Optional fields read from /list_resturants when present (the card hides the
+// matching piece when a field is missing):
+//   image_url | res_image | banner_url | cover_url  -> hero photo
+//   logo_url                                         -> logo tile
+//   rating, rating_count                             -> amber rating pill
+//   offer | offer_text                               -> dashed offer strip
+//   weekly_orders                                    -> "4.2k bought this week"
+// Optional fields read from /preview_items: unit | weight, mrp | original_price.
 function renderRestaurants(results, containers) {
     const { display_resturants, no_results_container } = containers;
 
@@ -1476,6 +1708,7 @@ function renderRestaurants(results, containers) {
         display_resturants.innerHTML = "";
         no_results_container.style.display = "block";
         KiranaUtils.refreshHeaderPill();
+        homeUpdateShopStats();
         return;
     }
 
@@ -1485,70 +1718,76 @@ function renderRestaurants(results, containers) {
     const favorites = getFavoriteIds(userId);
 
     const skeletonThumbs = `
-        <div class="product-thumb skeleton-thumb"><div class="skeleton-img"></div></div>
-        <div class="product-thumb skeleton-thumb"><div class="skeleton-img"></div></div>
-        <div class="product-thumb skeleton-thumb"><div class="skeleton-img"></div></div>`;
+        <div class="product-thumb skeleton-thumb"><div class="skeleton-img sq"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div></div>
+        <div class="product-thumb skeleton-thumb"><div class="skeleton-img sq"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div></div>
+        <div class="product-thumb skeleton-thumb"><div class="skeleton-img sq"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div></div>`;
 
     const html = Object.entries(results).map(([id, detail], index) => {
         const isFavorite = favorites.has(id);
         const cached = previewItemsCache.get(id);
-        const productsMarkup = cached ? productThumbsMarkup(cached) : skeletonThumbs;
-        const displayEta = KiranaUtils.etaRange(detail.distance_km).label;
+        const productsMarkup = cached ? productThumbsMarkup(cached, id) : skeletonThumbs;
+        const eta = KiranaUtils.etaRange(detail.distance_km).label;
 
         // Live status wins over a possibly stale list/cache value.
         const online = storeStatus.has(id) ? storeStatus.get(id) : detail.is_online !== false;
         storeStatus.set(id, online);
 
-        // delivery_available can arrive as a boolean or a string depending on
-        // how the restaurant was created — normalise before comparing.
+        // delivery_available can arrive as a boolean or a string — normalise.
         const hasDelivery = String(detail.delivery_available).toLowerCase() === "true";
 
+        const km = Number(detail.distance_km);
+        const kmText = Number.isFinite(km) ? km.toFixed(1) : String(detail.distance_km ?? "");
+        const name = String(detail.res_name || "");
+        const typeLabel = HOME_TYPE_LABELS[detail.type] || "Store";
+        const sub = `${typeLabel} • ${hasDelivery ? `Delivery within ${detail.delivery_radius} km` : "Pickup only"}`;
+
+        const statusText = !online ? "Offline" : (hasDelivery ? `Open • ${eta} min` : "Open • Pickup");
+
+        const heroUrl = detail.image_url || detail.res_image || detail.banner_url || detail.cover_url || "";
+        const heroImg = heroUrl ? `<img class="hero-img" src="${escapeHtml(heroUrl)}" alt="" loading="lazy">` : "";
+        const logo = detail.logo_url
+            ? `<img src="${escapeHtml(detail.logo_url)}" alt="">`
+            : escapeHtml((name.trim()[0] || "S").toUpperCase());
+
+        const rating = Number(detail.rating);
+        const ratingCount = homeFormatCount(detail.rating_count);
+        const ratingHtml = Number.isFinite(rating) && rating > 0
+            ? `<span class="hero-rating"><i class="fa-solid fa-star"></i> ${rating.toFixed(1)}${ratingCount ? ` (${ratingCount})` : ""}</span>`
+            : "";
+
+        const offer = detail.offer || detail.offer_text || "";
+        const offerHtml = offer
+            ? `<div class="store-offer"><i class="fa-solid fa-tags"></i><span>${escapeHtml(offer)}</span><span class="offer-tc">T&amp;C</span></div>`
+            : "";
+
+        const bought = homeFormatCount(detail.weekly_orders);
+        const boughtHtml = bought ? `<span class="bought">${escapeHtml(bought)} bought this week</span>` : "";
+
         return `
-        <div class="store-card${online ? "" : " is-offline"}" id="${escapeHtml(id)}" data-type="${escapeHtml(detail.type || "")}" data-distance="${escapeHtml(detail.distance_km)}" data-delivery="${hasDelivery}" data-radius="${escapeHtml(detail.delivery_radius ?? "")}" style="--i:${index}">
-            <div class="store-head">
-                <div>
-                    <h3 class="store-name resturant_name">${escapeHtml(detail.res_name)}</h3>
-                    <div class="store-badges">
-                        <span class="badge-verified"><i class="fa-solid fa-circle-check"></i> Verified Partner</span>
-                        <span class="store-status-badge ${online ? "badge-open" : "badge-closed"}">${online ? "Open Now" : "Currently Offline"}</span>
-                        ${hasDelivery ? `
-                            <span class="badge-delivery">
-                                <i class="fa-solid fa-truck"></i>
-                                Delivery within ${escapeHtml(detail.delivery_radius)} km
-                            </span>
-                        ` : `
-                            <span class="badge-pickup">
-                                <i class="fa-solid fa-store"></i>
-                                Pickup only
-                            </span>
-                        `}
-                    </div>
+        <div class="store-card${online ? "" : " is-offline"}" id="${escapeHtml(id)}" data-type="${escapeHtml(detail.type || "")}" data-distance="${escapeHtml(detail.distance_km)}" data-delivery="${hasDelivery}" data-radius="${escapeHtml(detail.delivery_radius ?? "")}" data-eta="${escapeHtml(hasDelivery ? eta : "")}" data-address="${escapeHtml(detail.address)}" style="--i:${index}">
+            <div class="store-hero" style="background:${HOME_HERO_BG[detail.type] || HOME_HERO_BG_DEFAULT}">
+                ${heroImg}
+                <div class="hero-top">
+                    <span class="hero-chip store-status-badge ${online ? "badge-open" : "badge-closed"}">${escapeHtml(statusText)}</span>
+                    <span class="hero-chip chip-dist"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(kmText)} km</span>
+                    <button class="store-fav${isFavorite ? " active" : ""}" type="button" data-fav-id="${escapeHtml(id)}" aria-label="Save to favorites">
+                        <i class="fa-solid fa-heart"></i>
+                    </button>
                 </div>
-                <button
-                    class="store-fav${isFavorite ? " active" : ""}"
-                    type="button"
-                    data-fav-id="${escapeHtml(id)}"
-                    aria-label="Save to favorites"
-                >
-                    <i class="fa-solid fa-heart"></i>
-                </button>
+                <div class="hero-bottom">
+                    <span class="store-logo">${logo}</span>
+                    <div class="hero-title">
+                        <h3 class="store-name resturant_name">${escapeHtml(name)}</h3>
+                        <p class="store-sub">${escapeHtml(sub)}</p>
+                    </div>
+                    ${ratingHtml}
+                </div>
             </div>
 
-            <div class="store-meta">
-                <span class="rating"><i class="fa-solid fa-star"></i> 4.2</span>
-                <span class="dot">•</span>
-                <span>${escapeHtml(displayEta)} mins</span>
-                <span class="dot">•</span>
-                <span>${escapeHtml(detail.distance_km)} km away</span>
-            </div>
+            ${offerHtml}
 
+            <div class="products-head"><strong>Quick add — bestsellers</strong>${boughtHtml}</div>
             <div class="store-products" data-res-id="${escapeHtml(id)}">${productsMarkup}</div>
-
-            <div class="store-tags">
-                <span class="tag-chip area">${escapeHtml(detail.address)}</span>
-                <span class="tag-chip">Free Delivery</span>
-                <span class="tag-chip">Local Prices</span>
-            </div>
         </div>`;
     }).join("");
     display_resturants.innerHTML = html;
@@ -1557,16 +1796,17 @@ function renderRestaurants(results, containers) {
     // Join the realtime rooms so these cards flip the moment a seller toggles.
     watchStores(Object.keys(results));
 
-    // Only fetch for restaurants we don't already have cached items for —
-    // this is what stops a re-render from re-triggering the skeleton state.
+    homeSortCards();
+    homeUpdateShopStats();
+    if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
+
+    // Only fetch for restaurants we don't already have cached items for.
     const idsNeedingFetch = Object.keys(results).filter(id => !previewItemsCache.has(id));
     loadPreviewItems(idsNeedingFetch);
 }
 
 // Batched fetch of a few real items per restaurant, for the store-card
-// product strip. One request for the whole visible list instead of one
-// per card. Pairs with POST /preview_items on the server (see
-// get_preview_items in database.py).
+// product strip. Pairs with POST /preview_items on the server.
 async function loadPreviewItems(resIds) {
     if (!resIds || resIds.length === 0) return;
     try {
@@ -1579,19 +1819,17 @@ async function loadPreviewItems(resIds) {
         const data = await res.json();
         if (!data.success) throw new Error(data.message || "preview_items returned success:false");
 
-        // Backend omits the key entirely for a restaurant with zero in-stock
-        // items — treat every id we asked for as resolved, defaulting missing
-        // ones to an empty list, so nothing is left shimmering forever.
+        // Backend omits the key for a restaurant with zero in-stock items —
+        // default missing ones to an empty list so nothing shimmers forever.
         resIds.forEach(resId => {
             const items = (data.items && data.items[resId]) || [];
             previewItemsCache.set(resId, items);
             const container = document.querySelector(`.store-products[data-res-id="${CSS.escape(resId)}"]`);
-            if (container) container.innerHTML = productThumbsMarkup(items);
+            if (container) container.innerHTML = productThumbsMarkup(items, resId);
         });
+        updateHomeCartBar();
     } catch (e) {
         console.error("loadPreviewItems failed", e);
-        // Don't leave every card shimmering forever if the request/route is broken —
-        // show a clear "couldn't load" state instead so it's obvious something's wrong.
         // Deliberately NOT cached, so the next re-render retries the fetch.
         resIds.forEach(resId => {
             const container = document.querySelector(`.store-products[data-res-id="${CSS.escape(resId)}"]`);
@@ -1604,8 +1842,7 @@ function getPosition() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
             reject("Geolocation is not supported by your browser");
-            return; // bugfix: without this, code fell through and called
-            // navigator.geolocation.getCurrentPosition on undefined
+            return;
         }
         navigator.geolocation.getCurrentPosition(resolve, reject);
     });
@@ -1617,13 +1854,10 @@ async function reverseGeocode(lat, lon) {
     );
     if (!response.ok) throw new Error(`reverseGeocode failed: ${response.status}`);
     const data = await response.json();
-    // return data.display_name;
     return data.display_name.split(',').slice(0, 2).join(',');
 }
 
-// change(): re-fetches restaurants for a newly picked location. Kept at
-// module scope (not inside initHomePage) since it's referenced by click
-// handlers that get attached fresh each time initHomePage runs.
+// change(): re-fetches restaurants for a newly picked location.
 async function change(latt, long) {
     const display_resturants = document.getElementById("resturants_container");
     const pathParts = window.location.pathname.split("/");
@@ -1652,7 +1886,7 @@ async function change(latt, long) {
         const res = await fetch("/list_resturants", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ latt: userLatt, long: userLong, dist: 5 })
+            body: JSON.stringify({ latt: userLatt, long: userLong, dist: homeRadiusKm })
         });
         if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
         const data = await res.json();
@@ -1662,7 +1896,6 @@ async function change(latt, long) {
             if (Note) Note.style.display = "block";
             renderRestaurants(data.results, { display_resturants, no_results_container });
             sessionStorage.setItem(getRestaurantCacheKey(userId), JSON.stringify(data.results));
-            if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
         } else {
             clearKhSkeleton(display_resturants);
             alert("error loading resturants");
@@ -1706,12 +1939,8 @@ async function initHomePage() {
     const display_resturants = document.getElementById("resturants_container");
     if (!display_resturants) return; // safety: not actually on the home content
 
-    const cartBtn = document.getElementById("CartBtn");
-    const orderBtn = document.getElementById("OrdersBtn");
     const pathParts = window.location.pathname.split("/");
     const no_results_container = document.getElementById("no-results-container");
-    const select_options = document.getElementById("distance_options");
-    const access_denied_container = document.getElementById("deny");
     const Note = document.getElementById("Note");
     const loading = document.getElementById("loading");
     const request_location = document.getElementById("requestlocation");
@@ -1721,14 +1950,9 @@ async function initHomePage() {
     const savedAddress = document.getElementById("savedAddress");
     const userId = window.APP_USER_ID || pathParts[pathParts.length - 1];
 
-    // Small, purely cosmetic touch: greet by time of day instead of a
-    // static heading. Safe to set unconditionally — nothing else in this
-    // file reads Note's text, only its display/visibility.
-    if (Note) {
-        const hour = new Date().getHours();
-        const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-        Note.textContent = `${greeting}! Restaurants with online delivery near you`;
-    }
+    // Heading ("Shops in 2 km"), slider, chips and the big radius number.
+    homePaintRadius();
+
     const maps_btn = document.getElementById("map_btn");
     const cancelbtn = document.getElementById("closeModal");
 
@@ -1750,43 +1974,65 @@ async function initHomePage() {
     // (Re)create the Leaflet map fresh every time — its old DOM node was just
     // discarded by the router's content swap, so the old instance is dead anyway.
     if (map) { try { map.remove(); } catch (e) { } }
-    marker = null; // bugfix: old marker belonged to the removed map instance
+    marker = null;
     map = L.map('map').setView([17.3850, 78.4867], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    addListenerOnce(select_options, "change", async (e) => {
-        const storedLocation = JSON.parse(localStorage.getItem("userLocation"));
-        const previousCards = display_resturants.innerHTML;
-        showRestaurantSkeleton(display_resturants, no_results_container);
-        try {
-            const res = await fetch("/list_resturants", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ latt: storedLocation.latt, long: storedLocation.long, dist: e.target.value })
-            });
-            if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
-            const data = await res.json();
-            console.log(data);
-            if (data.success) {
-                renderRestaurants(data.results, renderContainers);
-                sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.results));
-                if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
-            } else {
-                display_resturants.innerHTML = previousCards;
-                alert("error loading resturants");
-            }
-        } catch (err) {
-            console.error("distance filter failed", err);
-            display_resturants.innerHTML = previousCards;
-            alert("error loading resturants");
-        }
+    // ---- Radius card: slider + chips ----
+    const radiusSlider = document.getElementById("radiusSlider");
+    addListenerOnce(radiusSlider, "input", () => {
+        const km = HOME_RADIUS_STEPS[Number(radiusSlider.value)];
+        if (km === undefined) return;
+        homeRadiusKm = km;
+        homePaintRadius(); // live label while dragging; the fetch happens on release
     });
+    addListenerOnce(radiusSlider, "change", () => {
+        const km = HOME_RADIUS_STEPS[Number(radiusSlider.value)];
+        if (km !== undefined) homeSetRadius(km);
+    });
+    addListenerOnce(document.getElementById("radiusChips"), "click", (e) => {
+        const btn = e.target.closest("button[data-km]");
+        if (!btn) return;
+        homeSetRadius(parseFloat(btn.dataset.km));
+    });
+
+    // ---- Sort button: Nearest <-> Open first ----
+    addListenerOnce(document.getElementById("sortNearestBtn"), "click", () => {
+        const btn = document.getElementById("sortNearestBtn");
+        homeSortMode = homeSortMode === "nearest" ? "open" : "nearest";
+        btn.innerHTML = `<i class="fa-solid fa-arrow-up-wide-short"></i> ${homeSortMode === "nearest" ? "Nearest" : "Open first"}`;
+        homeSortCards();
+    });
+
+    // ---- Floating cart bar ----
+    addListenerOnce(document.getElementById("hcbView"), "click", () => goToPage("cart"));
+
+    // Broken hero / logo photos fall back to the gradient.
+    if (!display_resturants.dataset.imgErr) {
+        display_resturants.dataset.imgErr = "1";
+        display_resturants.addEventListener("error", (e) => {
+            const t = e.target;
+            if (t && t.matches && t.matches(".hero-img, .store-logo img")) t.remove();
+        }, true);
+    }
 
     // Bound up-front (not after the network calls below) so the Add buttons
     // on cached cards work immediately.
     addListenerOnce(display_resturants, "click", function (e) {
+        // --- express banner ---
+        if (e.target.closest(".express-btn")) {
+            e.stopPropagation();
+            if (homeRadiusKm > 1) {
+                homeSetRadius(1);
+            } else {
+                const first = display_resturants.querySelector(".store-card");
+                if (first) first.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            return;
+        }
+
         // --- preview strip: Add / - / + ---
         const addBtn = e.target.closest(".p-add");
         if (addBtn) {
@@ -1820,11 +2066,10 @@ async function initHomePage() {
         const card = e.target.closest(".store-card");
         if (card) {
             const name = card.querySelector(".resturant_name").textContent;
-            const addresss = card.querySelector(".area").textContent;
+            const addresss = card.dataset.address || "";
             const res_id = card.getAttribute("id");
-            // Routes inside the SPA so the header/map/session state never gets
-            // torn down. Offline stores are still browsable; the menu page
-            // shows the offline banner and disables ordering.
+            // Offline stores are still browsable; the menu page shows the
+            // offline banner and disables ordering.
             navigateToMenu(name, addresss, res_id, userId, {
                 distanceKm: card.dataset.distance,
                 type: card.dataset.type,
@@ -1834,14 +2079,13 @@ async function initHomePage() {
         }
     });
 
-    // Real cart quantities for the preview strip (re-synced on every Home mount).
+    // Real cart quantities for the preview strip + cart bar (re-synced on every Home mount).
     refreshHomeCart();
 
     try {
         const fetchlocation = JSON.parse(localStorage.getItem("userLocation"));
         if (fetchlocation === null) {
-            // await getLocation();
-            const position = await getPosition()
+            const position = await getPosition();
             userLatt = position.coords.latitude;
             userLong = position.coords.longitude;
             const address = await reverseGeocode(userLatt, userLong);
@@ -1855,7 +2099,6 @@ async function initHomePage() {
             let locationFound = false;
             const previoussavedAddress = localStorage.getItem("currentAddress");
 
-            // bugfix: was fetchlocation.lat (undefined) — the stored key is "latt"
             if (
                 previoussavedAddress &&
                 fetchlocation.latt !== null &&
@@ -1896,8 +2139,7 @@ async function initHomePage() {
                     localStorage.setItem("userLocation", JSON.stringify(userLocation));
                 }
 
-                // bugfix: clear stale entries before rebuilding, or this list
-                // grows every time initHomePage() re-runs
+                // clear stale entries before rebuilding, or this list grows on every re-run
                 savedAddress.innerHTML = "";
                 data.address.forEach((addr) => {
                     savedAddress.innerHTML += `
@@ -1920,11 +2162,11 @@ async function initHomePage() {
         const res = await fetch("/list_resturants", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ latt: userLatt, long: userLong, dist: 5 })
+            body: JSON.stringify({ latt: userLatt, long: userLong, dist: homeRadiusKm })
         });
         if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
         const data = await res.json();
-        console.log(data)
+        console.log(data);
         if (data.success) {
             if (loading) loading.style.display = "none";
             if (Note) Note.style.display = "block";
@@ -1937,12 +2179,7 @@ async function initHomePage() {
             alert("error loading resturants");
         }
 
-        addListenerOnce(cartBtn, "click", () => { window.location.href = `/user/${userId}/#cart`; });
-        addListenerOnce(orderBtn, "click", () => { window.location.href = `/orders/${userId}`; });
-
-        // Type tabs may have loaded with a non-"all" active tab from a previous
-        // page visit (dataset flags survive since these are shared header nodes),
-        // so re-apply filters against whatever just got rendered.
+        // Re-apply filters against whatever just got rendered.
         if (typeof window.__applyHomeFilters === "function") window.__applyHomeFilters();
     } catch (e) {
         console.error("initHomePage location/restaurant load failed", e);
@@ -1979,21 +2216,6 @@ async function initHomePage() {
             console.error("request_location failed", err);
         }
     });
-
-    const indicator = document.querySelector(".active-indicator");
-    function moveIndicator(btn) {
-        if (!indicator || !btn) return;
-        const x = btn.offsetLeft + (btn.offsetWidth - indicator.offsetWidth) / 2;
-        indicator.style.transform = `translateX(${x}px)`;
-    }
-    document.querySelectorAll(".nav-btn").forEach(btn => {
-        addListenerOnce(btn, "click", () => {
-            document.querySelector(".nav-btn.active")?.classList.remove("active");
-            btn.classList.add("active");
-            moveIndicator(btn);
-        });
-    });
-    moveIndicator(document.querySelector(".nav-btn.active"));
 
     const input = document.getElementById("addressInput");
     const suggestions = document.getElementById("suggestions");
@@ -2049,6 +2271,12 @@ async function initHomePage() {
         overlay.classList.remove("show");
     });
 
+    // "Map view" link next to the live chips: open the location panel with the map showing.
+    addListenerOnce(document.getElementById("mapViewBtn"), "click", () => {
+        if (trigger) trigger.click();
+        if (maps_btn && maps_btn.getAttribute("is_active") === "false") maps_btn.click();
+    });
+
     addListenerOnce(suggestions, "click", (e) => {
         const item = e.target.closest(".suggestion-item");
         if (!item) return;
@@ -2085,11 +2313,10 @@ async function initHomePage() {
         });
     });
 
-    // ---- Search box + category quick-filter strip, combined ----
+    // ---- Search box + store-type pill tabs, combined ----
     // Both act on the already-rendered .store-card elements: text search
-    // matches the restaurant name, the pill-tab filter matches data-type.
-    // Exposed on window so change()/distance-filter re-renders can re-apply
-    // the currently active filters without needing to re-bind listeners.
+    // matches the store name, the pill-tab filter matches data-type.
+    // Exposed on window so re-renders can re-apply the active filters.
     const searchInput = document.getElementById("searchInput");
     const typeTabs = document.getElementById("typeTabs");
 
@@ -2116,12 +2343,10 @@ async function initHomePage() {
         if (noSearchMatches) {
             noSearchMatches.classList.toggle("show", allCards.length > 0 && visibleCount === 0);
         }
+        homePlaceExpressBanner();
     }
     window.__applyHomeFilters = applyHomeFilters;
 
-    // Each pill tab owns a full color theme (home.css reads it off
-    // body[data-theme]). Set it once on load to match whichever tab is
-    // already active, then keep it in sync on every tab click below.
     document.body.dataset.theme =
         (typeTabs?.querySelector(".pill-tab.active")?.dataset.type) || "all";
 
@@ -2197,12 +2422,8 @@ async function initHomePage() {
     });
 
     // ---- Scroll-to-top button ----
-    // The button lives inside the Home template, so it's a fresh DOM node
-    // every time the SPA router remounts Home. addListenerOnce handles the
-    // click fine (it keys off the node itself), but the window-level
-    // scroll listener needs to be swapped to point at the current node
-    // each run, or it'd keep toggling a detached element after navigating
-    // away and back.
+    // The window-level scroll listener is swapped each run so it never
+    // toggles a detached element after navigating away and back.
     const scrollTopBtn = document.getElementById("scrollTopBtn");
     if (scrollTopBtn) {
         if (scrollTopHandler) window.removeEventListener("scroll", scrollTopHandler);
@@ -2211,9 +2432,7 @@ async function initHomePage() {
         addListenerOnce(scrollTopBtn, "click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
     }
 
-    // ---- Voice search / upload-handwritten-list buttons ----
-    // No backend wired up yet for either — stubbed with a toast so the
-    // buttons aren't dead ends, swap these for real handlers when ready.
+    // ---- Voice search / upload-handwritten-list buttons (stubs until a backend exists) ----
     addListenerOnce(document.getElementById("voiceSearchBtn"), "click", () => {
         showToast("Voice search coming soon");
     });
@@ -2222,13 +2441,11 @@ async function initHomePage() {
     });
 }
 
-
 /* ============================================================
    MENU PAGE (merged from menu.js)
 
-   Was its own full page at /menu/:res_name/:address/:res_id/:userId.
-   Now an SPA page: routed via #menu/<res_name>/<address>/<res_id>/<userId>,
-   rendered into tpl-menu, params read from the hash instead of the path.
+   An SPA page: routed via the router's renderPage("menu"), rendered into
+   tpl-menu, params read from sessionStorage ("menuParams").
    ============================================================ */
 
 const pendingMenuUpdates = new Map();
@@ -2318,8 +2535,7 @@ async function initMenuPage() {
     }
 
     if (!menuParams || !menuParams.resId) {
-        // No restaurant context to show (e.g. a direct reload landed on the
-        // menu template with nothing in sessionStorage) — bounce home.
+        // No restaurant context to show — bounce home.
         goToPage("home");
         return;
     }
@@ -2516,10 +2732,6 @@ async function initMenuPage() {
     const addingItems = new Set(); // items with an add_to_cart request in flight
 
     // ---- Footer total: updated instantly, server value only reconciles ----
-    // cartTotal starts from the server's total (the cart may hold items that
-    // aren't on this page). Every tap adjusts it right away by the item's
-    // price; the API response then just confirms it, and is ignored while
-    // other taps are still pending so a stale reply can't make it jump back.
     let cartTotal = Number(cartData?.results?.total) || 0;
 
     function renderFooterTotal() {
@@ -2554,15 +2766,13 @@ async function initMenuPage() {
 
     const wishlist = new Set();
 
-    // Keep menuItems in step with what the user has in their cart, so a
-    // re-render (filter, search, offline flip) never shows stale quantities.
+    // Keep menuItems in step with what the user has in their cart.
     function setLocalQty(id, qty) {
         const match = menuItems.find(i => i.id === String(id));
         if (match) match.qty = qty;
     }
 
-    // Swap only one item's control (ADD <-> quantity stepper) in place,
-    // instead of re-rendering the whole menu. qty <= 0 shows ADD.
+    // Swap only one item's control (ADD <-> quantity stepper) in place.
     function setItemControls(itemId, qty) {
         const el = menuContainer.querySelector(
             `.menu-item[data-item-id="${CSS.escape(String(itemId))}"] .item-controls`
@@ -3262,10 +3472,9 @@ async function initMenuPage() {
     });
 }
 
-// Keep the shared header's page-scoped chrome (search bar, category strip)
-// in sync with whichever page is actually showing. The header never gets
-// swapped out by the router, so without this it would stay visible on
-// Orders/Cart/Profile/Menu too. Runs for every navigation, not just Home.
+// Keep the shared header's page-scoped chrome (search bar, live chips, pill
+// tabs) in sync with whichever page is actually showing. The header never gets
+// swapped out by the router, so body[data-page] drives what is visible.
 document.addEventListener("spa:pageload", (e) => {
     document.body.dataset.page = e.detail.page;
 });
@@ -3284,14 +3493,13 @@ document.addEventListener("spa:pageload", (e) => {
 /* ============================================================
    KIRANA CASH
    Header badge (#kiranaCashBadge) -> full-screen "how it works" page
-   (#kcpPage in home.html). Everything lives in this file + home.html.
+   (#kcpPage in home.html).
 
    - Edit KIRANA_CASH_RULES below to change the numbers shown on the page.
-   - The balance defaults to 0. Until your backend credits it, it is read
-     from localStorage ("kiranaCash_<userId>"). When you add an API, call
-     KiranaCash.set(amount) with the real balance and the badge + page update.
-   - Earning and redeeming are NOT wired to orders/checkout yet; this is the
-     customer-facing page and the balance display.
+   - The balance defaults to 0 and is read from localStorage
+     ("kiranaCash_<userId>"). When you add an API, call
+     KiranaCash.set(amount) with the real balance.
+   - Earning and redeeming are NOT wired to orders/checkout yet.
 ============================================================ */
 const KIRANA_CASH_RULES = {
     earnPercent: 5,     // % of the bill returned as Kirana Cash
@@ -3431,12 +3639,10 @@ const KIRANA_CASH_RULES = {
 
 
 /* ============================================================
-   CART COUNT BADGE (red circle on the Cart icon in the bottom nav)
+   CART COUNT BADGE (small circle on the raised Cart button in the bottom nav)
    Shows the total quantity of items in the cart. Source of truth is
    /get_cart_items; the menu adjusts it instantly on every tap and the
-   server value reconciles it. Refreshes on load, on every SPA
-   navigation (e.g. coming back from the Cart page) and when the tab
-   becomes visible again.
+   server value reconciles it.
 ============================================================ */
 var cartBadgeCount = 0;
 var cartBadgeTimer = null;
@@ -3453,10 +3659,10 @@ function paintCartBadge() {
             st.textContent = `
                 .app-navbar .nav-item[data-page="cart"] { position: relative; }
                 .cart-count-badge {
-                    position: absolute; top: 2px; left: 50%; margin-left: 6px;
-                    min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
-                    border-radius: 999px; background: #e53935; color: #fff;
-                    font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+                    position: absolute; top: -20px; left: 50%; margin-left: 10px;
+                    min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box;
+                    border-radius: 999px; background: #1B231F; color: #fff;
+                    font-size: 11px; font-weight: 800; line-height: 20px; text-align: center;
                     box-shadow: 0 0 0 2px #fff; pointer-events: none;
                 }
                 .cart-count-badge[hidden] { display: none; }

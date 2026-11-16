@@ -1,5 +1,6 @@
 from pymongo import MongoClient, UpdateOne, ReturnDocument
-from pymongo.errors import DuplicateKeyError, OperationFailure
+from pymongo.errors import DuplicateKeyError, OperationFailure, PyMongoError
+
 from dotenv import load_dotenv
 import re
 from bson import ObjectId
@@ -22,7 +23,18 @@ from redis_db import (
 
 load_dotenv(override=True)
 api = os.getenv("MONGO_URI", None)
-client = MongoClient(api)
+client = MongoClient(
+    api,
+    maxPoolSize=int(os.getenv("MONGO_MAX_POOL", "50")),   # per worker; workers * this must stay under your Atlas connection limit
+    minPoolSize=int(os.getenv("MONGO_MIN_POOL", "5")),    # warm connections, no TLS handshake on the first requests
+    maxIdleTimeMS=60000,
+    waitQueueTimeoutMS=5000,       # fail fast instead of piling up threads when the pool is exhausted
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=5000,
+    socketTimeoutMS=30000,
+    retryWrites=True,
+    appname="kirana-api",
+)
 try:
     client.admin.command('ping')
     print("Connected successfullyto MongoDB Atlas!")
@@ -219,6 +231,7 @@ def is_restaurant_online(res_id):
     except Exception:
         return False
     if not doc:
+        set_cached_online(res_id, False, ttl=60)     # negative cache
         return False
     online = _to_bool(doc.get("is_online", True))
     set_cached_online(res_id, online)
@@ -371,8 +384,47 @@ def generate_token():
 #   }
 # =========================================================
 
+# ---------------------------------------------------------------------
+# BLOCK 4 - store_orders. Replace the whole existing store_orders function
+# with the two functions below.
+#
+# What changed vs. the old version:
+#  * No pre-read of stock/prices from Mongo. The stock decrement itself is the
+#    check: each UpdateOne only matches if the item belongs to that restaurant,
+#    the price still equals the cart price and enough stock is left. That is
+#    atomic (the old read-then-write had a race) and saves one Mongo round trip.
+#  * The detailed error message ("out of stock", "price changed") is only
+#    computed on the failure path, with one extra read.
+#  * session.with_transaction() does the transient-error / commit retries
+#    correctly (the old loop could dereference e.details when it was None).
+#  * All print() timing lines removed.
+# ---------------------------------------------------------------------
+def _explain_stock_failure(cart_restaurants):
+    """Failure path only: work out which cart line made the stock guard fail."""
+    try:
+        ids = [ObjectId(iid) for r in cart_restaurants.values() for iid in r["items"].keys()]
+    except Exception:
+        return "Your cart contains an invalid item. Please clear it and add the items again."
+
+    docs = {
+        str(d["_id"]): d
+        for d in resturants_items.find(
+            {"_id": {"$in": ids}}, {"price": 1, "item_qty": 1, "resturant_id": 1}
+        )
+    }
+    for rid, restaurant in cart_restaurants.items():
+        for item_id, item in restaurant["items"].items():
+            d = docs.get(item_id)
+            if not d or d.get("resturant_id") != rid:
+                return "Item no longer available"
+            if d["price"] != item["price"]:
+                return f"Price changed for {item.get('name', 'an item')}, please review your cart"
+            if d["item_qty"] < item["qty"]:
+                return f"{item.get('name', 'Item')} is out of stock"
+    return "Some items just went out of stock, please review your cart"
+
+
 def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None, coupon_code=None):
-    token = generate_token()
     items = get_cart(userid)
 
     if not items or not items.get("cart"):
@@ -416,9 +468,8 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None,
             "coordinates": addr.get("coordinates"),
         }
 
+    token = generate_token()
     current_time = datetime.utcnow()
-    # Shared by every seller doc of this checkout; replaces the old parent order _id.
-    # Generated once, outside the retry loop, so a retried transaction reuses it.
     checkout_id = str(ObjectId())
     seller_docs = []
     inventory_updates = []
@@ -427,41 +478,31 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None,
     coupon_used = False
 
     for restaurant_id, restaurant in items["cart"].items():
-        item_ids = [ObjectId(iid) for iid in restaurant["items"].keys()]
-
-        # authoritative read - never trust cart's stored price/qty limits
-        fresh_docs = resturants_items.find(
-            {"_id": {"$in": item_ids}},
-            {"_id": 1, "price": 1, "available": 1, "item_qty": 1}
-        )
-        price_map = {str(d["_id"]): d for d in fresh_docs}
-
         restaurant_ids.append(restaurant_id)
         verified_items = {}
 
         for item_id, item in restaurant["items"].items():
-            fresh = price_map.get(item_id)
+            try:
+                qty = int(item["qty"])
+                price = item["price"]
+                oid = ObjectId(item_id)
+            except Exception:
+                return {"success": False, "message": "Your cart contains an invalid item. Please clear it and add the items again."}
+            if qty <= 0:
+                return {"success": False, "message": "Your cart contains an invalid quantity"}
 
-            if not fresh:
-                return {"success": False, "message": "Item no longer available"}
+            verified_items[item_id] = dict(item)
 
-            if fresh["item_qty"] < item["qty"]:
-                return {"success": False, "message": f"{item.get('name', 'Item')} is out of stock"}
-
-            if fresh["price"] != item["price"]:
-                # mismatch = tampering or stale-cache signal
-                print(f"PRICE MISMATCH user={userid} item={item_id} cart={item['price']} actual={fresh['price']}")
-                return {"success": False, "message": f"Price changed for {item.get('name', 'an item')}, please review your cart"}
-
-            # use server price, never the cart's
-            verified_item = dict(item)
-            verified_item["price"] = fresh["price"]
-            verified_items[item_id] = verified_item
-
+            # The guard IS the verification: right store + same price + enough stock, atomically.
             inventory_updates.append(
                 UpdateOne(
-                    {"_id": ObjectId(item_id), "item_qty": {"$gte": item["qty"]}},
-                    {"$inc": {"item_qty": -item["qty"], "sold": item["qty"]}}
+                    {
+                        "_id": oid,
+                        "resturant_id": restaurant_id,
+                        "price": price,
+                        "item_qty": {"$gte": qty},
+                    },
+                    {"$inc": {"item_qty": -qty, "sold": qty}}
                 )
             )
 
@@ -483,6 +524,7 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None,
                 coupon_used = True
 
         seller_docs.append({
+            "_id": ObjectId(),          # fixed up-front so transaction retries reuse the same ids
             "checkout_id": checkout_id,
             "user_id": userid,
             "token_no": token,
@@ -503,66 +545,27 @@ def store_orders(userid, pickup_time=None, order_type="pickup", address_id=None,
     if coupon_code and not coupon_used:
         return {"success": False, "code": "COUPON_INVALID", "message": "Invalid coupon code"}
 
-    for attempt in range(MAX_RETRIES):
+    def _txn(session):
+        # Insert first, contended stock writes last: item docs stay locked for the
+        # shortest possible time, which matters when many users buy the same item.
+        seller_orders.insert_many(seller_docs, session=session)
+        result = resturants_items.bulk_write(inventory_updates, ordered=False, session=session)
+        if result.matched_count != len(inventory_updates):
+            raise InventoryError("Inventory unavailable")
 
-        try:
+    try:
+        with client.start_session() as session:
+            session.with_transaction(_txn)
+    except InventoryError:
+        return {"success": False, "message": _explain_stock_failure(items["cart"])}
+    except PyMongoError as e:
+        print("store_orders transaction failed:", e)
+        return False
 
-            with client.start_session() as session:
-
-                with session.start_transaction():
-
-                    t = time.perf_counter()
-
-                    if seller_docs:
-                        seller_orders.insert_many(
-                            seller_docs,
-                            session=session
-                        )
-
-                    print("seller insert", time.perf_counter() - t)
-
-                    t = time.perf_counter()
-
-                    if inventory_updates:
-                        inventory_result = resturants_items.bulk_write(
-                            inventory_updates,
-                            session=session
-                        )
-
-                        # Stock changed between our read and the write -> abort the whole transaction
-                        if inventory_result.modified_count != len(inventory_updates):
-                            raise InventoryError("Inventory unavailable")
-
-                    print("inventory", time.perf_counter() - t)
-
-            # Transaction committed here
-
-            t = time.perf_counter()
-
-            delete_cart(userid)
-
-            print("delete cart", time.perf_counter() - t)
-
-            return restaurant_ids
-
-        except InventoryError:
-            return {"success": False, "message": "Some items just went out of stock, please review your cart"}
-
-        except OperationFailure as e:
-
-            if "TransientTransactionError" in e.details.get("errorLabels", []):
-
-                time.sleep(0.05)
-
-                # insert_many may have mutated the dicts with an _id; strip it so the retry is clean
-                for doc in seller_docs:
-                    doc.pop("_id", None)
-
-                continue
-
-            raise
-
-    return False
+    # Transaction committed. If this delete fails the cart survives, but the
+    # per-user checkout lock in the endpoint blocks accidental double clicks.
+    delete_cart(userid)
+    return restaurant_ids
 
 
 def _combined_status(statuses):

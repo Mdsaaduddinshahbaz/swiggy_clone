@@ -65,7 +65,12 @@ print("USER:", mail_username, flush=True)
 print("PASS EXISTS:", bool(mail_password), flush=True)
 
 brevo_api = os.getenv("brevo_api_email")
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    message_queue=storage_uri,          # defined a few lines above in your file
+    async_mode="threading",
+)
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
@@ -80,7 +85,6 @@ def login_required(f):
             request.cookies.get("seller_token")
         )
         if not token:
-            print(request.endpoint)
             if (request.endpoint == "home"):
                 return redirect(url_for("login", role="user"))
             elif (request.endpoint == "sellerTemplate"):
@@ -94,7 +98,6 @@ def login_required(f):
                 app.config["SECRET_KEY"],
                 algorithms=["HS256"]
             )
-            print(payload)
             g.type = payload["type"]
             if (g.type == "user"):
                 g.user_id = payload["user_id"]
@@ -674,45 +677,40 @@ def updateCart():
 
 
 @app.post("/add_to_cart")
-#@limiter.limit("30 per minute")
 @login_required
 def addToCart():
     try:
+        if g.type != "user":
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
+
         data, error = validate_add_to_cart()
         if error:
             return error
 
-        userid = g.user_id
-
-        if not is_restaurant_online(data["resid"]):
-            return jsonify({
-                "success": False,
-                "code": "STORE_OFFLINE",
-                "message": STORE_OFFLINE_MSG
-            }), 503
-
-        # TODO: re-enable server-side price/stock lookup instead of trusting the client.
-        # response = get_resturantItem_price(data["resid"], data["item_id"])
-        # price, available_qty = response["price"], response["available_qty"]
-        price = data["price"]
-        available_qty = 10000
-
-        replace = data.get("replace", False)
-
-        res = add_cart(
-            data["resid"],
-            userid,
-            data["item"],
-            data["ress_name"],
-            data["item_id"],
-            data["qty"],
-            price,
-            available_qty,
-            replace
+        # TODO (unchanged): price/stock still come from the client here. store_orders
+        # verifies the price against the database atomically, so a tampered price
+        # cannot be bought.
+        call_args = (
+            data["resid"], g.user_id, data["item"], data["ress_name"],
+            data["item_id"], data["qty"], data["price"], 10000, data["replace"],
         )
-        print("add_cart result:", res)
+
+        res = add_cart(*call_args)
+
+        if res.get("code") == "STORE_STATUS_UNKNOWN":
+            # online flag not in Redis yet: warm it from Mongo, then retry once
+            if not is_restaurant_online(data["resid"]):
+                return jsonify({"success": False, "code": "STORE_OFFLINE", "message": STORE_OFFLINE_MSG}), 503
+            res = add_cart(*call_args)
+            if res.get("code") == "STORE_STATUS_UNKNOWN":
+                return jsonify({"success": False, "message": "Please try again"}), 503
+
         if res["success"]:
             return jsonify({"success": True, "Total": res["total"]})
+
+        if res.get("code") == "STORE_OFFLINE":
+            return jsonify({"success": False, "code": "STORE_OFFLINE", "message": STORE_OFFLINE_MSG}), 503
+
         return jsonify({"success": False, "message": res.get("message", "Unable to add item to cart")}), 400
 
     except Exception as e:
@@ -739,12 +737,14 @@ def available_offers(res_id):
         print("available_offers error:", e)
         return jsonify({"success": False, "message": "Couldn't load offers"}), 500
 @app.post("/store_orders")
-#@limiter.limit("5 per minute")
 @login_required
 def store_order():
+    if g.type != "user":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
     user_id = g.user_id
     lock_key = f"lock:checkout:{user_id}"
-    token = acquire_lock(lock_key, ttl_seconds=15)
+    token = acquire_lock(lock_key, ttl_seconds=30)
 
     if not token:
         return jsonify({
@@ -752,18 +752,15 @@ def store_order():
             "message": "Your order is already being processed"
         }), 409
     try:
-        user_id = g.user_id
-        data = request.get_json(force=True) or {}
+        data = request.get_json(force=True, silent=True) or {}
         pickup_time = data.get("pickup_time")
         order_type = data.get("order_type", "pickup")
         if order_type not in ("pickup", "delivery"):
             return jsonify({"success": False, "message": "Invalid order type"}), 400
         address_id = data.get("address_id")
         coupon_code = data.get("coupon_code")
-        print(pickup_time, order_type, address_id)
 
-        resids = store_orders(user_id, pickup_time, order_type, address_id,coupon_code)
-        print(resids)
+        resids = store_orders(user_id, pickup_time, order_type, address_id, coupon_code)
 
         # store_orders returns a dict on validation failure, 404 for an empty cart,
         # False on unexpected failure, or a list of restaurant ids on success
@@ -775,14 +772,16 @@ def store_order():
                 "message": resids.get("message", "Unable to place order")
             }), status
         if resids == 404:
-            return ({"success": False})
+            return jsonify({"success": False}), 404
         if resids is False:
             return jsonify({"success": False, "message": "Unable to place order, please try again"}), 500
+
         for resid in resids:
             socketio.emit("new_order", {"msg": "refresh"}, room=resid)
-        return ({"success": True})
+        return jsonify({"success": True})
     except Exception as e:
-        raise Exception
+        print("store_order error:", e)
+        return jsonify({"success": False, "message": "Something went wrong, please try again"}), 500
     finally:
         release_lock(lock_key, token)
 
@@ -1791,86 +1790,54 @@ def validate_update_item():
     return validated, None
 
 
+# ---------------------------------------------------------------------
+# BLOCK 5 - validate_add_to_cart. Replace the whole function.
+# Removed the two print(data) lines, fixed data["replace"] raising KeyError
+# (-> 500) when the field is missing, and added size limits so a client
+# can't push huge strings into Redis.
+# ---------------------------------------------------------------------
+_OBJECT_ID_RE = re.compile(r"^[0-9a-fA-F]{24}$")
+
+
 def validate_add_to_cart():
     data = request.get_json(silent=True)
-    print(data)
-    print("validate_add to cart", data)
-    if not data:
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid JSON payload"
-        }), 400)
+    if not data or not isinstance(data, dict):
+        return None, (jsonify({"success": False, "message": "Invalid JSON payload"}), 400)
 
-    required = [
-        "resid",
-        "item",
-        "qty",
-        "item_id",
-        "ress_name",
-        "price"
-    ]
-
-    for field in required:
+    for field in ("resid", "item", "qty", "item_id", "ress_name", "price"):
         if field not in data:
-            return None, (jsonify({
-                "success": False,
-                "message": f"{field} is required"
-            }), 400)
+            return None, (jsonify({"success": False, "message": f"{field} is required"}), 400)
 
-    # Item name
     item = str(data["item"]).strip()
-    if not item:
-        return None, (jsonify({
-            "success": False,
-            "message": "Item name cannot be empty"
-        }), 400)
+    if not item or len(item) > 100:
+        return None, (jsonify({"success": False, "message": "Item name is invalid"}), 400)
 
-    replace = data["replace"]
-    if (type(replace) != bool):
-        return None, (jsonify({
-            "success": False,
-            "message": "Replace value must be a Boolean"
-        }), 400)
-    # Restaurant name
+    replace = data.get("replace", False)
+    if type(replace) is not bool:
+        return None, (jsonify({"success": False, "message": "Replace value must be a Boolean"}), 400)
+
     res_name = str(data["ress_name"]).strip()
-    if not res_name:
-        return None, (jsonify({
-            "success": False,
-            "message": "Restaurant name cannot be empty"
-        }), 400)
+    if not res_name or len(res_name) > 100:
+        return None, (jsonify({"success": False, "message": "Restaurant name is invalid"}), 400)
 
-    # Quantity
     try:
         qty = int(data["qty"])
-        if qty <= 0:
+        if qty <= 0 or qty > 999:
             raise ValueError
     except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Quantity must be greater than 0"
-        }), 400)
+        return None, (jsonify({"success": False, "message": "Quantity must be between 1 and 999"}), 400)
 
-    # Price
     try:
         price = float(data["price"])
         if price < 0:
             raise ValueError
     except (ValueError, TypeError):
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid price"
-        }), 400)
+        return None, (jsonify({"success": False, "message": "Invalid price"}), 400)
 
-    # IDs
-    try:
-        resid = (data["resid"])
-        item_id = (data["item_id"])
-    except Exception as e:
-        print(e)
-        return None, (jsonify({
-            "success": False,
-            "message": "Invalid restaurant or item id"
-        }), 400)
+    resid = str(data["resid"]).strip()
+    item_id = str(data["item_id"]).strip()
+    if not _OBJECT_ID_RE.match(resid) or not _OBJECT_ID_RE.match(item_id):
+        return None, (jsonify({"success": False, "message": "Invalid restaurant or item id"}), 400)
 
     return {
         "resid": resid,
@@ -1881,7 +1848,6 @@ def validate_add_to_cart():
         "price": price,
         "replace": replace
     }, None
-
 
 def validate_update_cart():
     data = request.get_json(silent=True)
@@ -2637,4 +2603,4 @@ def seller_complaints_update():
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    socketio.run(host="0.0.0.0", port=5000, app=app, debug=True)

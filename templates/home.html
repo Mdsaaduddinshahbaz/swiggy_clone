@@ -16,16 +16,8 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
-        /* Skeleton loading (shimmer) — used by the menu page, saved addresses
-           and the home grid while the API is still responding. */
         @keyframes khShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        .kh-sk {
-            display: block;
-            border-radius: 8px;
-            background: linear-gradient(90deg, #ececec 25%, #f7f7f7 50%, #ececec 75%);
-            background-size: 200% 100%;
-            animation: khShimmer 1.3s linear infinite;
-        }
+        .kh-sk { display: block; border-radius: 8px; background: linear-gradient(90deg, #ececec 25%, #f7f7f7 50%, #ececec 75%); background-size: 200% 100%; animation: khShimmer 1.3s linear infinite; }
         .kh-sk-circle { border-radius: 50%; }
         .kh-sk-line { height: 12px; }
         .kh-sk-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; margin-right: 14px; flex-shrink: 0; }
@@ -34,54 +26,23 @@
         .kh-sk-item .item-body { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
         .kh-sk-address { padding: 10px 0; display: flex; flex-direction: column; gap: 8px; }
         .res-delivery-info .kh-sk-line { display: inline-block; margin-right: 14px; }
-        .kh-sk-text {
-            display: inline-block;
-            min-width: 6ch;
-            color: transparent !important;
-            border-radius: 6px;
-            background: linear-gradient(90deg, #ececec 25%, #f7f7f7 50%, #ececec 75%);
-            background-size: 200% 100%;
-            animation: khShimmer 1.3s linear infinite;
-            pointer-events: none;
-            user-select: none;
-        }
+        .kh-sk-text { display: inline-block; min-width: 6ch; color: transparent !important; border-radius: 6px; background: linear-gradient(90deg, #ececec 25%, #f7f7f7 50%, #ececec 75%); background-size: 200% 100%; animation: khShimmer 1.3s linear infinite; pointer-events: none; user-select: none; }
         .kh-sk-cart-item { display: flex !important; align-items: center; gap: 12px; padding: 12px 0; }
         .kh-sk-offer { display: inline-block; width: 130px; height: 44px; border-radius: 8px; }
         @media (prefers-reduced-motion: reduce) { .kh-sk, .kh-sk-text { animation: none; } }
-        /* ---------- Kirana Cash page (full-screen sheet, opened from the header badge) ---------- */
+        /* ---------- Kirana Cash page ---------- */
         #kiranaCashBadge { cursor: pointer; }
         #kiranaCashBadge:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
         body.kcp-open { overflow: hidden; }
-        .kcp-page {
-            position: fixed; inset: 0; z-index: 5000;
-            background: #faf7f2; color: #1f2937;
-            display: flex; flex-direction: column;
-            transform: translateY(100%); visibility: hidden;
-            transition: transform .3s ease, visibility 0s linear .3s;
-        }
+        .kcp-page { position: fixed; inset: 0; z-index: 5000; background: #faf7f2; color: #1f2937; display: flex; flex-direction: column; transform: translateY(100%); visibility: hidden; transition: transform .3s ease, visibility 0s linear .3s; }
         .kcp-page.show { transform: none; visibility: visible; transition: transform .3s ease; }
-        .kcp-topbar {
-            display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-            padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
-            background: #fff; border-bottom: 1px solid #eee;
-        }
+        .kcp-topbar { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; background: #fff; border-bottom: 1px solid #eee; }
         .kcp-topbar h1 { margin: 0; font-size: 18px; font-weight: 700; }
-        .kcp-back {
-            width: 38px; height: 38px; border: 0; border-radius: 50%;
-            background: #f3f4f6; color: inherit; font-size: 15px; cursor: pointer;
-        }
+        .kcp-back { width: 38px; height: 38px; border: 0; border-radius: 50%; background: #f3f4f6; color: inherit; font-size: 15px; cursor: pointer; }
         .kcp-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
         .kcp-inner { max-width: 560px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-        .kcp-hero {
-            text-align: center; color: #fff; border-radius: 20px; padding: 26px 18px 22px;
-            background: linear-gradient(135deg, #ffb627 0%, #f57c00 100%);
-            box-shadow: 0 12px 28px -14px rgba(245, 124, 0, .7);
-        }
-        .kcp-coin {
-            width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-size: 26px;
-            background: rgba(255, 255, 255, .25); border: 3px solid rgba(255, 255, 255, .55);
-        }
+        .kcp-hero { text-align: center; color: #fff; border-radius: 20px; padding: 26px 18px 22px; background: linear-gradient(135deg, #ffb627 0%, #f57c00 100%); box-shadow: 0 12px 28px -14px rgba(245, 124, 0, .7); }
+        .kcp-coin { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; background: rgba(255, 255, 255, .25); border: 3px solid rgba(255, 255, 255, .55); }
         .kcp-balance { font-size: 44px; font-weight: 800; line-height: 1; }
         .kcp-hero p { margin: 6px 0 0; font-size: 14px; opacity: .95; }
         .kcp-hero .kcp-value { font-weight: 600; }
@@ -90,11 +51,7 @@
         .kcp-card p { margin: 0; font-size: 14px; line-height: 1.5; color: #4b5563; }
         .kcp-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
         .kcp-steps li { display: flex; gap: 12px; align-items: flex-start; }
-        .kcp-step-n {
-            flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-            background: #fff3e0; color: #e65100; font-weight: 700; font-size: 13px;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .kcp-step-n { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #fff3e0; color: #e65100; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; }
         .kcp-steps strong { display: block; font-size: 14px; margin-bottom: 2px; }
         .kcp-steps span.kcp-sub { font-size: 13px; color: #6b7280; line-height: 1.45; }
         .kcp-rules { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -103,10 +60,7 @@
         .kcp-calc { background: #fff8ee; border: 1px dashed #f5b971; border-radius: 12px; padding: 12px; }
         .kcp-calc label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
         .kcp-calc-row { display: flex; align-items: center; gap: 10px; }
-        .kcp-calc input {
-            flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px;
-            border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;
-        }
+        .kcp-calc input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
         .kcp-calc-out { font-size: 14px; font-weight: 700; color: #e65100; white-space: nowrap; }
         .kcp-calc-note { margin-top: 8px !important; font-size: 12.5px !important; }
         .kcp-empty { text-align: center; padding: 10px 0 4px; }
@@ -118,34 +72,19 @@
         .kcp-faq summary::after { content: "+"; color: #9ca3af; font-weight: 700; }
         .kcp-faq details[open] summary::after { content: "–"; }
         .kcp-faq details p { margin-top: 8px; }
-        .kcp-cta {
-            width: 100%; border: 0; border-radius: 12px; padding: 14px 0; cursor: pointer;
-            font: inherit; font-size: 15px; font-weight: 700; color: #fff; background: #f57c00;
-        }
+        .kcp-cta { width: 100%; border: 0; border-radius: 12px; padding: 14px 0; cursor: pointer; font: inherit; font-size: 15px; font-weight: 700; color: #fff; background: #f57c00; }
         @media (prefers-reduced-motion: reduce) { .kcp-page, .kcp-page.show { transition: none; } }
-
     </style>
 </head>
 
 <body data-page="home" data-theme="all">
-    <!-- data-page defaults to "home" to match the Home nav-item's initial
-         "active" state below. home.js updates this on every SPA navigation
-         so page-scoped chrome (search bar, category strip) can be hidden via
-         CSS on Orders/Cart/Profile/Menu instead of just staying visible forever. -->
 
-    <!-- ============================================================
-         SHARED HEADER — always live in the DOM, never swapped.
-    ============================================================= -->
     <header class="navbar">
         <div class="nav-shell">
 
             <div class="location-overlay" id="locationOverlay"></div>
             <div class="pickup-overlay" id="pickupOverlay"></div>
 
-            <!-- Pickup time sheet (used from Cart's scheduled-order flow).
-                 NOTE: this block used to appear twice with identical ids
-                 (pickupSheet / pickupTimeInput / pickupError / confirmPickupBtn).
-                 Duplicate ids are invalid HTML, so only one copy is kept. -->
             <div class="address-options" id="pickupSheet">
                 <h2>Pickup Time</h2>
                 <div class="pickup-time-row">
@@ -162,12 +101,15 @@
             <div class="brand-row">
 
                 <div class="location-trigger" id="locationTrigger" role="button" tabindex="0">
-                    <div class="loc-row">
-                        <i class="fa-solid fa-location-dot"></i>
-                        <span id="currentAddress">Select location</span>
-                        <i class="fa-solid fa-chevron-down"></i>
+                    <span class="loc-avatar">H</span>
+                    <div class="loc-col">
+                        <div class="loc-row">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span id="currentAddress">Select location</span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </div>
+                        <span class="delivery-pill" id="deliveryEtaPill" style="display:none"></span>
                     </div>
-                    <span class="delivery-pill" id="deliveryEtaPill" style="display:none"></span>
                 </div>
 
                 <div class="kirana-cash-badge" id="kiranaCashBadge" role="button" tabindex="0" aria-label="Open Kirana Cash">
@@ -179,7 +121,6 @@
                 </div>
 
                 <div class="header-actions">
-                    <!-- <button cc -->
                     <button class="avatar-btn" type="button" aria-label="Profile">
                         <img src="../static/profile.png" alt="Profile" id="profileLogo">
                     </button>
@@ -187,8 +128,6 @@
 
             </div>
 
-            <!-- Bottom tab nav (Home / Orders / Cart) — unchanged behavior,
-                 just visually tucked under the header via home.css rules. -->
             <nav class="app-navbar" id="appNavbar">
                 <div class="navbar-indicator" id="navbarIndicator"></div>
 
@@ -197,84 +136,43 @@
                     <span>Home</span>
                 </a>
 
+                <button type="button" class="nav-extra" id="navSearchBtn">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span>Search</span>
+                </button>
+
                 <a href="#orders" class="nav-item" data-page="orders">
-                    <i class="fa-solid fa-bag-shopping"></i>
+                    <i class="fa-solid fa-receipt"></i>
                     <span>Orders</span>
                 </a>
 
+                <button type="button" class="nav-extra" id="navSavedBtn">
+                    <i class="fa-regular fa-heart"></i>
+                    <span>Saved</span>
+                </button>
+
                 <a href="#cart" class="nav-item" data-page="cart">
-                    <i class="fa-solid fa-cart-shopping"></i>
+                    <i class="fa-solid fa-basket-shopping"></i>
                     <span>Cart</span>
                 </a>
             </nav>
 
             <div class="searchBarContainer">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" placeholder="Search for Aashirvaad Atta, Dal, Milk, or brands" id="searchInput">
-                <button class="search-icon-btn" id="voiceSearchBtn" type="button" aria-label="Voice search"
-                    title="Voice search">
+                <input type="text" placeholder="Search “curd”, “atta”, “momos”…" id="searchInput">
+                <button class="search-icon-btn" id="voiceSearchBtn" type="button" aria-label="Voice search" title="Voice search">
                     <i class="fa-solid fa-microphone"></i>
                 </button>
-                <button class="search-icon-btn" id="uploadListBtn" type="button" aria-label="Upload handwritten list"
-                    title="Upload Handwritten List">
-                    <i class="fa-solid fa-camera"></i>
+                <button class="search-icon-btn dark" id="filterBtn" type="button" aria-label="Filters" title="Filters">
+                    <i class="fa-solid fa-sliders"></i>
                 </button>
             </div>
 
-            <!-- Decorative category strip — matches the reference screenshot's
-                 6 icon circles. Not wired to filtering (6 items don't map
-                 1:1 onto the 4 real backend types below), purely visual. -->
-            <div class="category-strip-wrap">
-                <p class="category-strip-title">Category Quick-Filter Strip</p>
-                <div class="category-strip" id="quickFilterStrip">
-                    <button class="category-item" type="button">
-                        <span class="cat-icon"><i class="fa-solid fa-bolt"></i></span>
-                        <span>Essentials</span>
-                    </button>
-                    <button class="category-item" type="button">
-                        <span class="cat-icon"><i class="fa-solid fa-wheat-awn"></i></span>
-                        <span>Staples</span>
-                    </button>
-                    <button class="category-item" type="button">
-                        <span class="cat-icon"><i class="fa-solid fa-pump-soap"></i></span>
-                        <span>Household</span>
-                    </button>
-                    <button class="category-item" type="button">
-                        <span class="cat-icon"><i class="fa-solid fa-pump-medical"></i></span>
-                        <span>Personal Care</span>
-                    </button>
-                    <button class="category-item" type="button">
-                        <span class="cat-icon"><i class="fa-solid fa-box"></i></span>
-                        <span>Monthly Pack</span>
-                    </button>
-                    <button class="category-item" type="button">
-                        <span class="cat-icon"><i class="fa-solid fa-gift"></i></span>
-                        <span>Gifts</span>
-                    </button>
-                </div>
+            <div class="live-row">
+                <span class="live-chip live"><i class="live-dot"></i> Live: <b id="liveShopCount">0</b>&nbsp;shops near you</span>
+                <span class="live-chip"><i class="fa-solid fa-motorcycle"></i> Avg <b id="avgEta">15</b>&nbsp;min delivery</span>
+                <button class="map-view-btn" id="mapViewBtn" type="button"><i class="fa-solid fa-location-dot"></i> Map view</button>
             </div>
-
-            <!-- Real store-type filter — pill tabs. This is the one home.js's
-                 __applyHomeFilters reads (matches .store-card[data-type]). -->
-            <div class="pill-tabs" id="typeTabs">
-                <button class="pill-tab active" data-type="all" type="button">
-                    <i class="fa-solid fa-layer-group"></i>
-                    <span>All</span>
-                </button>
-                <button class="pill-tab" data-type="restaurant" type="button">
-                    <i class="fa-solid fa-utensils"></i>
-                    <span>Restaurants</span>
-                </button>
-                <button class="pill-tab" data-type="medical" type="button">
-                    <i class="fa-solid fa-kit-medical"></i>
-                    <span>Medical</span>
-                </button>
-                <button class="pill-tab" data-type="general_store" type="button">
-                    <i class="fa-solid fa-store"></i>
-                    <span>General Store</span>
-                </button>
-            </div>
-
 
             <div class="location-box" id="locationBox">
                 <div class="location-header">
@@ -319,10 +217,6 @@
         </div>
     </header>
 
-    <!-- ============================================================
-         PAGE TEMPLATES — inert until spa_router.js clones one of
-         these into #spa-content.
-    ============================================================= -->
     <template id="tpl-home">
         <main class="container">
             <div id="loading_container">
@@ -342,10 +236,45 @@
                 </div>
             </div>
 
+            <section class="radius-card" id="radiusCard">
+                <div class="rc-rings" aria-hidden="true">
+                    <div class="rc-ring2">
+                        <div class="rc-core"><i class="fa-solid fa-store"></i><span class="rc-dot"></span></div>
+                    </div>
+                </div>
+                <p class="rc-kicker"><i class="fa-solid fa-satellite-dish"></i> SHOWING SHOPS WITHIN</p>
+                <h2 class="rc-value"><span id="rcKm">2 km</span> <small id="rcMeta">• 0 shops • 0 open now</small></h2>
+                <div class="rc-slider-wrap">
+                    <input type="range" id="radiusSlider" min="0" max="4" step="1" value="2" aria-label="Shop radius">
+                    <div class="rc-scale"><span>500m</span><span>10km</span></div>
+                </div>
+                <div class="rc-chips" id="radiusChips">
+                    <button type="button" data-km="0.5">500 m</button>
+                    <button type="button" data-km="1">1 km</button>
+                    <button type="button" data-km="2" class="active">2 km</button>
+                    <button type="button" data-km="5">5 km</button>
+                    <button type="button" data-km="10">10 km</button>
+                </div>
+            </section>
+
+            <div class="pill-tabs" id="typeTabs">
+                <button class="pill-tab active" data-type="all" type="button"><span class="pt-ico">✦</span>All</button>
+                <button class="pill-tab" data-type="restaurant" type="button"><span class="pt-ico">🍽️</span>Restaurants</button>
+                <button class="pill-tab" data-type="medical" type="button"><span class="pt-ico">💊</span>Medical</button>
+                <button class="pill-tab" data-type="general_store" type="button"><span class="pt-ico">🛒</span>General Store</button>
+            </div>
+
             <section class="filters">
-                <h2 id="Note">Restaurants with online food delivery in Hyderabad</h2>
-                <div id="distancediv">
+                <div>
+                    <h2 id="Note">Shops in 2 km</h2>
+                    <p class="filters-sub">Tap + to add without opening menu</p>
+                </div>
+                <button class="sort-btn" id="sortNearestBtn" type="button"><i class="fa-solid fa-arrow-down-wide-short"></i> Nearest</button>
+                <div id="distancediv" hidden>
                     <select name="distance" id="distance_options">
+                        <option value="0.5">500m</option>
+                        <option value="1">1km</option>
+                        <option value="2" selected>2km</option>
                         <option value="5">5km</option>
                         <option value="10">10km</option>
                         <option value="20">20km</option>
@@ -355,37 +284,12 @@
                 </div>
             </section>
 
-            <div class="promo-banner">
-                <i class="fa-solid fa-circle-check"></i>
-                Directly from Trusted Kirana Partners — Local Prices, Zero Markups
-            </div>
-
             <img src="../static/loading-spinner.svg" alt="Loading" id="loading">
             <section class="restaurant-grid" id="resturants_container">
-                <div class="skeleton-card" aria-hidden="true">
-                    <div class="skeleton-img"></div>
-                    <div class="skeleton-line w-70"></div>
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-55"></div>
-                </div>
-                <div class="skeleton-card" aria-hidden="true">
-                    <div class="skeleton-img"></div>
-                    <div class="skeleton-line w-70"></div>
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-55"></div>
-                </div>
-                <div class="skeleton-card" aria-hidden="true">
-                    <div class="skeleton-img"></div>
-                    <div class="skeleton-line w-70"></div>
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-55"></div>
-                </div>
-                <div class="skeleton-card" aria-hidden="true">
-                    <div class="skeleton-img"></div>
-                    <div class="skeleton-line w-70"></div>
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-55"></div>
-                </div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
+                <div class="skeleton-card" aria-hidden="true"><div class="skeleton-img"></div><div class="skeleton-line w-70"></div><div class="skeleton-line w-40"></div><div class="skeleton-line w-55"></div></div>
             </section>
 
             <p id="no-search-matches">No restaurants match your search. Try a different name.</p>
@@ -393,10 +297,7 @@
             <div id="no-results-container">
                 <div class="icon-circle">📍</div>
                 <h2>No restaurants found near you</h2>
-                <p>
-                    It looks like we don't have any partners within 5km of your location.
-                    Try checking a different area.
-                </p>
+                <p>It looks like we don't have any partners within 2 km of your location. Try a wider radius.</p>
                 <button onclick="location.reload()">Try again / refresh</button>
             </div>
 
@@ -408,15 +309,9 @@
         <div class="access_container" id="deny">
             <div class="icon">📍</div>
             <h1>Location access required</h1>
-            <p>
-                We use your location to find nearby restaurants and provide
-                accurate distance-based results.
-            </p>
+            <p>We use your location to find nearby restaurants and provide accurate distance-based results.</p>
             <button id="requestlocation">Allow location access</button>
-            <div class="help-text">
-                If you previously denied access, enable location permissions
-                in your browser settings and refresh the page.
-            </div>
+            <div class="help-text">If you previously denied access, enable location permissions in your browser settings and refresh the page.</div>
         </div>
     </template>
 
@@ -432,7 +327,6 @@
                 </select>
             </div>
 
-            <!-- Tells users where complaints live (shop closed, delays, etc.) -->
             <p class="orders-help-note" style="margin:0 0 12px;font-size:13px;color:#6b5f58;">
                 Shop closed or something not right? Tap <strong>Report a problem</strong> on your pending order.
             </p>
@@ -440,10 +334,7 @@
             <div class="empty-state" id="No_orders_container">
                 <div class="icon">🛍️</div>
                 <h1>No Orders Yet</h1>
-                <p>
-                    Looks like you haven't placed any orders yet.
-                    Start exploring our products and find something you'll love.
-                </p>
+                <p>Looks like you haven't placed any orders yet. Start exploring our products and find something you'll love.</p>
                 <button class="btn" id="shopBtn">Start Shopping</button>
             </div>
 
@@ -457,10 +348,7 @@
             <div class="empty-state" id="No_orders_container">
                 <div class="icon">🛒</div>
                 <h1>Your Cart is Empty</h1>
-                <p>
-                    Looks like you haven't added any items yet.
-                    Start exploring our products and find something you'll love.
-                </p>
+                <p>Looks like you haven't added any items yet. Start exploring our products and find something you'll love.</p>
                 <button class="btn" id="shopBtn">Start Shopping</button>
             </div>
 
@@ -468,9 +356,7 @@
                 <div class="checkout-card" id="orderTypeCard">
                     <div class="step-header">
                         <i class="fa-solid fa-bag-shopping"></i>
-                        <div>
-                            <h3>Order Type</h3>
-                        </div>
+                        <div><h3>Order Type</h3></div>
                     </div>
                     <div id="orderTypeOptions" class="payment-options order-type-options">
                         <label class="payment-option" id="optPickup">
@@ -486,9 +372,7 @@
                 <div class="checkout-card" id="deliveryTimeCard" style="display:none">
                     <div class="step-header">
                         <i class="fa-regular fa-clock"></i>
-                        <div>
-                            <h3>Delivery Time</h3>
-                        </div>
+                        <div><h3>Delivery Time</h3></div>
                     </div>
                     <div class="payment-options order-type-options">
                         <label class="payment-option">
@@ -539,9 +423,7 @@
                             </div>
                         </div>
 
-                        <button type="button" id="addAddressBtn" class="add-address-btn">
-                            + Add New Address
-                        </button>
+                        <button type="button" id="addAddressBtn" class="add-address-btn">+ Add New Address</button>
 
                         <div id="addAddressForm" class="add-address-form">
                             <select id="newAddrType">
@@ -552,8 +434,7 @@
 
                             <textarea id="newAddrText" placeholder="Flat / house no., street, area, city"></textarea>
 
-                            <input type="tel" id="newAddrPhone" placeholder="10-digit phone number for this address"
-                                maxlength="13">
+                            <input type="tel" id="newAddrPhone" placeholder="10-digit phone number for this address" maxlength="13">
 
                             <button type="button" id="useLocationForNewAddr">📍 Use Current Location</button>
 
@@ -573,9 +454,7 @@
                 <div class="checkout-card">
                     <div class="step-header">
                         <i class="fa-solid fa-wallet"></i>
-                        <div>
-                            <h3>Payment</h3>
-                        </div>
+                        <div><h3>Payment</h3></div>
                     </div>
                     <p class="payment-hint">Select your payment method after reviewing the items.</p>
 
@@ -628,12 +507,9 @@
                         </div>
                     </div>
 
-                    <!-- Coupon: input + Apply, a status line, and tappable offers from this store.
-                         cart.js fills #offerChips and #couponMsg. -->
                     <div class="coupon-box">
                         <i class="fa-solid fa-percent"></i>
-                        <input type="text" id="couponInput" placeholder="Apply Coupon" maxlength="20"
-                            autocomplete="off" autocapitalize="characters" spellcheck="false">
+                        <input type="text" id="couponInput" placeholder="Apply Coupon" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false">
                         <button type="button" id="applyCouponBtn" class="coupon-apply-btn">Apply</button>
                     </div>
                     <p class="coupon-msg" id="couponMsg" role="status" aria-live="polite"></p>
@@ -657,22 +533,13 @@
         </main>
     </template>
 
-    <!-- ============================================================
-         MENU TEMPLATE — was its own full page (menu.html). Now cloned
-         into #spa-content like everything else, routed via
-         #menu/<res_name>/<address>/<res_id>/<userId>. The shared header
-         above already provides Home/Orders/Cart nav, so this only needs
-         the restaurant strip, search/filter/menu grid, the replace-cart
-         confirmation modal, and the floating "view cart" bar.
-    ============================================================= -->
     <template id="tpl-menu">
         <main class="menu-container">
 
             <section class="res-strip">
 
                 <nav class="breadcrumbs">
-                    <a href="#home" class="breadcrumb-home">Home</a> / <span id="menuAreaCrumb"></span> / <span
-                        id="menuNameCrumb"></span>
+                    <a href="#home" class="breadcrumb-home">Home</a> / <span id="menuAreaCrumb"></span> / <span id="menuNameCrumb"></span>
                 </nav>
 
                 <div class="res-header">
@@ -704,26 +571,11 @@
             </div>
 
             <nav class="category-rail" id="categoryTabs" role="tablist" aria-label="Food categories">
-                <span class="kh-sk-chip" aria-hidden="true">
-                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
-                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
-                </span>
-                <span class="kh-sk-chip" aria-hidden="true">
-                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
-                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
-                </span>
-                <span class="kh-sk-chip" aria-hidden="true">
-                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
-                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
-                </span>
-                <span class="kh-sk-chip" aria-hidden="true">
-                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
-                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
-                </span>
-                <span class="kh-sk-chip" aria-hidden="true">
-                    <span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span>
-                    <span class="kh-sk kh-sk-line" style="width:48px"></span>
-                </span>
+                <span class="kh-sk-chip" aria-hidden="true"><span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span><span class="kh-sk kh-sk-line" style="width:48px"></span></span>
+                <span class="kh-sk-chip" aria-hidden="true"><span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span><span class="kh-sk kh-sk-line" style="width:48px"></span></span>
+                <span class="kh-sk-chip" aria-hidden="true"><span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span><span class="kh-sk kh-sk-line" style="width:48px"></span></span>
+                <span class="kh-sk-chip" aria-hidden="true"><span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span><span class="kh-sk kh-sk-line" style="width:48px"></span></span>
+                <span class="kh-sk-chip" aria-hidden="true"><span class="kh-sk kh-sk-circle" style="width:56px;height:56px"></span><span class="kh-sk kh-sk-line" style="width:48px"></span></span>
             </nav>
 
             <div class="filter-row" id="filterRow">
@@ -747,54 +599,12 @@
             <p class="result-meta" id="resultMeta"></p>
 
             <section class="menu-section" id="menu_container">
-                <div class="menu-item kh-sk-item" aria-hidden="true">
-                    <div class="item-media"><span class="kh-sk"></span></div>
-                    <div class="item-body">
-                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
-                    </div>
-                </div>
-                <div class="menu-item kh-sk-item" aria-hidden="true">
-                    <div class="item-media"><span class="kh-sk"></span></div>
-                    <div class="item-body">
-                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
-                    </div>
-                </div>
-                <div class="menu-item kh-sk-item" aria-hidden="true">
-                    <div class="item-media"><span class="kh-sk"></span></div>
-                    <div class="item-body">
-                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
-                    </div>
-                </div>
-                <div class="menu-item kh-sk-item" aria-hidden="true">
-                    <div class="item-media"><span class="kh-sk"></span></div>
-                    <div class="item-body">
-                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
-                    </div>
-                </div>
-                <div class="menu-item kh-sk-item" aria-hidden="true">
-                    <div class="item-media"><span class="kh-sk"></span></div>
-                    <div class="item-body">
-                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
-                    </div>
-                </div>
-                <div class="menu-item kh-sk-item" aria-hidden="true">
-                    <div class="item-media"><span class="kh-sk"></span></div>
-                    <div class="item-body">
-                        <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                        <span class="kh-sk kh-sk-line" style="width:45%"></span>
-                    </div>
-                </div>
+                <div class="menu-item kh-sk-item" aria-hidden="true"><div class="item-media"><span class="kh-sk"></span></div><div class="item-body"><span class="kh-sk kh-sk-line" style="width:30%"></span><span class="kh-sk kh-sk-line" style="width:75%"></span><span class="kh-sk kh-sk-line" style="width:45%"></span></div></div>
+                <div class="menu-item kh-sk-item" aria-hidden="true"><div class="item-media"><span class="kh-sk"></span></div><div class="item-body"><span class="kh-sk kh-sk-line" style="width:30%"></span><span class="kh-sk kh-sk-line" style="width:75%"></span><span class="kh-sk kh-sk-line" style="width:45%"></span></div></div>
+                <div class="menu-item kh-sk-item" aria-hidden="true"><div class="item-media"><span class="kh-sk"></span></div><div class="item-body"><span class="kh-sk kh-sk-line" style="width:30%"></span><span class="kh-sk kh-sk-line" style="width:75%"></span><span class="kh-sk kh-sk-line" style="width:45%"></span></div></div>
+                <div class="menu-item kh-sk-item" aria-hidden="true"><div class="item-media"><span class="kh-sk"></span></div><div class="item-body"><span class="kh-sk kh-sk-line" style="width:30%"></span><span class="kh-sk kh-sk-line" style="width:75%"></span><span class="kh-sk kh-sk-line" style="width:45%"></span></div></div>
+                <div class="menu-item kh-sk-item" aria-hidden="true"><div class="item-media"><span class="kh-sk"></span></div><div class="item-body"><span class="kh-sk kh-sk-line" style="width:30%"></span><span class="kh-sk kh-sk-line" style="width:75%"></span><span class="kh-sk kh-sk-line" style="width:45%"></span></div></div>
+                <div class="menu-item kh-sk-item" aria-hidden="true"><div class="item-media"><span class="kh-sk"></span></div><div class="item-body"><span class="kh-sk kh-sk-line" style="width:30%"></span><span class="kh-sk kh-sk-line" style="width:75%"></span><span class="kh-sk kh-sk-line" style="width:45%"></span></div></div>
             </section>
 
             <div class="overlay" id="overlayContainer"></div>
@@ -854,15 +664,9 @@
             <section class="profile-section">
                 <h3>Quick Links</h3>
                 <div class="profile-links">
-                    <button class="profile-link-btn" id="profileOrdersBtn">
-                        <i class="fa-solid fa-bag-shopping"></i> My Orders
-                    </button>
-                    <button class="profile-link-btn" id="profileHomeBtn">
-                        <i class="fa-solid fa-house"></i> Back to Home
-                    </button>
-                    <button class="profile-link-btn" type="button" data-open-support>
-                        <i class="fa-regular fa-circle-question"></i> Help &amp; Support
-                    </button>
+                    <button class="profile-link-btn" id="profileOrdersBtn"><i class="fa-solid fa-bag-shopping"></i> My Orders</button>
+                    <button class="profile-link-btn" id="profileHomeBtn"><i class="fa-solid fa-house"></i> Back to Home</button>
+                    <button class="profile-link-btn" type="button" data-open-support><i class="fa-regular fa-circle-question"></i> Help &amp; Support</button>
                 </div>
             </section>
 
@@ -872,16 +676,15 @@
         </main>
     </template>
 
-    <!-- ============================================================
-         Router clones exactly one template's content in here.
-    ============================================================= -->
     <div id="spa-content"></div>
 
-    <!-- ============================================================
-         KIRANA CASH PAGE — full-screen sheet opened from the header badge.
-         Rules shown here come from KIRANA_CASH_RULES at the top of the
-         Kirana Cash section in home.js (spans with data-kc-rule are filled in).
-    ============================================================= -->
+    <!-- Floating cart bar (Home only) -->
+    <div class="home-cart-bar" id="homeCartBar" hidden>
+        <span class="hcb-icon"><i class="fa-solid fa-basket-shopping"></i><b id="hcbCount">0</b></span>
+        <div class="hcb-text"><strong id="hcbTitle"></strong><span id="hcbSub"></span></div>
+        <button type="button" id="hcbView">View cart →</button>
+    </div>
+
     <div class="kcp-page" id="kcpPage" role="dialog" aria-modal="true" aria-labelledby="kcpTitle" aria-hidden="true">
         <div class="kcp-topbar">
             <button type="button" class="kcp-back" id="kcpBack" aria-label="Back">
@@ -903,44 +706,22 @@
                 <section class="kcp-card">
                     <h2>How it works</h2>
                     <ol class="kcp-steps">
-                        <li>
-                            <span class="kcp-step-n">1</span>
-                            <div><strong>Place an order</strong>
-                                <span class="kcp-sub">Order from any kirana, restaurant or medical store on KiranaHub.</span></div>
-                        </li>
-                        <li>
-                            <span class="kcp-step-n">2</span>
-                            <div><strong>Get your order</strong>
-                                <span class="kcp-sub">Cash is earned once your order is completed (picked up or delivered).</span></div>
-                        </li>
-                        <li>
-                            <span class="kcp-step-n">3</span>
-                            <div><strong>Cash lands in your wallet</strong>
-                                <span class="kcp-sub"><span data-kc-rule="percent"></span>% of your bill comes back as Kirana Cash.</span></div>
-                        </li>
-                        <li>
-                            <span class="kcp-step-n">4</span>
-                            <div><strong>Save on your next order</strong>
-                                <span class="kcp-sub">Use your balance to pay less on future orders.</span></div>
-                        </li>
+                        <li><span class="kcp-step-n">1</span><div><strong>Place an order</strong><span class="kcp-sub">Order from any kirana, restaurant or medical store on KiranaHub.</span></div></li>
+                        <li><span class="kcp-step-n">2</span><div><strong>Get your order</strong><span class="kcp-sub">Cash is earned once your order is completed (picked up or delivered).</span></div></li>
+                        <li><span class="kcp-step-n">3</span><div><strong>Cash lands in your wallet</strong><span class="kcp-sub"><span data-kc-rule="percent"></span>% of your bill comes back as Kirana Cash.</span></div></li>
+                        <li><span class="kcp-step-n">4</span><div><strong>Save on your next order</strong><span class="kcp-sub">Use your balance to pay less on future orders.</span></div></li>
                     </ol>
                 </section>
 
                 <section class="kcp-card">
                     <h2>How to earn</h2>
                     <ul class="kcp-rules">
-                        <li><i class="fa-solid fa-circle-check"></i>
-                            <span>Earn <b><span data-kc-rule="percent"></span>% back</b> on every completed order.</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i>
-                            <span>Minimum order value: <b>₹<span data-kc-rule="minOrder"></span></b>.</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i>
-                            <span>Earn up to <b>₹<span data-kc-rule="maxPerOrder"></span></b> on a single order.</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i>
-                            <span><b>1 Kirana Cash = ₹1</b> when you use it.</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i>
-                            <span>Cash is valid for <b><span data-kc-rule="expiryDays"></span> days</b> from the day it's credited.</span></li>
-                        <li><i class="fa-solid fa-circle-xmark"></i>
-                            <span>Cancelled orders don't earn Kirana Cash.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>Earn <b><span data-kc-rule="percent"></span>% back</b> on every completed order.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>Minimum order value: <b>₹<span data-kc-rule="minOrder"></span></b>.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>Earn up to <b>₹<span data-kc-rule="maxPerOrder"></span></b> on a single order.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span><b>1 Kirana Cash = ₹1</b> when you use it.</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>Cash is valid for <b><span data-kc-rule="expiryDays"></span> days</b> from the day it's credited.</span></li>
+                        <li><i class="fa-solid fa-circle-xmark"></i><span>Cancelled orders don't earn Kirana Cash.</span></li>
                     </ul>
 
                     <div class="kcp-calc">
@@ -963,22 +744,10 @@
 
                 <section class="kcp-card kcp-faq">
                     <h2>Good to know</h2>
-                    <details>
-                        <summary>When will I receive my cash?</summary>
-                        <p>Right after your order is marked completed by the store.</p>
-                    </details>
-                    <details>
-                        <summary>Can I withdraw it as money?</summary>
-                        <p>No. Kirana Cash can only be used to save on future orders on KiranaHub.</p>
-                    </details>
-                    <details>
-                        <summary>What happens if I cancel an order?</summary>
-                        <p>Cancelled orders don't earn Kirana Cash.</p>
-                    </details>
-                    <details>
-                        <summary>Does it expire?</summary>
-                        <p>Yes, each credit is valid for <span data-kc-rule="expiryDays"></span> days, so use it before it runs out.</p>
-                    </details>
+                    <details><summary>When will I receive my cash?</summary><p>Right after your order is marked completed by the store.</p></details>
+                    <details><summary>Can I withdraw it as money?</summary><p>No. Kirana Cash can only be used to save on future orders on KiranaHub.</p></details>
+                    <details><summary>What happens if I cancel an order?</summary><p>Cancelled orders don't earn Kirana Cash.</p></details>
+                    <details><summary>Does it expire?</summary><p>Yes, each credit is valid for <span data-kc-rule="expiryDays"></span> days, so use it before it runs out.</p></details>
                 </section>
 
                 <button type="button" class="kcp-cta" id="kcpShop">Start shopping</button>

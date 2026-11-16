@@ -8,22 +8,36 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 HOST = os.getenv("Redis_uri")
-PORT = os.getenv("Redis_port")
-USERNAME = os.getenv("Redis_USERNAME")
-PASSWORD = os.getenv("Redis_PASSWORD")
+PORT = int(os.getenv("Redis_port") or 6379)
+USERNAME = os.getenv("Redis_USERNAME") or None
+PASSWORD = os.getenv("Redis_PASSWORD") or None
+
+# Tune per deployment. Each gunicorn worker gets its own pool, so
+# total connections = workers * REDIS_MAX_CONNECTIONS (worst case).
+REDIS_MAX_CONNECTIONS = int(os.getenv("REDIS_MAX_CONNECTIONS", "400"))
+
+# Abandoned carts expire instead of living in Redis forever (7 days, refreshed on every change)
+CART_TTL = int(os.getenv("CART_TTL_SECONDS", str(7 * 24 * 3600)))
 
 # -------------------------
 # Pooled connection (create once, reuse everywhere)
+# BlockingConnectionPool waits for a free connection instead of raising
+# "Too many connections" when all threads are busy.
+# Install hiredis (pip install hiredis): redis-py uses it automatically.
 # -------------------------
 pool = redis.BlockingConnectionPool(
     host=HOST,
     port=PORT,
     username=USERNAME,
     password=PASSWORD,
-    max_connections=30,
-    timeout=5,
     decode_responses=True,
     db=0,
+    max_connections=REDIS_MAX_CONNECTIONS,
+    timeout=5,                    # seconds to wait for a free connection
+    socket_timeout=2,
+    socket_connect_timeout=2,
+    socket_keepalive=True,
+    health_check_interval=30,
 )
 r = redis.Redis(connection_pool=pool)
 
@@ -38,11 +52,28 @@ except Exception as e:
 # Data model per user:
 #   cart:{uid}:meta   -> hash { uid, restaurant, restaurant_name, total }
 #   cart:{uid}:items  -> hash { item_id: json({name, qty, price, available_qty}) }
+#   res:{resid}:online -> "1" / "0"   (written by database.set_cached_online)
 # =========================================================
 
+# One round trip for the whole add-to-cart:
+#   store online check + cart mutation + TTL refresh.
+# Returns a flat array (no cjson.encode of the reply, no json.loads in Python):
+#   {-2}            online flag not cached yet (caller warms the cache and retries)
+#   {-1}            store is offline
+#   {0, message}    business-rule failure
+#   {1, total}      success
 _ADD_CART_LUA = """
 local meta_key = KEYS[1]
 local items_key = KEYS[2]
+local online_key = KEYS[3]
+
+local online = redis.call('GET', online_key)
+if not online then
+    return {-2}
+end
+if online ~= '1' then
+    return {-1}
+end
 
 local uid = ARGV[1]
 local resid = ARGV[2]
@@ -53,19 +84,16 @@ local qty_delta = tonumber(ARGV[6])
 local price = tonumber(ARGV[7])
 local available_qty = tonumber(ARGV[8])
 local replace = ARGV[9]
+local ttl = tonumber(ARGV[10])
 
 local restaurant = redis.call('HGET', meta_key, 'restaurant')
 
 if restaurant and restaurant ~= resid then
     if replace == '1' then
-        redis.call('DEL', meta_key)
-        redis.call('DEL', items_key)
+        redis.call('DEL', meta_key, items_key)
         restaurant = nil
     else
-        return cjson.encode({
-            success = false,
-            message = "Items with different store exists, Would you like to replace it?"
-        })
+        return {0, "Items with different store exists, Would you like to replace it?"}
     end
 end
 
@@ -80,19 +108,13 @@ if existing then
     item = cjson.decode(existing)
     local new_qty = item.qty + qty_delta
     if new_qty > available_qty then
-        return cjson.encode({
-            success = false,
-            message = "Only " .. available_qty .. " items available."
-        })
+        return {0, "Only " .. available_qty .. " items available."}
     end
     item.qty = new_qty
     item.available_qty = available_qty
 else
     if qty_delta > available_qty then
-        return cjson.encode({
-            success = false,
-            message = "Only " .. available_qty .. " items available."
-        })
+        return {0, "Only " .. available_qty .. " items available."}
     end
     item = { name = item_name, qty = qty_delta, price = price, available_qty = available_qty }
 end
@@ -100,7 +122,10 @@ end
 redis.call('HSET', items_key, item_id, cjson.encode(item))
 local total = redis.call('HINCRBY', meta_key, 'total', qty_delta * item.price)
 
-return cjson.encode({ success = true, total = total, item = item })
+redis.call('EXPIRE', meta_key, ttl)
+redis.call('EXPIRE', items_key, ttl)
+
+return {1, total}
 """
 
 _UPDATE_QTY_LUA = """
@@ -109,6 +134,7 @@ local items_key = KEYS[2]
 
 local item_id = ARGV[1]
 local change = tonumber(ARGV[2])
+local ttl = tonumber(ARGV[3])
 
 local existing = redis.call('HGET', items_key, item_id)
 if not existing then
@@ -137,13 +163,17 @@ if new_qty <= 0 then
     removed = true
 
     if redis.call('HLEN', items_key) == 0 then
-        redis.call('DEL', meta_key)
-        redis.call('DEL', items_key)
+        redis.call('DEL', meta_key, items_key)
+    else
+        redis.call('EXPIRE', meta_key, ttl)
+        redis.call('EXPIRE', items_key, ttl)
     end
 else
     item.qty = new_qty
     redis.call('HSET', items_key, item_id, cjson.encode(item))
     total = redis.call('HINCRBY', meta_key, 'total', change * price)
+    redis.call('EXPIRE', meta_key, ttl)
+    redis.call('EXPIRE', items_key, ttl)
 end
 
 return cjson.encode({ success = true, total = total, removed = removed })
@@ -158,6 +188,15 @@ update_qty_script = r.register_script(_UPDATE_QTY_LUA)
 # =========================================================
 
 def add_cart(resid, uid, item_name, res_name, item_id, qty, price, available_qty, replace=False):
+    """
+    Returns one of:
+      {"success": True, "total": int}
+      {"success": False, "code": "STORE_OFFLINE", "message": ...}
+      {"success": False, "code": "STORE_STATUS_UNKNOWN"}   <- online flag not in Redis yet;
+            the caller should call database.is_restaurant_online(resid) (it warms the cache)
+            and retry once
+      {"success": False, "message": ...}
+    """
     resid = str(resid)
     uid = str(uid)
     item_id = str(item_id)
@@ -172,14 +211,21 @@ def add_cart(resid, uid, item_name, res_name, item_id, qty, price, available_qty
     if qty <= 0:
         return {"success": False, "message": "Quantity must be positive"}
 
-    meta_key = f"cart:{uid}:meta"
-    items_key = f"cart:{uid}:items"
-
-    result = add_cart_script(
-        keys=[meta_key, items_key],
-        args=[uid, resid, res_name, item_id, item_name, qty, price, available_qty, "1" if replace else "0"],
+    out = add_cart_script(
+        keys=[f"cart:{uid}:meta", f"cart:{uid}:items", f"res:{resid}:online"],
+        args=[uid, resid, res_name, item_id, item_name, qty, price,
+              available_qty, "1" if replace else "0", CART_TTL],
     )
-    return json.loads(result)
+
+    status = out[0]
+    if status == 1:
+        return {"success": True, "total": out[1]}
+    if status == 0:
+        return {"success": False, "message": out[1]}
+    if status == -1:
+        return {"success": False, "code": "STORE_OFFLINE",
+                "message": "This store is currently offline. You can't add items right now."}
+    return {"success": False, "code": "STORE_STATUS_UNKNOWN"}
 
 
 def update_cart_qty(uid, item_id, change):
@@ -194,12 +240,9 @@ def update_cart_qty(uid, item_id, change):
     uid = str(uid)
     item_id = str(item_id)
 
-    meta_key = f"cart:{uid}:meta"
-    items_key = f"cart:{uid}:items"
-
     result = update_qty_script(
-        keys=[meta_key, items_key],
-        args=[item_id, change],
+        keys=[f"cart:{uid}:meta", f"cart:{uid}:items"],
+        args=[item_id, change, CART_TTL],
     )
     return json.loads(result)
 
@@ -231,13 +274,9 @@ def get_carts(uid):
 def get_cart(uid):
     uid = str(uid)
 
-    meta_key = f"cart:{uid}:meta"
-    items_key = f"cart:{uid}:items"
-
-    pipe = r.pipeline()
-    pipe.hgetall(meta_key)
-    pipe.hgetall(items_key)
-
+    pipe = r.pipeline(transaction=False)
+    pipe.hgetall(f"cart:{uid}:meta")
+    pipe.hgetall(f"cart:{uid}:items")
     meta, raw_items = pipe.execute()
 
     if not meta:
@@ -270,8 +309,7 @@ def get_cart_restaurant(uid):
 
 def delete_cart(uid, session=None):
     uid = str(uid)
-    r.delete(f"cart:{uid}:meta")
-    r.delete(f"cart:{uid}:items")
+    r.delete(f"cart:{uid}:meta", f"cart:{uid}:items")   # one round trip
 
 
 def add_json(userid, key, data, expiry=None):
