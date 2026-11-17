@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Swiggy Clone | Food Delivery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../static/user_navbar.css">
     <link rel="stylesheet" href="../static/cart.css">
     <link rel="stylesheet" href="../static/orders.css">
@@ -342,8 +345,9 @@
         </div>
     </template>
 
+    <!-- =================== NEW CART UI =================== -->
     <template id="tpl-cart">
-        <main class="cart-container">
+        <main class="cart-container cx-cart">
 
             <div class="empty-state" id="No_orders_container">
                 <div class="icon">🛒</div>
@@ -352,172 +356,172 @@
                 <button class="btn" id="shopBtn">Start Shopping</button>
             </div>
 
-            <div class="cart-left">
-                <div class="checkout-card" id="orderTypeCard">
-                    <div class="step-header">
-                        <i class="fa-solid fa-bag-shopping"></i>
-                        <div><h3>Order Type</h3></div>
-                    </div>
-                    <div id="orderTypeOptions" class="payment-options order-type-options">
-                        <label class="payment-option" id="optPickup">
-                            <input type="radio" name="orderType" value="pickup" checked>
-                            <span>🏪 Pickup from shop</span>
-                        </label>
-                        <label class="payment-option" id="optDelivery">
-                            <input type="radio" name="orderType" value="delivery">
-                            <span>🛵 Delivery <small id="deliveryNote"></small></span>
-                        </label>
-                    </div>
-                </div>
-                <div class="checkout-card" id="deliveryTimeCard" style="display:none">
-                    <div class="step-header">
-                        <i class="fa-regular fa-clock"></i>
-                        <div><h3>Delivery Time</h3></div>
-                    </div>
-                    <div class="payment-options order-type-options">
-                        <label class="payment-option">
-                            <input type="radio" name="deliveryMode" value="now" checked>
-                            <span>⚡ Deliver now <small id="deliveryNowEta"></small></span>
-                        </label>
-                        <label class="payment-option">
-                            <input type="radio" name="deliveryMode" value="scheduled">
-                            <span>🗓️ Schedule for later</span>
-                        </label>
-                    </div>
-                    <div class="slot-picker" id="slotPicker" style="display:none">
-                        <div class="slot-day-tabs" id="slotDayTabs">
-                            <button type="button" class="slot-day-tab active" data-day="today">Today</button>
-                            <button type="button" class="slot-day-tab" data-day="tomorrow">Tomorrow</button>
-                        </div>
-                        <div class="slot-grid" id="slotGrid"></div>
-                        <p class="slot-note">Slots are 30-minute delivery windows.</p>
-                    </div>
-                    <p class="slot-error" id="slotError" role="alert"></p>
-                </div>
-                <div class="checkout-card active-step" id="addressCard">
-                    <div class="step-header">
-                        <i class="fa-solid fa-location-dot"></i>
-                        <div>
-                            <h3>Delivery Address</h3>
-                            <p id="type" class="kh-sk-text">Home -</p>
-                            <p id="Deliveryaddress" class="kh-sk-text">Home - Madhapur, Hyderabad, Telangana 500081</p>
+            <div class="cx-content">
+
+                <!-- header: ETA / pickup + address line (filled by cart.js) -->
+                <header class="cx-head">
+                    <div class="cx-head-row">
+                        <div class="cx-head-icon"><i class="fa-solid fa-motorcycle" id="cxHeadIcon"></i></div>
+                        <div class="cx-head-text">
+                            <span class="cx-head-title cx-h" id="cxHeadTitle">Your order</span>
+                            <span class="cx-head-sub" id="cxHeadSub"></span>
                         </div>
                     </div>
-                    <div id="deliveryWarning" class="delivery-warning"></div>
-                    <button class="change-btn" id="ChangeAdrs">CHANGE</button>
-
-                    <div id="loading_container">
-                        <h1>fetching location...</h1>
-                        <img src="../static/loading-spinner.svg" alt="Loading" id="loading" class="show">
+                    <div class="cx-head-count">
+                        <span class="cx-head-heading cx-h">Your cart</span>
+                        <span class="cx-muted"><span id="cxItemCount">0</span> items</span>
                     </div>
+                </header>
 
-                    <div id="addressOptions" class="address-options">
-                        <div id="savedAddressList" class="saved-address-list">
-                            <div class="kh-sk-address" data-kh-sk aria-hidden="true">
-                                <span class="kh-sk kh-sk-line" style="width:30%"></span>
-                                <span class="kh-sk kh-sk-line" style="width:85%"></span>
-                            </div>
-                            <div class="kh-sk-address" data-kh-sk aria-hidden="true">
-                                <span class="kh-sk kh-sk-line" style="width:25%"></span>
-                                <span class="kh-sk kh-sk-line" style="width:75%"></span>
-                            </div>
-                        </div>
-
-                        <button type="button" id="addAddressBtn" class="add-address-btn">+ Add New Address</button>
-
-                        <div id="addAddressForm" class="add-address-form">
-                            <select id="newAddrType">
-                                <option value="Home">Home</option>
-                                <option value="Work">Work</option>
-                                <option value="Other">Other</option>
-                            </select>
-
-                            <textarea id="newAddrText" placeholder="Flat / house no., street, area, city"></textarea>
-
-                            <input type="tel" id="newAddrPhone" placeholder="10-digit phone number for this address" maxlength="13">
-
-                            <button type="button" id="useLocationForNewAddr">📍 Use Current Location</button>
-
-                            <div class="form-actions">
-                                <button type="button" id="saveAddressBtn">Save Address</button>
-                                <button type="button" id="cancelAddressBtn">Cancel</button>
-                            </div>
-                            <button id="cart-liveLocationBtn" class="live-location-btn">
-                                <i class="fa-solid fa-location-crosshairs"></i>
-                                Use Current Location
-                            </button>
-                            <h2>Saved Location</h2>
-                        </div>
-                    </div>
-
-                </div>
-                <div class="checkout-card">
-                    <div class="step-header">
-                        <i class="fa-solid fa-wallet"></i>
-                        <div><h3>Payment</h3></div>
-                    </div>
-                    <p class="payment-hint">Select your payment method after reviewing the items.</p>
-
-                    <div id="paymentOptions" class="payment-options">
-                        <label class="payment-option">
-                            <input type="radio" name="payment" value="cash" checked>
-                            <span>💵 Cash on Delivery</span>
-                        </label>
-                        <label class="payment-option">
-                            <input type="radio" name="payment" value="upi">
-                            <span>📱 UPI</span>
-                        </label>
-                        <label class="payment-option">
-                            <input type="radio" name="payment" value="card">
-                            <span>💳 Card</span>
-                        </label>
-                    </div>
+                <div class="cx-strip">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span id="cxStrip"></span>
                 </div>
 
-                <div class="cart-right">
-                    <div class="order-summary-card">
-                        <div class="res-mini-header">
-                            <span class="res-initial" id="cartStoreInitial" aria-hidden="true">S</span>
-                            <div class="res-info">
-                                <h4 id="cartStoreName">Your order</h4>
-                            </div>
+                <div class="cx-body">
+
+                    <!-- items -->
+                    <div class="cx-card">
+                        <div class="cx-store">
+                            <span class="cx-store-initial" id="cartStoreInitial" aria-hidden="true">S</span>
+                            <h4 class="cx-store-name" id="cartStoreName">Your order</h4>
                         </div>
-                        <div class="cart-items" id="cart_items">
-                            <div data-kh-sk aria-hidden="true">
-                                <span class="kh-sk kh-sk-line" style="width:40%;height:14px"></span>
+                        <div class="cx-items" id="cart_items">
+                            <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
+                                <span class="kh-sk" style="width:64px;height:64px;border-radius:8px;flex-shrink:0"></span>
+                                <span style="flex:1;display:flex;flex-direction:column;gap:8px">
+                                    <span class="kh-sk kh-sk-line" style="width:60%"></span>
+                                    <span class="kh-sk kh-sk-line" style="width:35%"></span>
+                                </span>
+                                <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
                             </div>
                             <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
-                                <span class="kh-sk kh-sk-circle" style="width:16px;height:16px;flex-shrink:0"></span>
-                                <span class="kh-sk kh-sk-line" style="flex:1;max-width:55%"></span>
+                                <span class="kh-sk" style="width:64px;height:64px;border-radius:8px;flex-shrink:0"></span>
+                                <span style="flex:1;display:flex;flex-direction:column;gap:8px">
+                                    <span class="kh-sk kh-sk-line" style="width:60%"></span>
+                                    <span class="kh-sk kh-sk-line" style="width:35%"></span>
+                                </span>
                                 <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
-                                <span class="kh-sk kh-sk-line" style="width:44px;flex-shrink:0"></span>
-                            </div>
-                            <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
-                                <span class="kh-sk kh-sk-circle" style="width:16px;height:16px;flex-shrink:0"></span>
-                                <span class="kh-sk kh-sk-line" style="flex:1;max-width:55%"></span>
-                                <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
-                                <span class="kh-sk kh-sk-line" style="width:44px;flex-shrink:0"></span>
-                            </div>
-                            <div class="cart-item kh-sk-cart-item" data-kh-sk aria-hidden="true">
-                                <span class="kh-sk kh-sk-circle" style="width:16px;height:16px;flex-shrink:0"></span>
-                                <span class="kh-sk kh-sk-line" style="flex:1;max-width:55%"></span>
-                                <span class="kh-sk" style="width:72px;height:28px;border-radius:8px;flex-shrink:0"></span>
-                                <span class="kh-sk kh-sk-line" style="width:44px;flex-shrink:0"></span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="coupon-box">
-                        <i class="fa-solid fa-percent"></i>
+                    <!-- order type -->
+                    <div class="cx-card" id="orderTypeCard">
+                        <div class="cx-card-head">
+                            <span class="cx-card-icon"><i class="fa-solid fa-bag-shopping"></i></span>
+                            <h3>Order Type</h3>
+                        </div>
+                        <div id="orderTypeOptions" class="cx-opts">
+                            <label class="cx-opt" id="optPickup">
+                                <input type="radio" name="orderType" value="pickup" checked>
+                                <span>🏪 Pickup from shop</span>
+                            </label>
+                            <label class="cx-opt" id="optDelivery">
+                                <input type="radio" name="orderType" value="delivery">
+                                <span>🛵 Delivery <small id="deliveryNote"></small></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- delivery time -->
+                    <div class="cx-card" id="deliveryTimeCard" style="display:none">
+                        <div class="cx-card-head">
+                            <span class="cx-card-icon"><i class="fa-regular fa-clock"></i></span>
+                            <h3>Delivery Time</h3>
+                        </div>
+                        <div class="cx-opts">
+                            <label class="cx-opt">
+                                <input type="radio" name="deliveryMode" value="now" checked>
+                                <span>⚡ Deliver now <small id="deliveryNowEta"></small></span>
+                            </label>
+                            <label class="cx-opt">
+                                <input type="radio" name="deliveryMode" value="scheduled">
+                                <span>🗓️ Schedule for later</span>
+                            </label>
+                        </div>
+                        <div class="slot-picker" id="slotPicker" style="display:none">
+                            <div class="slot-day-tabs" id="slotDayTabs">
+                                <button type="button" class="slot-day-tab active" data-day="today">Today</button>
+                                <button type="button" class="slot-day-tab" data-day="tomorrow">Tomorrow</button>
+                            </div>
+                            <div class="slot-grid" id="slotGrid"></div>
+                            <p class="slot-note">Slots are 30-minute delivery windows.</p>
+                        </div>
+                        <p class="slot-error" id="slotError" role="alert"></p>
+                    </div>
+
+                    <!-- delivery address -->
+                    <div class="cx-card cx-addr active-step" id="addressCard">
+                        <div class="cx-card-head">
+                            <span class="cx-card-icon"><i class="fa-solid fa-location-dot"></i></span>
+                            <div class="cx-card-head-text">
+                                <h3>Delivery Address</h3>
+                                <p id="type" class="kh-sk-text">Home -</p>
+                                <p id="Deliveryaddress" class="kh-sk-text">Home - Madhapur, Hyderabad, Telangana 500081</p>
+                            </div>
+                            <button class="change-btn" id="ChangeAdrs" type="button">CHANGE</button>
+                        </div>
+                        <div id="deliveryWarning" class="delivery-warning"></div>
+
+                        <div id="loading_container">
+                            <h1>fetching location...</h1>
+                            <img src="../static/loading-spinner.svg" alt="Loading" id="loading" class="show">
+                        </div>
+
+                        <div id="addressOptions" class="address-options">
+                            <div id="savedAddressList" class="saved-address-list">
+                                <div class="kh-sk-address" data-kh-sk aria-hidden="true">
+                                    <span class="kh-sk kh-sk-line" style="width:30%"></span>
+                                    <span class="kh-sk kh-sk-line" style="width:85%"></span>
+                                </div>
+                                <div class="kh-sk-address" data-kh-sk aria-hidden="true">
+                                    <span class="kh-sk kh-sk-line" style="width:25%"></span>
+                                    <span class="kh-sk kh-sk-line" style="width:75%"></span>
+                                </div>
+                            </div>
+
+                            <button type="button" id="addAddressBtn" class="add-address-btn">+ Add New Address</button>
+
+                            <div id="addAddressForm" class="add-address-form">
+                                <select id="newAddrType">
+                                    <option value="Home">Home</option>
+                                    <option value="Work">Work</option>
+                                    <option value="Other">Other</option>
+                                </select>
+
+                                <textarea id="newAddrText" placeholder="Flat / house no., street, area, city"></textarea>
+
+                                <input type="tel" id="newAddrPhone" placeholder="10-digit phone number for this address" maxlength="13">
+
+                                <button type="button" id="useLocationForNewAddr">📍 Use Current Location</button>
+
+                                <div class="form-actions">
+                                    <button type="button" id="saveAddressBtn">Save Address</button>
+                                    <button type="button" id="cancelAddressBtn">Cancel</button>
+                                </div>
+                                <button id="cart-liveLocationBtn" class="live-location-btn">
+                                    <i class="fa-solid fa-location-crosshairs"></i>
+                                    Use Current Location
+                                </button>
+                                <h2>Saved Location</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- coupon -->
+                    <div class="cx-coupon coupon-box">
+                        <span class="cx-coupon-icon"><i class="fa-solid fa-percent"></i></span>
                         <input type="text" id="couponInput" placeholder="Apply Coupon" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false">
                         <button type="button" id="applyCouponBtn" class="coupon-apply-btn">Apply</button>
                     </div>
                     <p class="coupon-msg" id="couponMsg" role="status" aria-live="polite"></p>
                     <div class="offer-chips" id="offerChips"></div>
 
-                    <div class="bill-details">
+                    <!-- bill -->
+                    <div class="cx-card cx-bill">
                         <h5>Bill Details</h5>
-                        <div class="bill-row"><span>Item Total</span><span id="totalPrice" class="kh-sk-text">₹0</span></div>
+                        <div class="bill-row"><span>Item Total</span><span>₹<span id="totalPrice" class="kh-sk-text">0</span></span></div>
                         <div class="bill-row discount" id="discountRow" style="display:none">
                             <span>Coupon <b id="appliedCode"></b>
                                 <button type="button" id="removeCouponBtn" class="coupon-remove-btn">Remove</button>
@@ -525,11 +529,58 @@
                             <span>− ₹<span id="discountAmount">0</span></span>
                         </div>
                         <hr>
-                        <div class="bill-row total"><span>TO PAY</span><span id="toPay" class="kh-sk-text">₹0</span></div>
+                        <div class="bill-row total"><span>To pay</span><span>₹<span id="toPay" class="kh-sk-text">0</span></span></div>
                     </div>
 
-                    <button id="placeorder" class="pay-btn">Place Order</button>
+                    <div class="cx-card cx-trust">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div>
+                            <strong>Straight from your local shop</strong>
+                            <span>Your order goes directly to the shop. Pay at pickup or on delivery.</span>
+                        </div>
+                    </div>
+
                 </div>
+
+                <!-- sticky checkout bar -->
+                <div class="cx-bar">
+                    <div class="cx-bar-total">
+                        <small>TO PAY</small>
+                        <b>₹<span id="barTotal">0</span></b>
+                    </div>
+                    <button id="placeorder" class="cx-pay" type="button">Pay &amp; Place Order <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- payment sheet: opens when "Pay & Place Order" is tapped -->
+                <div class="cx-sheet" id="paySheet" role="dialog" aria-modal="true" aria-labelledby="paySheetTitle">
+                    <div class="cx-sheet-grab" aria-hidden="true"></div>
+                    <h2 id="paySheetTitle">Choose payment method</h2>
+
+                    <div class="cx-pay-pickup" id="payPickupRow">
+                        <label for="payPickupTime"><i class="fa-regular fa-clock"></i> Pickup time</label>
+                        <input type="time" id="payPickupTime">
+                        <p class="cx-pay-error" id="payPickupError">Please pick a time to continue.</p>
+                    </div>
+
+                    <div id="paymentOptions" class="cx-opts">
+                        <label class="cx-opt">
+                            <input type="radio" name="payment" value="cash" checked>
+                            <span id="cashLabel">💵 Cash on Delivery</span>
+                        </label>
+                        <label class="cx-opt">
+                            <input type="radio" name="payment" value="upi" disabled>
+                            <span>📱 UPI <small>(coming soon)</small></span>
+                        </label>
+                        <label class="cx-opt">
+                            <input type="radio" name="payment" value="card" disabled>
+                            <span>💳 Card <small>(coming soon)</small></span>
+                        </label>
+                    </div>
+
+                    <button id="confirmPayBtn" class="cx-pay" type="button">Place Order · ₹<span id="paySheetTotal">0</span></button>
+                </div>
+
+            </div>
         </main>
     </template>
 

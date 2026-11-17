@@ -265,13 +265,18 @@ async function initCartPage() {
     const pathParts = window.location.pathname.split("/").filter(Boolean);
     const userId = window.APP_USER_ID || pathParts[pathParts.length - 1];
 
-    const heading = document.querySelector(".res-info h4");
-    if (heading) heading.innerText = "Order List";
-
     const placeorder = document.getElementById("placeorder");
     const orderBtn = document.getElementById("orderBtn");
     const totalPrice = document.getElementById("totalPrice");
     const toPay = document.getElementById("toPay");
+    const barTotal = document.getElementById("barTotal");
+
+    // new header / strip elements
+    const cxHeadIcon = document.getElementById("cxHeadIcon");
+    const cxHeadTitle = document.getElementById("cxHeadTitle");
+    const cxHeadSub = document.getElementById("cxHeadSub");
+    const cxItemCount = document.getElementById("cxItemCount");
+    const cxStrip = document.getElementById("cxStrip");
 
     const addressChgBtn = document.getElementById("ChangeAdrs");
     const deliveryAdrs = document.getElementById("Deliveryaddress");
@@ -293,6 +298,14 @@ async function initCartPage() {
     const pickupTimeInput = document.getElementById("pickupTimeInput");
     const pickupError = document.getElementById("pickupError");
     const confirmPickupBtn = document.getElementById("confirmPickupBtn");
+
+    // payment sheet (opens from "Pay & Place Order")
+    const paySheet = document.getElementById("paySheet");
+    const payPickupRow = document.getElementById("payPickupRow");
+    const payPickupTime = document.getElementById("payPickupTime");
+    const payPickupError = document.getElementById("payPickupError");
+    const confirmPayBtn = document.getElementById("confirmPayBtn");
+    const paySheetTotal = document.getElementById("paySheetTotal");
 
     const addressCard = document.getElementById("addressCard");
     const deliveryWarning = document.getElementById("deliveryWarning");
@@ -348,7 +361,7 @@ async function initCartPage() {
         restaurants = {
             "<res_id>": {
                 name: "New kirana",
-                items: { "<item_id>": { name, price, qty, available_qty } },
+                items: { "<item_id>": { name, price, qty, available_qty, image? } },
                 delivery: { delivery_available, delivery_radius, long, latt, is_online }
             }
         }
@@ -679,6 +692,37 @@ async function initCartPage() {
         return { ok: true, message: "" };
     }
 
+    // Top header (ETA / pickup title + address line) and the yellow strip.
+    function updateCartHeader() {
+        if (!cxHeadTitle) return;
+
+        const type = getOrderType();
+        const d = getDeliveryInfo();
+        const store = isCartEmpty(restaurants) ? "" : getStoreName();
+        let title, sub, strip;
+
+        if (type === "delivery") {
+            const km = deliveryDistanceKm();
+            const eta = km != null && window.KiranaUtils ? KiranaUtils.etaRange(km).label : null;
+            title = eta ? `Delivery in ${eta} mins` : "Home delivery";
+            sub = selectedAddress
+                ? `${selectedAddress.adrs_type} • ${selectedAddress.address}`
+                : "Select a delivery address";
+            strip = d && d.delivery_radius != null
+                ? `${store} delivers within ${d.delivery_radius} km`
+                : "Home delivery available";
+        } else {
+            title = "Pickup from shop";
+            sub = store;
+            strip = "Choose a pickup time at checkout and pay at the shop";
+        }
+
+        cxHeadTitle.textContent = title;
+        if (cxHeadSub) cxHeadSub.textContent = sub;
+        if (cxStrip) cxStrip.textContent = strip;
+        if (cxHeadIcon) cxHeadIcon.className = type === "delivery" ? "fa-solid fa-motorcycle" : "fa-solid fa-store";
+    }
+
     function updateOrderTypeUI() {
         const offered = isDeliveryOffered();
         const type = getOrderType();
@@ -700,6 +744,7 @@ async function initCartPage() {
 
         if (addressCard) addressCard.style.display = type === "delivery" ? "" : "none";
         updateDeliveryTimeUI();
+        updateCartHeader();
 
         const check = checkDelivery();
         if (deliveryWarning) {
@@ -724,15 +769,13 @@ async function initCartPage() {
         if (!cartContainer) return 0;
         endCartSkeleton();
 
-        const cl = cartContainer.querySelector(".cart-left");
-        const cr = cartContainer.querySelector(".cart-right");
+        const content = cartContainer.querySelector(".cx-content");
 
         if (isCartEmpty(cart)) {
             cart_items_container.innerHTML = "";
 
-            // Hide (don't destroy) the panels so later renders still work
-            if (cl) cl.style.display = "none";
-            if (cr) cr.style.display = "none";
+            // Hide (don't destroy) the content so later renders still work
+            if (content) content.style.display = "none";
 
             cartContainer.style.display = "block";
             if (no_order_container) no_order_container.classList.add("show");
@@ -741,65 +784,76 @@ async function initCartPage() {
             syncCoupon(0);
             if (totalPrice) totalPrice.innerText = 0;
             if (toPay) toPay.innerText = 0;
+            if (barTotal) barTotal.innerText = 0;
+            if (cxItemCount) cxItemCount.textContent = 0;
             renderStoreBanner();
             renderStoreHeader();
             return 0;
         }
 
-        if (cl) cl.style.display = "";
-        if (cr) cr.style.display = "";
+        if (content) content.style.display = "";
         if (no_order_container) no_order_container.classList.remove("show");
 
         const storeOnline = isStoreOnline();
         let total = 0;
+        let count = 0;
 
         const html = Object.entries(cart).map(([res_id, r]) => {
             const items = r?.items || {};
             if (Object.keys(items).length === 0) return "";
 
-            const itemsHtml = Object.entries(items).map(([item_id, detail]) => {
+            return Object.entries(items).map(([item_id, detail]) => {
                 const price = Number(detail.price) || 0;
                 const qty = Number(detail.qty) || 0;
                 total += price * qty;
+                count += qty;
 
                 const atMax = detail.available_qty != null && qty >= detail.available_qty;
                 const disableIncrease = atMax || !storeOnline;
 
+                const name = String(detail.name ?? "Item");
+                const thumb = detail.image
+                    ? `<img src="${escapeHtml(detail.image)}" alt="" loading="lazy">`
+                    : `<span>${escapeHtml(name.trim().charAt(0).toUpperCase() || "•")}</span>`;
+
+                let sub = `₹${escapeHtml(price)} each`;
+                if (atMax) sub += " • max available";
+                else if (detail.available_qty != null && detail.available_qty <= 5) sub += ` • only ${escapeHtml(detail.available_qty)} left`;
+
                 return `
-                <div class="cart-item" id="${escapeHtml(item_id)}" data-res-id="${escapeHtml(res_id)}">
-                    <span class="veg-icon">
-                        <i class="fa-regular fa-circle-stop"></i>
-                    </span>
-
-                    <span class="item-name">
-                        ${escapeHtml(detail.name)} x ${escapeHtml(qty)}
-                    </span>
-
-                    <div class="quantity-control">
-                        <button type="button" class="qty-btn reduce">-</button>
-                        <span class="item_qty">${escapeHtml(qty)}</span>
-                        <button type="button" class="qty-btn increase${storeOnline ? "" : " is-store-offline"}" ${disableIncrease ? "disabled" : ""}>+</button>
+                <div class="cx-item" id="${escapeHtml(item_id)}" data-res-id="${escapeHtml(res_id)}">
+                    <div class="cx-thumb">${thumb}</div>
+                    <div class="cx-item-main">
+                        <div class="cx-item-top">
+                            <div class="cx-item-text">
+                                <span class="cx-item-name">${escapeHtml(name)}</span>
+                                <span class="cx-item-sub">${sub}</span>
+                            </div>
+                            <button type="button" class="cx-remove" data-qty-action="remove" aria-label="Remove ${escapeHtml(name)}">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
+                        <div class="cx-item-bottom">
+                            <span class="cx-price">₹${escapeHtml(price * qty)}</span>
+                            <div class="cx-stepper">
+                                <button type="button" class="cx-step reduce" data-qty-action="reduce" aria-label="Decrease quantity">−</button>
+                                <span class="item_qty">${escapeHtml(qty)}</span>
+                                <button type="button" class="cx-step increase${storeOnline ? "" : " is-store-offline"}" data-qty-action="increase" aria-label="Increase quantity" ${disableIncrease ? "disabled" : ""}>+</button>
+                            </div>
+                        </div>
                     </div>
-
-                    <span class="unit-price">${escapeHtml(price)}</span>
-                    <span class="item-price">${escapeHtml(price * qty)}</span>
                 </div>
                 `;
             }).join("");
-
-            return `
-                <div class="cart-restaurant" data-res-id="${escapeHtml(res_id)}">
-                    <div class="cart-restaurant-name">${escapeHtml(r.name || "Store")}</div>
-                    <hr>
-                    ${itemsHtml}
-                </div>
-            `;
         }).join("");
 
         cart_items_container.innerHTML = html;
         const discount = syncCoupon(total);
+        const payable = Math.max(Number((total - discount).toFixed(2)), 0);
         if (totalPrice) totalPrice.innerText = total;
-        if (toPay) toPay.innerText = Math.max(Number((total - discount).toFixed(2)), 0);
+        if (toPay) toPay.innerText = payable;
+        if (barTotal) barTotal.innerText = payable;
+        if (cxItemCount) cxItemCount.textContent = count;
         renderStoreBanner();
         renderStoreHeader();
         updateOrderTypeUI();
@@ -1035,18 +1089,23 @@ async function initCartPage() {
     on(document.getElementById("shopBtn"), "click", () => goToPage("home"));
 
     on(cartContainer, "click", (e) => {
-        if (!e.target.classList.contains("qty-btn") || e.target.disabled) return;
+        const btn = e.target.closest("[data-qty-action]");
+        if (!btn || btn.disabled) return;
 
-        const itemRow = e.target.closest(".cart-item");
+        const itemRow = btn.closest(".cx-item");
         if (!itemRow) return;
 
         const itemId = itemRow.id;
         const resId = itemRow.dataset.resId;
+        const action = btn.dataset.qtyAction;
 
-        if (e.target.classList.contains("increase")) {
+        if (action === "increase") {
             changeQty(itemId, resId, +1);
-        } else if (e.target.classList.contains("reduce")) {
+        } else if (action === "reduce") {
             changeQty(itemId, resId, -1);
+        } else if (action === "remove") {
+            const found = findItem(itemId, resId);
+            if (found) changeQty(itemId, found.resId, -found.item.qty);
         }
     });
 
@@ -1208,8 +1267,10 @@ async function initCartPage() {
         addAddressForm?.classList.remove("show");
     }
 
+    // Closes every checkout sheet (the header's pickup sheet and the cart's payment sheet)
     function closePickupSheet() {
         pickupSheet?.classList.remove("show");
+        paySheet?.classList.remove("show");
     }
 
     on(savedAddressList, "click", async (e) => {
@@ -1445,6 +1506,7 @@ async function initCartPage() {
             items: restaurants,
             pickup_time: type === "pickup" ? pickupTime : null,
             order_type: type,
+            payment_method: document.querySelector('input[name="payment"]:checked')?.value || "cash",
             coupon_code: appliedCoupon ? appliedCoupon.code : null
         };
         if (type === "delivery") {
@@ -1519,6 +1581,16 @@ async function initCartPage() {
         }
     }
 
+    function openPaySheet() {
+        const type = getOrderType();
+        if (payPickupRow) payPickupRow.style.display = type === "pickup" ? "" : "none";
+        payPickupError?.classList.remove("show");
+        if (paySheetTotal && toPay) paySheetTotal.textContent = toPay.textContent;
+        paySheet?.classList.add("show");
+        overlay?.classList.add("show");
+    }
+
+    // "Pay & Place Order": validate, then show the payment options
     on(placeorder, "click", () => {
         if (isSubmitting) return;
 
@@ -1544,17 +1616,19 @@ async function initCartPage() {
                 deliveryTimeCard?.scrollIntoView({ behavior: "smooth", block: "center" });
                 return;
             }
-            submitOrder(null, placeorder); // delivery uses a slot (or "now"), not the pickup-time sheet
-            return;
         }
 
-        pickupError?.classList.remove("show");
-        pickupSheet?.classList.add("show");
-        overlay?.classList.add("show");
+        openPaySheet();
     });
 
-    on(confirmPickupBtn, "click", async () => {
+    // Confirm inside the payment sheet: this is what actually places the order
+    on(confirmPayBtn, "click", async () => {
         if (isSubmitting) return;
+
+        if (isCartEmpty(restaurants)) {
+            alert("Your cart is empty");
+            return;
+        }
 
         if (!isStoreOnline()) {
             closePickupSheet();
@@ -1563,28 +1637,42 @@ async function initCartPage() {
             return;
         }
 
-        const pickupTime = pickupTimeInput.value; // "HH:MM" 24hr, or "" if unset
+        let pickupTime = null;
 
-        if (!pickupTime) {
-            pickupError?.classList.add("show");
-            return;
+        if (getOrderType() === "delivery") {
+            // re-check: a slot can expire while the sheet is open
+            const check = checkDelivery();
+            if (!check.ok) {
+                alert(check.message);
+                return;
+            }
+            const slotCheck = validateDeliverySlot();
+            if (!slotCheck.ok) {
+                closePickupSheet();
+                overlay?.classList.remove("show");
+                showSlotError(slotCheck.message);
+                deliveryTimeCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+            }
+        } else {
+            pickupTime = payPickupTime ? payPickupTime.value : ""; // "HH:MM" 24hr, or "" if unset
+
+            if (!pickupTime) {
+                payPickupError?.classList.add("show");
+                return;
+            }
+            payPickupError?.classList.remove("show");
+
+            const [hh, mm] = pickupTime.split(":").map(Number);
+            const pickupDate = new Date();
+            pickupDate.setHours(hh, mm, 0, 0);
+            if (pickupDate < new Date()) {
+                alert("Please choose a pickup time that is later than now");
+                return;
+            }
         }
-        pickupError?.classList.remove("show");
 
-        const [hh, mm] = pickupTime.split(":").map(Number);
-        const pickupDate = new Date();
-        pickupDate.setHours(hh, mm, 0, 0);
-        if (pickupDate < new Date()) {
-            alert("Please choose a pickup time that is later than now");
-            return;
-        }
-
-        if (isCartEmpty(restaurants)) {
-            alert("Your cart is empty");
-            return;
-        }
-
-        await submitOrder(pickupTime, confirmPickupBtn);
+        await submitOrder(pickupTime, confirmPayBtn);
     });
 
     on(orderBtn, "click", () => goToPage("orders"));

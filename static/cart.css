@@ -985,3 +985,345 @@ body {
         display: block;
     }
 }
+
+/* =====================================================================
+   NEW CART UI  -  paste this at the END of your existing cart.css
+   (it only styles the new .cx-* markup + a few overrides scoped to
+   .cx-cart, so the rest of your app is not affected)
+   ===================================================================== */
+
+.cart-container.cx-cart {
+    --cx-bg: #faf6ef;
+    --cx-fg: #1a2118;
+    --cx-border: #e9dfc9;
+    --cx-primary: #157a3a;
+    --cx-primary-fg: #ffffff;
+    --cx-secondary: #e4f2e5;
+    --cx-muted: #7f796c;
+    --cx-accent: #ff4d00;
+    --cx-card: #ffffff;
+    --cx-gold: #ffb800;
+    --cx-cream: #fff8e8;
+    --cx-danger: #c62828;
+
+    display: block;
+    grid-template-columns: none;
+    gap: 0;
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0;
+    background: var(--cx-bg);
+    color: var(--cx-fg);
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+    box-sizing: border-box;
+}
+.cx-cart *, .cx-cart *::before, .cx-cart *::after { box-sizing: border-box; }
+.cx-cart .cx-h { font-family: "Nunito", "Inter", sans-serif; }
+.cx-cart .cx-muted { color: var(--cx-muted); }
+
+.cx-content { display: flex; flex-direction: column; min-height: 70vh; }
+
+/* ---------- header ---------- */
+.cx-head { background: var(--cx-card); padding: 16px 16px 12px; border-bottom: 1px solid var(--cx-border); }
+.cx-head-row { display: flex; align-items: center; gap: 10px; }
+.cx-head-icon {
+    width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px;
+    background: var(--cx-secondary); color: var(--cx-primary);
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+}
+.cx-head-text { display: flex; flex-direction: column; min-width: 0; }
+.cx-head-title { font-weight: 900; font-size: 16px; line-height: 1.25; }
+.cx-head-sub {
+    font-size: 14px; font-weight: 500; color: var(--cx-muted); line-height: 1.25;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cx-head-count { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.cx-head-heading { font-weight: 900; font-size: 20px; }
+.cx-head-count .cx-muted { font-size: 14px; font-weight: 500; }
+
+.cx-strip {
+    background: var(--cx-gold); color: var(--cx-fg);
+    padding: 8px 16px; font-size: 12px; font-weight: 500;
+    display: flex; align-items: center; gap: 8px;
+}
+
+/* ---------- body ---------- */
+.cx-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px 16px; }
+
+.cx-card {
+    background: var(--cx-card); border: 1px solid var(--cx-border);
+    border-radius: 12px; padding: 14px; position: relative;
+}
+.cx-card-head { display: flex; align-items: center; gap: 10px; }
+.cx-card-icon {
+    width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px;
+    background: var(--cx-secondary); color: var(--cx-primary);
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.cx-card-head h3 { margin: 0; font-family: "Nunito", "Inter", sans-serif; font-weight: 800; font-size: 16px; color: var(--cx-fg); }
+.cx-card-head-text { flex: 1; min-width: 0; }
+.cx-card-head-text p { margin: 2px 0 0; font-size: 13px; color: var(--cx-muted); line-height: 1.35; }
+.cx-addr #type { display: none; }
+.cx-addr #Deliveryaddress { color: var(--cx-fg); font-weight: 500; }
+
+.cx-cart .change-btn {
+    position: static; margin: 0; padding: 6px 12px; flex-shrink: 0;
+    background: none; border: 1px solid var(--cx-primary); color: var(--cx-primary);
+    border-radius: 8px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.cx-cart .delivery-warning { margin-top: 10px; font-size: 13px; color: var(--cx-danger); }
+
+/* ---------- items ---------- */
+.cx-store { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px dashed var(--cx-border); }
+.cx-store-initial {
+    width: 32px; height: 32px; border-radius: 10px; background: var(--cx-primary); color: #fff;
+    font-family: "Nunito", sans-serif; font-weight: 900; display: flex; align-items: center; justify-content: center;
+}
+.cx-store-name { margin: 0; font-family: "Nunito", sans-serif; font-weight: 800; font-size: 15px; }
+
+.cx-items { display: flex; flex-direction: column; }
+.cx-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--cx-border); }
+.cx-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.cx-thumb {
+    width: 64px; height: 64px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+    background: var(--cx-cream); border: 1px solid var(--cx-border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Nunito", sans-serif; font-weight: 900; font-size: 24px; color: var(--cx-primary);
+}
+.cx-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.cx-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cx-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.cx-item-text { display: flex; flex-direction: column; min-width: 0; }
+.cx-item-name { font-size: 14px; font-weight: 500; line-height: 1.25; word-break: break-word; }
+.cx-item-sub { margin-top: 2px; font-size: 12px; color: var(--cx-muted); }
+.cx-remove { border: 0; background: none; color: var(--cx-muted); cursor: pointer; padding: 4px; font-size: 14px; }
+.cx-remove:hover { color: var(--cx-danger); }
+.cx-item-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.cx-price { font-family: "Nunito", sans-serif; font-weight: 800; font-size: 16px; }
+
+.cx-stepper { display: flex; align-items: center; background: var(--cx-primary); border-radius: 8px; overflow: hidden; }
+.cx-step {
+    width: 30px; height: 30px; border: 0; background: none; color: var(--cx-primary-fg);
+    font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.cx-step:disabled { opacity: .45; cursor: not-allowed; }
+.cx-stepper .item_qty { min-width: 22px; text-align: center; font-size: 14px; font-weight: 600; color: var(--cx-primary-fg); }
+
+/* ---------- option rows (order type / delivery time / payment) ---------- */
+.cx-opts { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.cx-opt {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer;
+    border: 1px solid var(--cx-border); border-radius: 8px; background: var(--cx-bg);
+    font-size: 14px; font-weight: 500;
+}
+.cx-opt input { accent-color: var(--cx-primary); width: 16px; height: 16px; margin: 0; }
+.cx-opt small { color: var(--cx-muted); font-weight: 400; }
+.cx-opt:has(input:checked) { border-color: var(--cx-primary); background: var(--cx-secondary); }
+.cx-opt:has(input:disabled), .cx-opt.disabled { opacity: .5; cursor: not-allowed; }
+.cx-hint { margin: 8px 0 0; font-size: 12px; color: var(--cx-muted); }
+
+/* slots (classes are generated by cart.js) */
+.cx-cart .slot-picker { margin-top: 12px; }
+.cx-cart .slot-day-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.cx-cart .slot-day-tab {
+    flex: 1; padding: 8px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--cx-border); border-radius: 8px; background: var(--cx-bg); color: var(--cx-fg);
+}
+.cx-cart .slot-day-tab.active { background: var(--cx-primary); border-color: var(--cx-primary); color: #fff; }
+.cx-cart .slot-day-tab:disabled { opacity: .45; cursor: not-allowed; }
+.cx-cart .slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cx-cart .slot-chip {
+    padding: 8px 4px; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--cx-border); border-radius: 8px; background: var(--cx-card); color: var(--cx-fg);
+}
+.cx-cart .slot-chip.selected { background: var(--cx-primary); border-color: var(--cx-primary); color: #fff; }
+.cx-cart .slot-note, .cx-cart .slot-empty { font-size: 12px; color: var(--cx-muted); margin: 8px 0 0; }
+.cx-cart .slot-error { font-size: 13px; color: var(--cx-danger); margin: 8px 0 0; }
+
+/* ---------- coupon ---------- */
+.cx-coupon {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    background: var(--cx-card); border: 1px dashed rgba(21, 122, 58, .35); border-radius: 12px;
+}
+.cx-coupon-icon {
+    width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+    background: var(--cx-secondary); color: var(--cx-primary);
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.cx-coupon input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+    font: inherit; font-size: 14px; font-weight: 500; color: var(--cx-fg); text-transform: uppercase; padding: 8px 0;
+}
+.cx-coupon input::placeholder { text-transform: none; color: var(--cx-muted); }
+.cx-cart .coupon-apply-btn { color: var(--cx-accent); font-weight: 700; }
+.cx-cart .coupon-msg { margin: -4px 4px 0; }
+.cx-cart .offer-chips { margin: -4px 0 0; }
+.cx-cart .offer-chip { color: var(--cx-primary); background: var(--cx-card); border-color: rgba(21, 122, 58, .45); }
+
+/* ---------- bill ---------- */
+.cx-bill h5 { margin: 0 0 10px; font-family: "Nunito", sans-serif; font-weight: 800; font-size: 16px; }
+.cx-bill .bill-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 14px; color: var(--cx-muted); }
+.cx-bill .bill-row > span:last-child { color: var(--cx-fg); font-weight: 500; }
+.cx-bill .bill-row.discount, .cx-bill .bill-row.discount > span:last-child { color: var(--cx-primary); }
+.cx-bill hr { border: 0; border-top: 1px solid var(--cx-border); margin: 8px 0; }
+.cx-bill .bill-row.total { color: var(--cx-fg); font-family: "Nunito", sans-serif; font-weight: 800; font-size: 16px; }
+.cx-bill .bill-row.total > span:last-child { font-weight: 900; font-size: 18px; }
+
+.cx-trust { display: flex; align-items: center; gap: 10px; }
+.cx-trust i { color: var(--cx-primary); font-size: 18px; }
+.cx-trust strong { display: block; font-size: 14px; }
+.cx-trust span { font-size: 12px; color: var(--cx-muted); }
+
+/* ---------- sticky checkout bar ---------- */
+.cx-bar {
+    position: sticky; bottom: 0; z-index: 20; margin-top: auto;
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--cx-card); border-top: 1px solid var(--cx-border);
+}
+.cx-bar-total { display: flex; flex-direction: column; line-height: 1.1; }
+.cx-bar-total small { font-size: 11px; font-weight: 600; color: var(--cx-muted); letter-spacing: .04em; }
+.cx-bar-total b { font-family: "Nunito", sans-serif; font-weight: 900; font-size: 20px; }
+.cx-pay {
+    flex: 1; height: 48px; border: 0; border-radius: 12px; cursor: pointer;
+    background: var(--cx-primary); color: var(--cx-primary-fg);
+    font-family: "Nunito", sans-serif; font-weight: 800; font-size: 16px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.cx-pay:disabled { opacity: .5; cursor: not-allowed; }
+
+/* =====================================================================
+   ADDRESS BOTTOM SHEET (opened by CHANGE)  -  append to cart.css too
+   Standalone styles: no dependency on the old checkout-card wrappers
+   ===================================================================== */
+.cx-cart #addressOptions {
+    position: fixed; top: auto; left: 0; right: 0; bottom: 0;
+    width: 100%; max-width: 480px; height: auto; max-height: 85vh; margin: 0 auto;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: #fff; border-radius: 20px 20px 0 0;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, .22);
+    z-index: 10000; opacity: 1; pointer-events: auto;
+    transform: translateY(105%); visibility: hidden;
+    transition: transform .28s ease, visibility 0s linear .28s;
+}
+.cx-cart #addressOptions.show {
+    transform: none; visibility: visible;
+    transition: transform .28s ease;
+}
+
+/* saved address cards */
+.cx-cart #savedAddressList { display: flex; flex-direction: column; gap: 10px; }
+.cx-cart .address-option {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    padding: 12px; cursor: pointer; background: var(--cx-bg);
+    border: 1px solid var(--cx-border); border-radius: 12px;
+}
+.cx-cart .address-option:active { border-color: var(--cx-primary); background: var(--cx-secondary); }
+.cx-cart .address-option-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.cx-cart .address-type {
+    align-self: flex-start; padding: 2px 8px; border-radius: 999px;
+    background: var(--cx-secondary); color: var(--cx-primary);
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+}
+.cx-cart .address-text { font-size: 14px; font-weight: 500; line-height: 1.35; color: var(--cx-fg); }
+.cx-cart .address-phone { font-size: 12.5px; color: var(--cx-muted); }
+.cx-cart .address-phone.missing { color: var(--cx-danger); font-weight: 600; cursor: pointer; }
+.cx-cart .address-option-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.cx-cart .address-edit-btn, .cx-cart .address-delete-btn {
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px;
+    border: 1px solid var(--cx-border); background: #fff; color: var(--cx-fg);
+    display: flex; align-items: center; justify-content: center;
+}
+.cx-cart .address-delete-btn:hover { color: var(--cx-danger); border-color: var(--cx-danger); }
+
+/* add new address */
+.cx-cart .add-address-btn {
+    width: 100%; padding: 12px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 700;
+    color: var(--cx-primary); background: #fff;
+    border: 1px dashed var(--cx-primary); border-radius: 12px;
+}
+.cx-cart #addAddressForm { display: none; flex-direction: column; gap: 10px; }
+.cx-cart #addAddressForm.show { display: flex; }
+.cx-cart #addAddressForm select,
+.cx-cart #addAddressForm textarea,
+.cx-cart #addAddressForm input {
+    width: 100%; padding: 11px 12px; font: inherit; font-size: 14px; color: var(--cx-fg);
+    background: #fff; border: 1px solid var(--cx-border); border-radius: 10px; outline: 0;
+}
+.cx-cart #addAddressForm textarea { min-height: 76px; resize: vertical; }
+.cx-cart #addAddressForm select:focus,
+.cx-cart #addAddressForm textarea:focus,
+.cx-cart #addAddressForm input:focus { border-color: var(--cx-primary); }
+.cx-cart #useLocationForNewAddr {
+    padding: 11px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600;
+    color: var(--cx-primary); background: var(--cx-secondary);
+    border: 1px solid rgba(21, 122, 58, .35); border-radius: 10px;
+}
+.cx-cart .form-actions { display: flex; gap: 10px; }
+.cx-cart .form-actions button {
+    flex: 1; padding: 12px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 700; border-radius: 10px;
+}
+.cx-cart #saveAddressBtn { background: var(--cx-primary); color: #fff; border: 0; }
+.cx-cart #saveAddressBtn:disabled { opacity: .5; cursor: progress; }
+.cx-cart #cancelAddressBtn { background: #fff; color: var(--cx-fg); border: 1px solid var(--cx-border); }
+
+/* leftovers from the old template that duplicate the controls above */
+.cx-cart #cart-liveLocationBtn,
+.cx-cart #addAddressForm > h2 { display: none; }
+
+/* =====================================================================
+   BILL DETAILS  -  overrides old .bill-details / .bill-row rules
+   ===================================================================== */
+.cx-cart .cx-bill { box-shadow: none !important; }
+.cx-cart .cx-bill, .cx-cart .cx-bill span, .cx-cart .cx-bill b {
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif !important;
+    text-decoration: none !important; letter-spacing: normal !important;
+}
+.cx-cart .cx-bill h5 {
+    margin: 0 0 10px !important; font-family: "Nunito", "Inter", sans-serif !important;
+    font-size: 16px !important; font-weight: 800 !important;
+    text-transform: none !important; letter-spacing: normal !important; color: var(--cx-fg) !important;
+}
+.cx-cart .cx-bill .bill-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0 !important; border: 0 !important; margin: 0 !important;
+    font-size: 14px !important; font-weight: 400 !important; color: var(--cx-muted) !important;
+}
+.cx-cart .cx-bill .bill-row > span:last-child { color: var(--cx-fg) !important; font-weight: 500 !important; font-size: 14px !important; }
+.cx-cart .cx-bill .bill-row.discount,
+.cx-cart .cx-bill .bill-row.discount > span:last-child { color: var(--cx-primary) !important; }
+.cx-cart .cx-bill hr { border: 0 !important; border-top: 1px solid var(--cx-border) !important; margin: 8px 0 !important; height: 0; }
+.cx-cart .cx-bill .bill-row.total { color: var(--cx-fg) !important; font-weight: 800 !important; font-size: 16px !important; }
+.cx-cart .cx-bill .bill-row.total > span { font-family: "Nunito", "Inter", sans-serif !important; }
+.cx-cart .cx-bill .bill-row.total > span:last-child { color: var(--cx-fg) !important; font-weight: 900 !important; font-size: 18px !important; }
+.cx-cart .cx-bill .bill-row.total > span:last-child span { font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; color: inherit !important; }
+
+/* cart.js hides the coupon row with an inline display:none; never override that */
+.cx-cart .cx-bill #discountRow[style*="none"] { display: none !important; }
+
+
+/* =====================================================================
+   PAYMENT SHEET (opens from "Pay & Place Order")
+   ===================================================================== */
+.cx-cart .cx-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; width: 100%; max-width: 480px; margin: 0 auto;
+    max-height: 85vh; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 10px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -12px 32px rgba(0, 0, 0, .22);
+    z-index: 10000; transform: translateY(105%); visibility: hidden;
+    transition: transform .28s ease, visibility 0s linear .28s;
+}
+.cx-cart .cx-sheet.show { transform: none; visibility: visible; transition: transform .28s ease; }
+.cx-sheet-grab { width: 40px; height: 4px; border-radius: 4px; background: var(--cx-border); margin: 0 auto 2px; }
+.cx-sheet h2 { margin: 0; font-family: "Nunito", "Inter", sans-serif; font-weight: 800; font-size: 18px; color: var(--cx-fg); }
+.cx-sheet .cx-opts { margin-top: 0; }
+.cx-sheet .cx-pay { flex: none; width: 100%; }
+.cx-pay-pickup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; background: var(--cx-bg); border: 1px solid var(--cx-border); border-radius: 10px; }
+.cx-pay-pickup label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--cx-fg); }
+.cx-pay-pickup input { flex: 1; min-width: 120px; padding: 8px 10px; font: inherit; font-size: 14px; border: 1px solid var(--cx-border); border-radius: 8px; background: #fff; }
+.cx-pay-error { display: none; flex-basis: 100%; margin: 0; font-size: 13px; color: var(--cx-danger); }
+.cx-pay-error.show { display: block; }
