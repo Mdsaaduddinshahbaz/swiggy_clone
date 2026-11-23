@@ -4490,19 +4490,63 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     const st = receiptState;
     if (!st || !st.file) return;
 
-    if (navigator.share) {
-      try {
-        if (st.canFiles) await navigator.share({ files: [st.file], title: `Receipt - Token ${st.token}` });
-        else await navigator.share({ title: `Receipt - Token ${st.token}`, text: st.text });
-      } catch (e) { /* closed the share window, nothing to do */ }
-      return;
+    // Android WebView native sharing
+    if (window.AndroidShare && window.AndroidShare.shareImage) {
+        try {
+            const reader = new FileReader();
+
+            reader.onload = function () {
+                const base64 = reader.result.split(",")[1];
+
+                window.AndroidShare.shareImage(
+                    base64,
+                    `receipt-${st.token}.png`,
+                    st.text || ""
+                );
+            };
+
+            reader.onerror = function () {
+                console.error("Failed to read receipt image");
+            };
+
+            reader.readAsDataURL(st.file);
+
+        } catch (e) {
+            console.error("Android sharing failed:", e);
+        }
+
+        return;
     }
 
-    // browser has no share window (some desktops): just save the image
+    // Normal browser sharing
+    if (navigator.share) {
+        try {
+            if (navigator.canShare && navigator.canShare({ files: [st.file] })) {
+                await navigator.share({
+                    files: [st.file],
+                    title: `Receipt - Token ${st.token}`
+                });
+            } else {
+                await navigator.share({
+                    title: `Receipt - Token ${st.token}`,
+                    text: st.text
+                });
+            }
+        } catch (e) {
+            console.log("Sharing cancelled or failed:", e);
+        }
+
+        return;
+    }
+
+    // Browser fallback
     const a = document.createElement("a");
-    a.href = st.url; a.download = `receipt-${st.token}.png`;
-    document.body.appendChild(a); a.click(); a.remove();
-  }
+    a.href = st.url;
+    a.download = `receipt-${st.token}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
 
   document.addEventListener("click", e => {
     const b = e.target.closest(".shareBtn");
