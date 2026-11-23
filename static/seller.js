@@ -4474,7 +4474,7 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
       state.file = new File([blob], `receipt-${r.token}.png`, { type: "image/png" });
       state.canFiles = !!(navigator.canShare && navigator.canShare({ files: [state.file] }));
     //   btn.textContent = navigator.share ? "Share" : "Save image";
-    btn.textContent = "Share"
+        btn.textContent = "Share"
       btn.disabled = false;
     }, "image/png");
   }
@@ -4529,8 +4529,8 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
                 });
             } else {
                 await navigator.share({
-                    title: `Receipt - Token ${st.token}`,
-                    text: st.text
+                    files: [st.file],
+                    title: `Receipt - Token ${st.token}`
                 });
             }
         } catch (e) {
