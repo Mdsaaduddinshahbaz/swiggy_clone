@@ -192,7 +192,7 @@ def update_profiles(user_id, name, phone):
         return {"success": False, "message": "User not found"}
 
 
-def list_resturants(long, latt, dist: int = 5):
+def list_resturants(long, latt, dist: int = 2):
     restaurants = restaurants_name.aggregate([
         {
             "$geoNear": {
@@ -209,8 +209,9 @@ def list_resturants(long, latt, dist: int = 5):
     ])
     res_names = {}
     for r in restaurants:
-        print(r.get("delivery_available"))
-        res_names[str(r["_id"])] = {"res_name": r["name"], "address": r["address"], "file_url": r["file_url"], "type": r.get("type", "restaurant"), "distance_km": f"{r['distanceMeters'] / 1000:.1f}", "delivery_available": r.get("delivery_available"), "delivery_radius": r.get("delivery_radius", 0), "is_online": _to_bool(r.get("is_online", True))}
+        # print(r.get("delivery_available"))
+        coords = (r.get("location") or {}).get("coordinates") or [None, None]
+        res_names[str(r["_id"])] = {"res_name": r["name"], "address": r["address"], "file_url": r["file_url"], "type": r.get("type", "restaurant"), "distance_km": f"{r['distanceMeters'] / 1000:.1f}", "delivery_available": r.get("delivery_available"), "delivery_radius": r.get("delivery_radius", 0), "is_online": _to_bool(r.get("is_online", True)), "long": coords[0], "latt": coords[1]}
     return res_names
 
 

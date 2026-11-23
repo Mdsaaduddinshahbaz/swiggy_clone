@@ -1154,6 +1154,7 @@ async function homeReloadRestaurants() {
         });
         if (!res.ok) throw new Error(`list_resturants failed: ${res.status}`);
         const data = await res.json();
+        console.log("list_resturants returned", data);
         if (myId !== homeReloadId) return; // a newer radius pick is already loading
         if (!data.success) throw new Error("list_resturants returned success:false");
 
