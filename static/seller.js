@@ -4301,7 +4301,7 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
   }, true);
 
   /* =====================================================================
-     6. SHARE RECEIPT  (preview + share options in a bottom sheet)
+     6. SHARE RECEIPT  (slip preview + the phone's own share window)
   ===================================================================== */
   let receiptState = null;
 
@@ -4325,29 +4325,22 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
       meta.push(`Pickup: ${o.pickup_time || "-"}`);
     }
 
-    // customer's number (delivery orders only) so WhatsApp can open their chat
-    let phone = "";
-    if (isDelivery && o.delivery_address.phone) {
-      const digits = String(o.delivery_address.phone).replace(/\D/g, "");
-      phone = digits.length === 10 ? "91" + digits : digits;
-    }
-
     return {
       id: o.order_id,
       token: o.token_no,
       shop: document.querySelector(".seller-name")?.textContent || "Store",
-      meta, items, bill, status: o.status, phone
+      meta, items, bill, status: o.status
     };
   }
 
   function receiptText(r) {
-    const L = [`*${r.shop}*`, ...r.meta, ""];
-    r.items.forEach(i => L.push(`${i.name} x ${i.qty}  -  ₹${i.amount}`));
+    const L = [r.shop, ...r.meta, ""];
+    r.items.forEach(i => L.push(`${i.name} x ${i.qty} - ₹${i.amount}`));
     if (r.bill.discount > 0) {
       L.push("", `Subtotal: ₹${r.bill.subtotal}`);
       L.push(`Coupon${r.bill.code ? " " + r.bill.code : ""}: - ₹${r.bill.discount}`);
     }
-    L.push("", `*Total: ₹${r.bill.total}*`, `Status: ${r.status}`, "Thank you!");
+    L.push("", `Total: ₹${r.bill.total}`, "Thank you!");
     return L.join("\n");
   }
 
@@ -4371,9 +4364,9 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
       g.strokeStyle = "#D9D5C7"; g.setLineDash([6, 4]); g.lineWidth = 1.5;
       g.beginPath(); g.moveTo(pad, y); g.lineTo(W - pad, y); g.stroke(); g.setLineDash([]);
     };
-    const row = (left, right, y, bold) => {
-      g.textAlign = "left"; g.fillStyle = "#20231F";
-      g.font = (bold ? "bold " : "") + "15px sans-serif";
+    const row = (left, right, y, bold, color) => {
+      g.fillStyle = color || "#20231F";
+      g.textAlign = "left"; g.font = (bold ? "bold " : "") + "15px sans-serif";
       g.fillText(fit(left, W - pad * 2 - 100), pad, y);
       g.textAlign = "right"; g.font = (bold ? "bold " : "") + "15px monospace";
       g.fillText(right, W - pad, y);
@@ -4383,7 +4376,6 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     g.textAlign = "center"; g.fillStyle = "#20231F"; g.font = "bold 22px sans-serif";
     g.fillText(fit(r.shop, W - pad * 2), W / 2, y);
 
-    g.fillStyle = "#6b6f66"; g.font = "14px sans-serif";
     y += 14;
     r.meta.forEach((m, i) => {
       y += 22;
@@ -4397,14 +4389,13 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
 
     if (r.bill.discount > 0) {
       y += 28; row("Subtotal", `₹${r.bill.subtotal}`, y);
-      y += 28; g.fillStyle = "#2E6F4E";
-      row(`Coupon${r.bill.code ? " " + r.bill.code : ""}`, `- ₹${r.bill.discount}`, y);
+      y += 28; row(`Coupon${r.bill.code ? " " + r.bill.code : ""}`, `- ₹${r.bill.discount}`, y, false, "#2E6F4E");
     }
 
     y += 14; dashed(y);
     y += 34; row("Total", `₹${r.bill.total}`, y, true);
     y += 30; g.textAlign = "center"; g.fillStyle = "#6b6f66"; g.font = "13px sans-serif";
-    g.fillText(`Status: ${r.status}  •  Thank you!`, W / 2, y);
+    g.fillText("Thank you!", W / 2, y);
     return c;
   }
 
@@ -4422,15 +4413,12 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
         transform: translateY(100%); transition: transform .35s cubic-bezier(.22,.8,.3,1); z-index: 3201; }
       #rcSheet.show { transform: translateY(0); }
       #rcSheet .rcHandle { width: 40px; height: 4px; background: #E1DED2; border-radius: 999px; margin: 12px auto 8px; flex-shrink: 0; }
-      #rcSheet .rcTitle { font-size: 16px; font-weight: 700; text-align: center; margin: 0 0 10px; flex-shrink: 0; }
       #rcSheet .rcPreview { overflow-y: auto; padding: 4px 20px 12px; flex: 1; min-height: 120px; text-align: center; -webkit-overflow-scrolling: touch; }
       #rcSheet .rcPreview img { width: 100%; max-width: 420px; border: 1px solid #E1DED2; border-radius: 12px; box-shadow: 0 6px 18px -10px rgba(0,0,0,.4); }
-      #rcSheet .rcShare { flex-shrink: 0; padding: 12px 20px calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px dashed #E1DED2; }
-      #rcSheet .rcNative { width: 100%; background: #2C4A6E; color: #fff; border: none; border-radius: 12px; padding: 13px 0; font-weight: 700; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
-      #rcSheet .rcGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-      #rcSheet .rcOpt { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; color: #20231F; padding: 4px 0; }
-      #rcSheet .rcIcon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; }
-      #rcSheet .rcClose { width: 100%; margin-top: 12px; background: #FFFFFB; border: 1.5px solid #E1DED2; border-radius: 12px; padding: 11px 0; font-weight: 700; font-size: 14px; cursor: pointer; color: #20231F; }
+      #rcSheet .rcFoot { flex-shrink: 0; padding: 12px 20px calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px dashed #E1DED2; }
+      #rcSheet .rcShare { width: 100%; background: #2C4A6E; color: #fff; border: none; border-radius: 12px; padding: 14px 0; font-weight: 700; font-size: 15px; cursor: pointer; }
+      #rcSheet .rcShare:disabled { opacity: .5; cursor: default; }
+      #rcSheet .rcClose { width: 100%; margin-top: 8px; background: transparent; border: none; padding: 10px 0; font-weight: 600; font-size: 14px; cursor: pointer; color: #6b6f66; }
     `;
     document.head.appendChild(style);
 
@@ -4442,26 +4430,17 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     sheet.setAttribute("aria-label", "Share receipt");
     sheet.innerHTML = `
       <div class="rcHandle"></div>
-      <p class="rcTitle">Share receipt</p>
       <div class="rcPreview"></div>
-      <div class="rcShare">
-        <button type="button" class="rcNative" data-rc="native" style="display:none">Share via...</button>
-        <div class="rcGrid">
-          <button type="button" class="rcOpt" data-rc="whatsapp"><span class="rcIcon" style="background:#25D366">💬</span><span>WhatsApp</span></button>
-          <button type="button" class="rcOpt" data-rc="email"><span class="rcIcon" style="background:#B23B30">✉️</span><span>Email</span></button>
-          <button type="button" class="rcOpt" data-rc="copy"><span class="rcIcon" style="background:#6b6f66">📋</span><span>Copy</span></button>
-          <button type="button" class="rcOpt" data-rc="download"><span class="rcIcon" style="background:#2b7de9">⬇️</span><span>Save image</span></button>
-        </div>
-        <button type="button" class="rcClose" data-rc="close">Close</button>
+      <div class="rcFoot">
+        <button type="button" class="rcShare" disabled>Share</button>
+        <button type="button" class="rcClose">Close</button>
       </div>`;
     document.body.appendChild(overlay);
     document.body.appendChild(sheet);
 
     overlay.addEventListener("click", closeReceiptSheet);
-    sheet.addEventListener("click", e => {
-      const t = e.target.closest("[data-rc]");
-      if (t) handleReceiptAction(t.dataset.rc, t);
-    });
+    sheet.querySelector(".rcClose").addEventListener("click", closeReceiptSheet);
+    sheet.querySelector(".rcShare").addEventListener("click", shareReceipt);
     document.addEventListener("keydown", e => { if (e.key === "Escape") closeReceiptSheet(); });
     return sheet;
   }
@@ -4470,31 +4449,32 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     const o = sellerOrders.find(x => String(x.order_id) === String(orderId));
     if (!o) return;
     const sheet = ensureReceiptSheet();
-    const overlay = document.getElementById("rcOverlay");
     const r = receiptData(o);
 
     if (receiptState && receiptState.url) URL.revokeObjectURL(receiptState.url);
-    const state = receiptState = {
-      id: r.id, token: r.token, phone: r.phone, text: receiptText(r),
-      url: null, file: null, canFiles: false
-    };
+    const state = receiptState = { token: r.token, text: receiptText(r), url: null, file: null, canFiles: false };
 
     const preview = sheet.querySelector(".rcPreview");
+    const btn = sheet.querySelector(".rcShare");
     preview.innerHTML = `<span style="font-size:13px;color:#87897F">Preparing receipt...</span>`;
-    sheet.querySelector(".rcNative").style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Share";
 
     void sheet.offsetHeight;
-    overlay.classList.add("show");
+    document.getElementById("rcOverlay").classList.add("show");
     sheet.classList.add("show");
     document.body.style.overflow = "hidden";
 
+    // The image is prepared BEFORE the button is tapped, because browsers
+    // only allow the share window to open straight from a tap.
     drawReceipt(r).toBlob(blob => {
       if (receiptState !== state || !blob) return;
       state.url = URL.createObjectURL(blob);
       preview.innerHTML = `<img src="${state.url}" alt="Receipt preview">`;
       state.file = new File([blob], `receipt-${r.token}.png`, { type: "image/png" });
       state.canFiles = !!(navigator.canShare && navigator.canShare({ files: [state.file] }));
-      sheet.querySelector(".rcNative").style.display = navigator.share ? "block" : "none";
+      btn.textContent = navigator.share ? "Share" : "Save image";
+      btn.disabled = false;
     }, "image/png");
   }
 
@@ -4506,41 +4486,22 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     document.body.style.overflow = "";
   }
 
-  async function handleReceiptAction(action, el) {
-    if (action === "close") return closeReceiptSheet();
+  async function shareReceipt() {
     const st = receiptState;
-    if (!st) return;
-    const title = `Receipt - Token ${st.token}`;
-    const plain = st.text.replace(/\*/g, "");
+    if (!st || !st.file) return;
 
-    if (action === "native") {
+    if (navigator.share) {
       try {
-        if (st.canFiles && st.file) await navigator.share({ files: [st.file], title, text: plain });
-        else await navigator.share({ title, text: plain });
-      } catch (e) { /* user closed the share popup */ }
-    } else if (action === "whatsapp") {
-      const base = st.phone ? `https://wa.me/${st.phone}` : "https://wa.me/";
-      window.open(`${base}?text=${encodeURIComponent(st.text)}`, "_blank", "noopener");
-    } else if (action === "email") {
-      window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(plain)}`;
-    } else if (action === "copy") {
-      try {
-        await navigator.clipboard.writeText(plain);
-      } catch (e) {
-        const ta = document.createElement("textarea");
-        ta.value = plain;
-        document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
-      }
-      const label = el.querySelector("span:last-child");
-      const old = label.textContent;
-      label.textContent = "Copied!";
-      setTimeout(() => (label.textContent = old), 1500);
-    } else if (action === "download") {
-      if (!st.url) return;
-      const a = document.createElement("a");
-      a.href = st.url; a.download = `receipt-${st.token}.png`;
-      document.body.appendChild(a); a.click(); a.remove();
+        if (st.canFiles) await navigator.share({ files: [st.file], title: `Receipt - Token ${st.token}` });
+        else await navigator.share({ title: `Receipt - Token ${st.token}`, text: st.text });
+      } catch (e) { /* closed the share window, nothing to do */ }
+      return;
     }
+
+    // browser has no share window (some desktops): just save the image
+    const a = document.createElement("a");
+    a.href = st.url; a.download = `receipt-${st.token}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
   }
 
   document.addEventListener("click", e => {
