@@ -4473,7 +4473,8 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
       preview.innerHTML = `<img src="${state.url}" alt="Receipt preview">`;
       state.file = new File([blob], `receipt-${r.token}.png`, { type: "image/png" });
       state.canFiles = !!(navigator.canShare && navigator.canShare({ files: [state.file] }));
-      btn.textContent = navigator.share ? "Share" : "Save image";
+    //   btn.textContent = navigator.share ? "Share" : "Save image";
+    btn.textContent = "Share"
       btn.disabled = false;
     }, "image/png");
   }
