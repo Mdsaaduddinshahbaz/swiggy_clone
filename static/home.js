@@ -2271,10 +2271,14 @@ async function initHomePage() {
         overlay.classList.remove("show");
     });
 
-    // "Map view" link next to the live chips: open the location panel with the map showing.
+    // "Map view" link next to the live chips: open the full-screen shop map
+    // (restaurants / medical / general stores, each with its own pin).
     addListenerOnce(document.getElementById("mapViewBtn"), "click", () => {
-        if (trigger) trigger.click();
-        if (maps_btn && maps_btn.getAttribute("is_active") === "false") maps_btn.click();
+        if (window.KiranaShopMap && typeof window.KiranaShopMap.open === "function") {
+            window.KiranaShopMap.open();
+        } else {
+            showToast("Map isn't ready yet. Please try again.");
+        }
     });
 
     addListenerOnce(suggestions, "click", (e) => {
@@ -3723,3 +3727,349 @@ document.addEventListener("spa:pageload", refreshCartBadgeSoon);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshCartBadgeSoon(); });
 paintCartBadge();
 refreshCartBadge();
+
+/* ============================================================
+   SHOP MAP  (paste at the very END of home.js)
+
+   "Map view" in the live row opens a full-screen map with every shop
+   from the Home list (restaurants, medical, general stores), each type
+   with its own coloured pin. Tap a pin -> popup -> "View menu".
+
+   Exposed as window.KiranaShopMap.open() / .close().
+   Builds its own markup + CSS, so home.html needs no changes.
+
+   Coordinates: reads them from the /list_resturants results if present
+   (latt/lat/latitude + long/lng/lon/longitude, or coordinates / location
+   as {latt,long} or GeoJSON). Shops without coordinates are looked up
+   once from their address (OpenStreetMap) and cached in localStorage.
+   ============================================================ */
+(function () {
+    "use strict";
+
+    const PIN = {
+        restaurant:    { label: "Restaurants",    icon: "🍽️", color: "#D2602A" },
+        medical:       { label: "Medical",        icon: "💊", color: "#0F6E5C" },
+        general_store: { label: "General stores", icon: "🛒", color: "#1F5FA8" }
+    };
+    const PIN_DEFAULT = { label: "Other", icon: "🏪", color: "#2A7F4B" };
+    const pinOf = (type) => PIN[type] || PIN_DEFAULT;
+
+    let overlay = null, shopMap = null, shopLayer = null, meLayer = null;
+    let entries = [];            // { id, type, detail, marker }
+    let activeType = "all";
+    let runToken = 0;            // cancels an old geocode run when the map reopens/closes
+    let unplaced = 0;
+    let me = null;               // L.LatLng of the user
+    let lastFocus = null;
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    function injectStyle() {
+        if (document.getElementById("smapStyle")) return;
+        const st = document.createElement("style");
+        st.id = "smapStyle";
+        st.textContent = `
+            body.smap-open { overflow: hidden; }
+            .smap-page { position: fixed; inset: 0; z-index: 4900; display: flex; flex-direction: column; background: #faf7f2; color: #1f2937; transform: translateY(100%); visibility: hidden; transition: transform .3s ease, visibility 0s linear .3s; }
+            .smap-page.show { transform: none; visibility: visible; transition: transform .3s ease; }
+            .smap-top { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 10px; background: #fff; }
+            .smap-back { width: 38px; height: 38px; border: 0; border-radius: 50%; background: #f3f4f6; color: inherit; font-size: 15px; cursor: pointer; }
+            .smap-top h1 { margin: 0; font-size: 18px; font-weight: 700; }
+            .smap-top p { margin: 2px 0 0; font-size: 12px; color: #6b7280; }
+            .smap-chips { display: flex; gap: 8px; flex-shrink: 0; padding: 0 16px 12px; background: #fff; border-bottom: 1px solid #eee; overflow-x: auto; scrollbar-width: none; }
+            .smap-chips::-webkit-scrollbar { display: none; }
+            .smap-chip { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; }
+            .smap-chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c, #2A7F4B); display: inline-block; }
+            .smap-chip b { font-weight: 700; color: #6b7280; }
+            .smap-chip.active { background: #1f2937; border-color: #1f2937; color: #fff; }
+            .smap-chip.active b { color: #d1d5db; }
+            .smap-map { flex: 1; min-height: 0; }
+            .smap-note { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 1000; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 999px; background: rgba(31, 41, 55, .92); color: #fff; font-size: 12.5px; text-align: center; pointer-events: none; }
+            .smap-note:empty { display: none; }
+
+            .smap-pin { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--c, #2A7F4B); border: 2px solid #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; }
+            .smap-pin span { transform: rotate(45deg); font-size: 16px; line-height: 1; }
+            .smap-pin.off { filter: grayscale(1); opacity: .65; }
+            .smap-me { position: relative; width: 18px; height: 18px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(37, 99, 235, .4); }
+            .smap-me::after { content: ""; position: absolute; inset: -10px; border-radius: 50%; background: rgba(37, 99, 235, .25); animation: smapPulse 1.8s ease-out infinite; }
+            @keyframes smapPulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
+            @media (prefers-reduced-motion: reduce) { .smap-page, .smap-page.show { transition: none; } .smap-me::after { animation: none; } }
+
+            .smap-pop { display: flex; flex-direction: column; gap: 4px; min-width: 150px; font-family: 'Inter', sans-serif; }
+            .smap-pop strong { font-size: 14px; }
+            .smap-pop span { font-size: 12px; color: #6b7280; }
+            .smap-pop .on { color: #157a3a; font-weight: 600; }
+            .smap-pop .off { color: #c2300a; font-weight: 600; }
+            .smap-pop button { margin-top: 6px; border: 0; border-radius: 8px; padding: 8px 10px; background: #157a3a; color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function build() {
+        if (overlay) return;
+        injectStyle();
+
+        overlay = document.createElement("div");
+        overlay.className = "smap-page";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-label", "Shops near you");
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML = `
+            <div class="smap-top">
+                <button type="button" class="smap-back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button>
+                <div><h1>Shops near you</h1><p class="smap-sub"></p></div>
+            </div>
+            <div class="smap-chips" role="group" aria-label="Filter by shop type"></div>
+            <div class="smap-map"></div>
+            <div class="smap-note" role="status" aria-live="polite"></div>
+        `;
+        document.body.appendChild(overlay);
+
+        shopMap = L.map(overlay.querySelector(".smap-map"), { zoomControl: false }).setView([17.385, 78.4867], 13);
+        L.control.zoom({ position: "bottomright" }).addTo(shopMap);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(shopMap);
+        meLayer = L.layerGroup().addTo(shopMap);
+        shopLayer = L.layerGroup().addTo(shopMap);
+
+        overlay.querySelector(".smap-back").addEventListener("click", close);
+        overlay.querySelector(".smap-chips").addEventListener("click", (e) => {
+            const chip = e.target.closest(".smap-chip");
+            if (!chip) return;
+            activeType = chip.dataset.type;
+            applyFilter();
+            fit();
+        });
+
+        // popup "View menu" button
+        shopMap.on("popupopen", (e) => {
+            const btn = e.popup.getElement()?.querySelector(".smap-open-menu");
+            if (!btn) return;
+            btn.addEventListener("click", () => openShopMenu(btn.dataset.id));
+        });
+    }
+
+    // ---------- data ----------
+    function loadResults() {
+        try {
+            return JSON.parse(sessionStorage.getItem(getRestaurantCacheKey(currentUserId())) || "null") || {};
+        } catch (e) { return {}; }
+    }
+
+    function pick() {
+        for (const v of arguments) {
+            const n = parseFloat(v);
+            if (Number.isFinite(n)) return n;
+        }
+        return null;
+    }
+
+    function coordsOf(d) {
+        const c = d.coordinates || d.location || d.coords || d.geo || {};
+        const arr = Array.isArray(c) ? c : (Array.isArray(c.coordinates) ? c.coordinates : null);
+        if (arr && arr.length >= 2) { // GeoJSON order: [lng, lat]
+            const lng = parseFloat(arr[0]), lat = parseFloat(arr[1]);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+        }
+        const lat = pick(d.latt, d.lat, d.latitude, c.latt, c.lat, c.latitude);
+        const lng = pick(d.long, d.lng, d.lon, d.longitude, c.long, c.lng, c.lon, c.longitude);
+        return lat !== null && lng !== null ? { lat, lng } : null;
+    }
+
+    function isOnline(id, d) {
+        return storeStatus.has(id) ? storeStatus.get(id) : d.is_online !== false;
+    }
+
+    // ---------- markers ----------
+    function iconFor(type, online) {
+        const p = pinOf(type);
+        return L.divIcon({
+            className: "",
+            html: `<div class="smap-pin${online ? "" : " off"}" style="--c:${p.color}"><span>${p.icon}</span></div>`,
+            iconSize: [34, 34],
+            iconAnchor: [17, 41],
+            popupAnchor: [0, -38]
+        });
+    }
+
+    function popupHtml(id, d, online) {
+        const p = pinOf(d.type);
+        const km = Number(d.distance_km);
+        const dist = Number.isFinite(km) ? `${km.toFixed(1)} km` : "";
+        const hasDelivery = String(d.delivery_available).toLowerCase() === "true";
+        const eta = KiranaUtils.etaRange(d.distance_km).label;
+        const status = !online ? "Offline" : (hasDelivery ? `Open • ${eta} min` : "Open • Pickup only");
+        return `
+            <div class="smap-pop">
+                <strong>${escapeHtml(d.res_name || "")}</strong>
+                <span>${escapeHtml(p.label.replace(/s$/, ""))}${dist ? " • " + escapeHtml(dist) : ""}</span>
+                <span class="${online ? "on" : "off"}">${escapeHtml(status)}</span>
+                <button type="button" class="smap-open-menu" data-id="${escapeHtml(id)}">View menu</button>
+            </div>`;
+    }
+
+    function addShop(id, d, pos) {
+        if (entries.some((e) => e.id === id)) return;
+        const online = isOnline(id, d);
+        const marker = L.marker([pos.lat, pos.lng], { icon: iconFor(d.type, online), title: d.res_name || "" });
+        marker.bindPopup(() => popupHtml(id, d, isOnline(id, d)));
+        entries.push({ id, type: d.type || "other", detail: d, marker });
+        applyFilter();
+    }
+
+    function visible(e) {
+        return activeType === "all" || e.type === activeType;
+    }
+
+    function applyFilter() {
+        entries.forEach((e) => {
+            const show = visible(e);
+            const on = shopLayer.hasLayer(e.marker);
+            if (show && !on) shopLayer.addLayer(e.marker);
+            if (!show && on) shopLayer.removeLayer(e.marker);
+        });
+
+        // legend chips with counts
+        const counts = {};
+        entries.forEach((e) => { counts[e.type] = (counts[e.type] || 0) + 1; });
+        const chips = [`<button type="button" class="smap-chip${activeType === "all" ? " active" : ""}" data-type="all" style="--c:#1f2937"><i></i>All <b>${entries.length}</b></button>`];
+        Object.keys(PIN).forEach((t) => {
+            chips.push(`<button type="button" class="smap-chip${activeType === t ? " active" : ""}" data-type="${t}" style="--c:${PIN[t].color}"><i></i>${PIN[t].label} <b>${counts[t] || 0}</b></button>`);
+        });
+        overlay.querySelector(".smap-chips").innerHTML = chips.join("");
+
+        const shown = entries.filter(visible).length;
+        overlay.querySelector(".smap-sub").textContent =
+            `${shown} shop${shown === 1 ? "" : "s"} within ${homeFormatKm(homeRadiusKm)}`;
+    }
+
+    function fit() {
+        const pts = entries.filter(visible).map((e) => e.marker.getLatLng());
+        if (me) pts.push(me);
+        if (pts.length > 1) shopMap.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 16 });
+        else if (pts.length === 1) shopMap.setView(pts[0], 15);
+    }
+
+    function setNote(text) {
+        const n = overlay && overlay.querySelector(".smap-note");
+        if (n) n.textContent = text || "";
+    }
+
+    // Looks up shops that came without coordinates, one per ~1.1s (OSM limit), cached forever.
+    async function geocodeMissing(list, token) {
+        for (const item of list) {
+            if (token !== runToken) return;
+            const key = `shopGeo_${item.id}`;
+            let pos = null;
+            try { pos = JSON.parse(localStorage.getItem(key)); } catch (e) { /* ignore */ }
+
+            if (!pos && item.detail.address) {
+                await sleep(1100);
+                if (token !== runToken) return;
+                try {
+                    const q = `${item.detail.address}, Hyderabad`;
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=${encodeURIComponent(q)}`);
+                    const j = r.ok ? await r.json() : [];
+                    if (j[0]) {
+                        pos = { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
+                        try { localStorage.setItem(key, JSON.stringify(pos)); } catch (e) { /* ignore */ }
+                    }
+                } catch (e) { /* leave unplaced */ }
+            }
+
+            if (pos && Number.isFinite(pos.lat) && Number.isFinite(pos.lng)) addShop(item.id, item.detail, pos);
+            else unplaced += 1;
+        }
+        if (token !== runToken) return;
+        fit();
+        setNote(unplaced ? `${unplaced} shop${unplaced === 1 ? "" : "s"} couldn't be placed on the map` : "");
+    }
+
+    function render() {
+        runToken += 1;
+        const token = runToken;
+        entries = [];
+        unplaced = 0;
+        activeType = "all";
+        shopLayer.clearLayers();
+        meLayer.clearLayers();
+        setNote("");
+
+        // you + search radius
+        me = null;
+        try {
+            const loc = JSON.parse(localStorage.getItem("userLocation"));
+            if (loc && Number.isFinite(parseFloat(loc.latt)) && Number.isFinite(parseFloat(loc.long))) {
+                me = L.latLng(parseFloat(loc.latt), parseFloat(loc.long));
+                L.circle(me, { radius: homeRadiusKm * 1000, color: "#2563eb", weight: 1, fillColor: "#2563eb", fillOpacity: 0.06, interactive: false }).addTo(meLayer);
+                L.marker(me, {
+                    icon: L.divIcon({ className: "", html: '<div class="smap-me"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+                    interactive: false, keyboard: false
+                }).addTo(meLayer);
+            }
+        } catch (e) { /* ignore */ }
+
+        const results = loadResults();
+        const missing = [];
+        Object.entries(results).forEach(([id, d]) => {
+            const pos = coordsOf(d);
+            if (pos) addShop(id, d, pos); else missing.push({ id, detail: d });
+        });
+
+        applyFilter();
+        fit();
+
+        if (!Object.keys(results).length) setNote("No shops to show yet. Go back and wait for the list to load.");
+        else if (missing.length) {
+            setNote(`Placing ${missing.length} more shop${missing.length === 1 ? "" : "s"}…`);
+            geocodeMissing(missing, token);
+        }
+    }
+
+    function openShopMenu(id) {
+        const e = entries.find((x) => x.id === id);
+        if (!e) return;
+        const d = e.detail;
+        close();
+        navigateToMenu(d.res_name || "", d.address || "", id, currentUserId(), {
+            distanceKm: d.distance_km,
+            type: d.type,
+            delivery: String(d.delivery_available).toLowerCase() === "true",
+            radius: d.delivery_radius
+        });
+    }
+
+    function open() {
+        if (typeof L === "undefined") { showToast("Map couldn't load. Please refresh."); return; }
+        build();
+        lastFocus = document.activeElement;
+        overlay.classList.add("show");
+        overlay.setAttribute("aria-hidden", "false");
+        document.body.classList.add("smap-open");
+        // Leaflet needs the container to have its final size before drawing
+        setTimeout(() => { shopMap.invalidateSize(); render(); }, 320);
+        overlay.querySelector(".smap-back").focus();
+    }
+
+    function close() {
+        if (!overlay || !overlay.classList.contains("show")) return;
+        runToken += 1; // stop any running address lookups
+        overlay.classList.remove("show");
+        overlay.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("smap-open");
+        if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+    }
+
+    // a seller toggled a shop while the map is open -> restyle its pin
+    document.addEventListener("store:status", (e) => {
+        if (!overlay || !overlay.classList.contains("show")) return;
+        const entry = entries.find((x) => x.id === String(e.detail.resId));
+        if (entry) entry.marker.setIcon(iconFor(entry.type, e.detail.online));
+    });
+
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    document.addEventListener("spa:pageload", close);
+    window.addEventListener("hashchange", close);
+
+    window.KiranaShopMap = { open, close };
+})();

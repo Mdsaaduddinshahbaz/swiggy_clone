@@ -9,6 +9,18 @@ function escapeOrderHtml(str) {
     })[c]);
 }
 
+function ordersNotify(msg) {
+    if (typeof window.showToast === "function") window.showToast(msg);
+    else alert(msg);
+}
+
+// ---------------------------------------------------------------
+// Inline icons (same icons as the design)
+// ---------------------------------------------------------------
+const ICON_QR = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3m5 0v.01M12 7v3a2 2 0 0 1-2 2H7m-4 0h.01M12 3h.01M12 16v.01M16 12h1m4 0v.01M12 21v-1"/></svg>`;
+const ICON_EYE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+const ICON_REPEAT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2l4 4l-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4l4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`;
+
 // ---------------------------------------------------------------
 // Complaints / "Report a problem"
 // ---------------------------------------------------------------
@@ -61,14 +73,39 @@ function ensureHelpButton(card, status) {
 }
 
 // ---------------------------------------------------------------
-// Shared state for edit / cancel
+// Shared state for edit / cancel / filters
 // ---------------------------------------------------------------
 let ordersById = {};                 // checkout_id -> order (filled by renderOrders)
+let lastOrders = [];                 // raw list from the last render (used for re-sorting)
 let ordersCtx = { userId: null };    // set by initOrdersPage
+let ordersFilter = "placed";         // "placed" | "completed" | "canceled"  (tabs)
+let ordersSort = "newest";           // "newest" | "oldest"
+const ITEM_PREVIEW_LIMIT = 3;        // items shown before "+ N more items"
+
+function tabFor(status) {
+    const s = String(status || "").trim().toLowerCase();
+    if (s === "completed" || s === "collected") return "completed";
+    if (s === "canceled" || s === "cancelled") return "canceled";
+    return "placed";
+}
 
 function findCard(orderId) {
     return Array.from(document.querySelectorAll(".order-card"))
         .find((c) => c.dataset.orderId === String(orderId)) || null;
+}
+
+// Hides everything that only makes sense while an order is still active
+function deactivateCard(card) {
+    if (!card) return;
+    const actions = card.querySelector(".order-actions");
+    if (actions) actions.style.display = "none";
+    const editNote = card.querySelector(".edit-note");
+    if (editNote) editNote.style.display = "none";
+    const qrBtn = card.querySelector(".qrBtn");
+    if (qrBtn) {
+        qrBtn.disabled = true;
+        qrBtn.classList.add("is-off");
+    }
 }
 
 function editDeadlineMs(order) {
@@ -95,9 +132,6 @@ async function refreshOrdersView() {
     const list = document.getElementById("orders-list");
     if (!userId || !list) return;
     await loadOrders(userId, { background: true });
-    const dd = document.getElementById("filterDropdown");
-    const empty = document.getElementById("No_orders_container");
-    if (dd && empty) applyFilterFor(dd, empty);
 }
 
 socket.on("connect", () => {
@@ -117,12 +151,7 @@ socket.on("order_status_updated", (data) => {
 
             // QR, edit and cancel only make sense while the order is still active
             if (data.status !== "placed") {
-                const actions = card.querySelector(".order-actions");
-                if (actions) actions.style.display = "none";
-                const editNote = card.querySelector(".edit-note");
-                if (editNote) editNote.style.display = "none";
-                const qrBtn = card.querySelector(".qrBtn");
-                if (qrBtn) qrBtn.style.display = "none";
+                deactivateCard(card);
                 const openSheet = document.getElementById("qrSheet");
                 if (openSheet && openSheet.dataset.token === card.dataset.token) closeQRSheet();
                 if (actionSheetState && actionSheetState.orderId === card.dataset.orderId) closeActionSheet();
@@ -141,6 +170,8 @@ socket.on("order_status_updated", (data) => {
             sessionStorage.setItem(cacheKey, JSON.stringify(orders));
         } catch (e) { }
     }
+    // tab counts + which tab the card belongs to
+    applyFilter();
 });
 
 // The shop trimmed this customer's order -> reload so quantities / totals are right
@@ -179,7 +210,7 @@ function ensureQRSheet() {
         #qrSheetOverlay {
             position: fixed;
             inset: 0;
-            background: rgba(36, 28, 26, 0.5);
+            background: rgba(26, 33, 24, 0.5);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
@@ -195,12 +226,13 @@ function ensureQRSheet() {
             margin: 0 auto;
             width: 100%;
             max-width: 480px;
-            background: #FFFDF9;
-            color: #241C1A;
+            background: #ffffff;
+            color: #1a2118;
             border-radius: 20px 20px 0 0;
             padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
-            box-shadow: 0 -14px 40px -18px rgba(36, 28, 26, 0.5);
+            box-shadow: 0 -14px 40px -18px rgba(26, 33, 24, 0.5);
             text-align: center;
+            font-family: 'Inter', sans-serif;
             transform: translateY(100%);
             transition: transform 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
             will-change: transform;
@@ -211,15 +243,15 @@ function ensureQRSheet() {
         #qrSheet .qrHandle {
             width: 40px;
             height: 4px;
-            background: #E7D8C3;
+            background: #e9dfc9;
             border-radius: 999px;
             margin: 0 auto 14px;
         }
-        #qrSheet .qrTitle { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+        #qrSheet .qrTitle { font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 900; margin: 0 0 4px; }
         #qrSheet .qrToken {
             font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
-            color: #6b5f58;
+            color: #7f796c;
             margin: 0 0 16px;
         }
         #qrSheet .qrBox {
@@ -230,21 +262,22 @@ function ensureQRSheet() {
             margin: 0 auto 18px;
             padding: 8px;
             background: #fff;
-            border: 1px solid #E7D8C3;
-            border-radius: 14px;
+            border: 1px solid #e9dfc9;
+            border-radius: 12px;
             width: fit-content;
             font-size: 13px;
-            color: #6b5f58;
+            color: #7f796c;
         }
         #qrSheet .qrClose {
             width: 100%;
-            background: #E8491D;
-            color: #FFFDF9;
+            background: #157a3a;
+            color: #ffffff;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 14px 0;
-            font-weight: 700;
+            font-weight: 600;
             font-size: 15px;
+            font-family: inherit;
             cursor: pointer;
         }
     `;
@@ -320,7 +353,7 @@ function closeQRSheet() {
 }
 
 // ---------------------------------------------------------------
-// Action bottom sheet — used for "Edit items" and "Cancel order"
+// Action bottom sheet — used for "View", "Edit items" and "Cancel order"
 // ---------------------------------------------------------------
 
 const CANCEL_REASONS = [
@@ -333,7 +366,7 @@ const CANCEL_REASONS = [
 ];
 const OTHER_REASON = "Something else";
 
-let actionSheetState = null;   // { mode: "edit" | "cancel", orderId, ... }
+let actionSheetState = null;   // { mode: "view" | "edit" | "cancel", orderId, ... }
 let sheetBusy = false;
 
 function ensureActionSheet() {
@@ -343,74 +376,65 @@ function ensureActionSheet() {
     const style = document.createElement("style");
     style.id = "osStyle";
     style.textContent = `
-        .order-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-        .order-actions .cancelBtn { margin: 0 !important; }
-        .editBtn {
-            background: var(--white, #FFFDF9); color: var(--flame-dark, #C23A15);
-            border: 1.5px solid var(--flame, #E8491D); border-radius: 8px; padding: 8px 16px;
-            font-family: var(--font-body, 'DM Sans', sans-serif); font-weight: 700; font-size: 12.5px;
-            letter-spacing: .03em; cursor: pointer; transition: background .12s ease, color .12s ease;
-        }
-        .editBtn:hover { background: var(--flame, #E8491D); color: var(--white, #FFFDF9); }
-        .editBtn:focus-visible { outline: 2px solid var(--flame, #E8491D); outline-offset: 2px; }
-        .edit-note { font-size: 12px; color: var(--ink-soft, #6b5f58); margin-top: 12px; text-align: right; }
-
-        #osOverlay { position: fixed; inset: 0; background: rgba(36,28,26,.5); opacity: 0; pointer-events: none; transition: opacity .3s ease; z-index: 2100; }
+        #osOverlay { position: fixed; inset: 0; background: rgba(26,33,24,.5); opacity: 0; pointer-events: none; transition: opacity .3s ease; z-index: 2100; }
         #osOverlay.show { opacity: 1; pointer-events: auto; }
         #osSheet {
             position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: 520px;
             max-height: 88vh; display: flex; flex-direction: column;
-            background: #FFFDF9; color: #241C1A; border-radius: 20px 20px 0 0;
-            box-shadow: 0 -14px 40px -18px rgba(36,28,26,.5);
-            font-family: 'DM Sans', sans-serif; text-align: left;
+            background: #ffffff; color: #1a2118; border-radius: 20px 20px 0 0;
+            box-shadow: 0 -14px 40px -18px rgba(26,33,24,.5);
+            font-family: 'Inter', sans-serif; text-align: left;
             transform: translateY(100%); transition: transform .35s cubic-bezier(.22,.8,.3,1);
             will-change: transform; z-index: 2101;
         }
         #osSheet.show { transform: translateY(0); }
-        #osSheet .osHandle { width: 40px; height: 4px; background: #E7D8C3; border-radius: 999px; margin: 12px auto 10px; flex-shrink: 0; }
-        #osSheet .osHead { display: flex; align-items: center; gap: 10px; padding: 0 20px 12px; border-bottom: 1px dashed #E7D8C3; flex-shrink: 0; }
-        #osSheet .osTitle { font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase; font-size: 22px; letter-spacing: .01em; margin: 0; flex: 1; }
-        #osSheet .osX { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; color: #6b5f58; padding: 4px 6px; }
+        #osSheet .osHandle { width: 40px; height: 4px; background: #e9dfc9; border-radius: 999px; margin: 12px auto 10px; flex-shrink: 0; }
+        #osSheet .osHead { display: flex; align-items: center; gap: 10px; padding: 0 20px 12px; border-bottom: 1px solid #e9dfc9; flex-shrink: 0; }
+        #osSheet .osTitle { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; margin: 0; flex: 1; }
+        #osSheet .osX { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; color: #7f796c; padding: 4px 6px; }
         #osSheet .osBody { overflow-y: auto; padding: 14px 20px calc(22px + env(safe-area-inset-bottom, 0px)); -webkit-overflow-scrolling: touch; }
-        #osSheet .osSub { font-size: 13px; color: #6b5f58; margin: 0 0 12px; line-height: 1.5; }
-        #osSheet .osStore { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #C23A15; margin: 14px 0 6px; }
-        #osSheet .osItem { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px dashed #E7D8C3; }
+        #osSheet .osSub { font-size: 13px; color: #7f796c; margin: 0 0 12px; line-height: 1.5; }
+        #osSheet .osStore { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #ff4d00; margin: 14px 0 6px; }
+        #osSheet .osItem { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #e9dfc9; }
         #osSheet .osItemInfo { display: flex; flex-direction: column; min-width: 0; }
-        #osSheet .osItemName { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
-        #osSheet .osItemPrice { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6b5f58; }
+        #osSheet .osItemName { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+        #osSheet .osItemPrice { font-size: 12px; color: #7f796c; }
+        #osSheet .osLine { font-weight: 600; font-size: 13px; flex-shrink: 0; }
         #osSheet .osItem.osRemoved .osItemName { text-decoration: line-through; opacity: .55; }
         #osSheet .osItem.osLocked { opacity: .6; }
         #osSheet .osStepper { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
         #osSheet .osStepper button {
-            width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid #E8491D; background: #FFFDF9;
-            color: #C23A15; font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; padding: 0;
+            width: 30px; height: 30px; border-radius: 8px; border: 1px solid #157a3a; background: #ffffff;
+            color: #157a3a; font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; padding: 0;
         }
-        #osSheet .osStepper button:hover { background: #E8491D; color: #FFFDF9; }
-        #osSheet .osQty { min-width: 28px; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; }
-        #osSheet .osTotal { display: flex; justify-content: flex-end; gap: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; margin-top: 14px; }
-        #osSheet .osError { color: #C23A15; font-size: 13px; font-weight: 700; margin: 10px 0 0; min-height: 0; }
+        #osSheet .osStepper button:hover { background: #157a3a; color: #ffffff; }
+        #osSheet .osQty { min-width: 28px; text-align: center; font-weight: 700; font-size: 14px; }
+        #osSheet .osTotal { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; margin-top: 14px; }
+        #osSheet .osInfo { margin-top: 14px; font-size: 12px; color: #7f796c; line-height: 1.6; }
+        #osSheet .osInfo b { color: #1a2118; font-weight: 600; }
+        #osSheet .osError { color: #c2300a; font-size: 13px; font-weight: 600; margin: 10px 0 0; min-height: 0; }
         #osSheet .osReasons { display: flex; flex-direction: column; gap: 8px; }
         #osSheet .osReason {
-            text-align: left; width: 100%; background: #FFF1DE; border: 1.5px solid #E7D8C3; border-radius: 12px;
-            padding: 12px 14px; font-family: inherit; font-size: 14px; font-weight: 700; color: #241C1A; cursor: pointer;
+            text-align: left; width: 100%; background: #faf6ef; border: 1px solid #e9dfc9; border-radius: 10px;
+            padding: 12px 14px; font-family: inherit; font-size: 14px; font-weight: 600; color: #1a2118; cursor: pointer;
         }
-        #osSheet .osReason:hover { border-color: #E8491D; }
-        #osSheet .osReason.selected { border-color: #E8491D; background: #FFE6C7; }
+        #osSheet .osReason:hover { border-color: #157a3a; }
+        #osSheet .osReason.selected { border-color: #157a3a; background: #e4f2e5; }
         #osSheet textarea {
             display: none; width: 100%; min-height: 80px; margin-top: 10px; font-family: inherit; font-size: 14px;
-            color: #241C1A; background: #fff; border: 1px solid #E7D8C3; border-radius: 10px; padding: 10px 12px; resize: vertical;
+            color: #1a2118; background: #fff; border: 1px solid #e9dfc9; border-radius: 10px; padding: 10px 12px; resize: vertical;
             -webkit-user-select: text; user-select: text;
         }
         #osSheet textarea.show { display: block; }
-        #osSheet textarea:focus { outline: 2px solid #E8491D; outline-offset: 1px; }
+        #osSheet textarea:focus { outline: 2px solid #157a3a; outline-offset: 1px; }
         #osSheet .osActions { display: flex; gap: 10px; margin-top: 16px; }
         #osSheet .osPrimary, #osSheet .osSecondary {
-            flex: 1; border-radius: 12px; padding: 13px 0; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit;
+            flex: 1; border-radius: 10px; padding: 13px 0; font-weight: 600; font-size: 14px; cursor: pointer; font-family: inherit;
         }
-        #osSheet .osPrimary { background: #E8491D; color: #FFFDF9; border: none; }
-        #osSheet .osPrimary.osDanger { background: #C23A15; }
+        #osSheet .osPrimary { background: #157a3a; color: #ffffff; border: none; }
+        #osSheet .osPrimary.osDanger { background: #c2300a; }
         #osSheet .osPrimary:disabled { opacity: .45; cursor: not-allowed; }
-        #osSheet .osSecondary { background: #FFFDF9; color: #241C1A; border: 1.5px solid #E7D8C3; }
+        #osSheet .osSecondary { background: #ffffff; color: #1a2118; border: 1px solid #e9dfc9; }
     `;
     document.head.appendChild(style);
 
@@ -469,6 +493,70 @@ function sheetEl(id) { return document.getElementById(id); }
 function setSheetError(msg) {
     const el = sheetEl("osError");
     if (el) el.textContent = msg || "";
+}
+
+// ------------------------- VIEW ORDER --------------------------
+
+function openViewSheet(orderId) {
+    const order = ordersById[orderId];
+    if (!order) return;
+    actionSheetState = { mode: "view", orderId };
+
+    const isDelivery = order.order_type === "delivery";
+    let total = 0;
+    let html = `<p class="osSub">${escapeOrderHtml(order.date)}</p>`;
+
+    Object.values(order.resturants.cart).forEach((store) => {
+        html += `<div class="osStore">${escapeOrderHtml(store.name)}</div>`;
+        Object.values(store.items || {}).forEach((item) => {
+            const line = (Number(item.price) || 0) * (Number(item.qty) || 0);
+            total += line;
+            html += `
+                <div class="osItem">
+                    <div class="osItemInfo">
+                        <span class="osItemName">${escapeOrderHtml(item.name)}</span>
+                        <span class="osItemPrice">₹${escapeOrderHtml(item.price)} x ${escapeOrderHtml(item.qty)}</span>
+                    </div>
+                    <span class="osLine">₹${line}</span>
+                </div>`;
+        });
+    });
+
+    let fulfil = "";
+    if (isDelivery && order.delivery_address) {
+        const a = order.delivery_address;
+        fulfil = `<b>Delivery to:</b> ${escapeOrderHtml(a.adrs_type)} - ${escapeOrderHtml(a.address)}`;
+        if (a.phone) fulfil += `<br><b>Phone:</b> ${escapeOrderHtml(a.phone)}`;
+    } else {
+        fulfil = `<b>Pickup time:</b> ${escapeOrderHtml(order.pickup_time || "-")}`;
+    }
+
+    html += `
+        <div class="osTotal"><span>Total</span><span>₹${total}</span></div>
+        <div class="osInfo">
+            <b>Order:</b> #${escapeOrderHtml(order.order_id)}<br>
+            <b>Token No:</b> ${escapeOrderHtml(order.token_no)}<br>
+            <b>Status:</b> ${escapeOrderHtml(order.status)}<br>
+            ${fulfil}
+        </div>
+        <div class="osActions">
+            <button type="button" class="osPrimary" data-os="close">Close</button>
+        </div>`;
+
+    showActionSheet("Order details", html);
+}
+
+// ------------------------- REORDER -----------------------------
+// Needs to talk to your cart. Define window.reorderFromOrder(order) in
+// cart.js (or anywhere) and this button will call it with the full order.
+function reorderOrder(orderId) {
+    const order = ordersById[orderId];
+    if (!order) return;
+    if (typeof window.reorderFromOrder === "function") {
+        window.reorderFromOrder(order);
+        return;
+    }
+    ordersNotify("Reorder isn't available yet.");
 }
 
 // ------------------------- EDIT ITEMS --------------------------
@@ -667,12 +755,7 @@ async function confirmCancel() {
                 const statusSpan = card.querySelector(".order-status");
                 statusSpan.textContent = "canceled";
                 statusSpan.className = "order-status status-canceled";
-                const actions = card.querySelector(".order-actions");
-                if (actions) actions.style.display = "none";
-                const note = card.querySelector(".edit-note");
-                if (note) note.style.display = "none";
-                const qrBtn = card.querySelector(".qrBtn");
-                if (qrBtn) qrBtn.style.display = "none";
+                deactivateCard(card);
                 ensureHelpButton(card, "canceled");
             }
             sheetBusy = false;
@@ -733,7 +816,7 @@ function refreshEditButtons() {
     document.querySelectorAll(".order-card").forEach((card) => {
         const order = ordersById[card.dataset.orderId];
         if (canEditNow(order)) return;
-        card.querySelector(".editBtn")?.remove();
+        card.querySelector(".oc-edit")?.remove();
         card.querySelector(".edit-note")?.remove();
     });
     const st = actionSheetState;
@@ -748,40 +831,51 @@ function refreshEditButtons() {
 // Rendering
 // ---------------------------------------------------------------
 
+function moreLabel(n) {
+    return `+ ${n} more item${n === 1 ? "" : "s"}`;
+}
+
 function renderOrders(orders, ordersList, no_order_container) {
     ordersById = {};
-    if (!orders || orders.length === 0) {
-        no_order_container.classList.add("show");
-        ordersList.innerHTML = "";
-        return;
-    }
-    no_order_container.classList.remove("show");
+    lastOrders = Array.isArray(orders) ? orders : [];
 
-    const html = orders.map(order => {
+    // newest / oldest first (orders with an unreadable date keep their server order)
+    const sorted = lastOrders.slice().sort((a, b) => {
+        const ta = Date.parse(a.date), tb = Date.parse(b.date);
+        if (Number.isNaN(ta) || Number.isNaN(tb)) return 0;
+        return ordersSort === "newest" ? tb - ta : ta - tb;
+    });
+
+    const html = sorted.map(order => {
         ordersById[String(order.order_id)] = order;
 
         const cart = order.resturants.cart;
         let total = 0;
         let restaurantsHTML = "";
+        let itemIdx = 0;
 
-        Object.entries(cart).forEach(([resId, blabla]) => {
+        Object.entries(cart).forEach(([resId, store]) => {
+            const groupHidden = itemIdx >= ITEM_PREVIEW_LIMIT;
             restaurantsHTML += `
-        <div class="restaurant-name" res_id="${escapeOrderHtml(resId)}">
-            ${escapeOrderHtml(blabla.name)}
-        </div>
-    `;
-            Object.entries(blabla.items).forEach(([itemid, item]) => {
+        <div class="oc-group${groupHidden ? " oc-extra" : ""}">
+            <div class="restaurant-name" res_id="${escapeOrderHtml(resId)}">${escapeOrderHtml(store.name)}</div>
+            <div class="oc-items">`;
+            Object.entries(store.items || {}).forEach(([itemid, item]) => {
                 const itemTotal = item.price * item.qty;
                 total += itemTotal;
                 restaurantsHTML += `
-            <div class="item" item_id="${escapeOrderHtml(itemid)}">
-                <span>${escapeOrderHtml(item.name)} x ${escapeOrderHtml(item.qty)}</span>
-                <span>₹${itemTotal}</span>
-            </div>
-        `;
+                <div class="item${itemIdx >= ITEM_PREVIEW_LIMIT ? " oc-extra" : ""}" item_id="${escapeOrderHtml(itemid)}">
+                    <span class="item-name">${escapeOrderHtml(item.name)} x ${escapeOrderHtml(item.qty)}</span>
+                    <span class="item-price">₹${itemTotal}</span>
+                </div>`;
+                itemIdx++;
             });
+            restaurantsHTML += `
+            </div>
+        </div>`;
         });
 
+        const extraCount = Math.max(0, itemIdx - ITEM_PREVIEW_LIMIT);
         const isActive = order.status === "placed";
         const isDelivery = order.order_type === "delivery";
         const canHelp = orderCanGetHelp(order);
@@ -793,63 +887,46 @@ function renderOrders(orders, ordersList, no_order_container) {
         if (isDelivery && order.delivery_address) {
             const a = order.delivery_address;
             fulfilmentHTML = `
-                <div class="order-date">Delivery to: ${escapeOrderHtml(a.adrs_type)} - ${escapeOrderHtml(a.address)}</div>
-                ${a.phone ? `<div class="order-date">Phone: ${escapeOrderHtml(a.phone)}</div>` : ""}
+                <p>Delivery to: ${escapeOrderHtml(a.adrs_type)} - ${escapeOrderHtml(a.address)}</p>
+                ${a.phone ? `<p>Phone: ${escapeOrderHtml(a.phone)}</p>` : ""}
             `;
         } else {
-            fulfilmentHTML = `<div class="order-date">Pickup Time: ${escapeOrderHtml(order.pickup_time || "-")}</div>`;
+            fulfilmentHTML = `<p>Pickup Time: ${escapeOrderHtml(order.pickup_time || "-")}</p>`;
         }
 
         return `
             <div class="order-card" data-order-id="${escapeOrderHtml(order.order_id)}" data-token="${escapeOrderHtml(order.token_no)}" data-order-type="${isDelivery ? "delivery" : "pickup"}">
-                <div class="order-header">
-                    <span class="order-id">#${escapeOrderHtml(order.order_id)}</span>
-                    <span class="order-status status-${escapeOrderHtml(order.status)}">
-                        ${escapeOrderHtml(order.status)}
-                    </span>
+                <div class="oc-top">
+                    <div class="order-header">
+                        <div class="oc-head-main">
+                            <div class="oc-id-row">
+                                <span class="order-id">#${escapeOrderHtml(order.order_id)}</span>
+                                <span class="order-status status-${escapeOrderHtml(order.status)}">${escapeOrderHtml(order.status)}</span>
+                            </div>
+                            <div class="token-no">Token No: ${escapeOrderHtml(order.token_no)}</div>
+                        </div>
+                        <button type="button" class="qrBtn oc-qr${isActive ? "" : " is-off"}" aria-label="Show QR code" ${isActive ? "" : "disabled"}>
+                            ${ICON_QR}<span>QR</span>
+                        </button>
+                    </div>
+                    <div class="oc-meta">
+                        <p>${escapeOrderHtml(order.date)}</p>
+                        ${fulfilmentHTML}
+                    </div>
                 </div>
-                <div class="token-no">Token No: ${escapeOrderHtml(order.token_no)}</div>
-                <button type="button" class="qrBtn" aria-label="Show QR code" style="
-                    background: none;
-                    border: none;
-                    padding: 0;
-                    margin: -11px 0;
-                    cursor: pointer;
-                    position:absolute;
-                    right:38px;
-                    line-height: 0;
-                    ${isActive ? "display:block;" : "display:none;"}
-                ">
-                    <img src="/static/qr-code.png" alt="Show QR code" style="width:23px; height:23px; display:block; pointer-events:none;">
-                </button>
-                <div class="order-date">${escapeOrderHtml(isDelivery ? "Delivery" : "Pickup")}</div>
-                <div class="order-date">${escapeOrderHtml(order.date)}</div>
-                ${fulfilmentHTML}
                 ${restaurantsHTML}
-                <div class="total">Total: ₹${total}</div>
+                ${extraCount > 0 ? `<div class="oc-more-wrap"><button type="button" class="oc-more" data-extra="${extraCount}">${moreLabel(extraCount)}</button></div>` : ""}
+                <div class="oc-total"><span>Total:</span><span>₹${total}</span></div>
                 ${canEdit ? `<div class="edit-note">You can edit items until ${escapeOrderHtml(fmtDeadline(editDeadlineMs(order)))}</div>` : ""}
                 ${isActive ? `
-                <div class="order-actions" style="display: flex;
-    justify-content: space-between;">
-                    ${canEdit ? `<button type="button" class="editBtn" style="    background: var(--white, #FFFDF9);
-    color: var(--flame-dark, #C23A15);
-    border: 1.5px solid var(--flame, #E8491D);
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-family: var(--font-body);
-    font-weight: 700;
-    font-size: 12.5px;
-    letter-spacing: .03em;
-    cursor: pointer;
-    transition: background .12s ease, color .12s ease;">Edit items</button>` : ""}
-                    <button class="cancelBtn" style="
-                        background: red;
-                        color: white;
-                        padding: 5px 11px;
-                        border-radius: 7px;
-                        border: none;
-                    ">Cancel Order</button>
+                <div class="order-actions">
+                    ${canEdit ? `<button type="button" class="oc-act oc-edit">Edit items</button>` : ""}
+                    <button type="button" class="oc-act oc-cancel">Cancel order</button>
                 </div>` : ""}
+                <div class="order-footer">
+                    <button type="button" class="oc-btn outline oc-view">${ICON_EYE}<span>View</span></button>
+                    <button type="button" class="oc-btn solid oc-reorder">${ICON_REPEAT}<span>Reorder</span></button>
+                </div>
                 ${canHelp ? helpButtonHTML({
             orderId: order.order_id,
             storeName: storeLabel,
@@ -862,22 +939,39 @@ function renderOrders(orders, ordersList, no_order_container) {
     }).join("");
 
     ordersList.innerHTML = html;
+    applyFilter();
 }
 
-function applyFilterFor(filterDropdown, no_order_container) {
-    no_order_container.classList.remove("show");
-    const cards = document.querySelectorAll(".order-card");
-    let visibleCardss = 0;
-    cards.forEach(card => {
-        const statusText = card.querySelector(".order-status").textContent.trim().toLowerCase();
-        if (filterDropdown.value.toLowerCase() === "all" || statusText === filterDropdown.value.toLowerCase()) {
-            card.style.display = "block";
-            visibleCardss++;
-        } else {
-            card.style.display = "none";
-        }
+// Shows only the cards of the selected tab, refreshes the tab counts and
+// toggles the empty-state / "No more orders" note.
+function applyFilter() {
+    const list = document.getElementById("orders-list");
+    if (!list) return;
+    const empty = document.getElementById("No_orders_container");
+    const endNote = document.getElementById("ordersEndNote");
+
+    const counts = { placed: 0, completed: 0, canceled: 0 };
+    let visible = 0;
+
+    list.querySelectorAll(".order-card").forEach((card) => {
+        const status = card.querySelector(".order-status")?.textContent || "";
+        const tab = tabFor(status);
+        counts[tab]++;
+        const show = tab === ordersFilter;
+        card.style.display = show ? "" : "none";
+        if (show) visible++;
     });
-    no_order_container.classList.toggle("show", visibleCardss === 0);
+
+    document.querySelectorAll(".orders-tab").forEach((btn) => {
+        const f = btn.dataset.filter;
+        btn.classList.toggle("active", f === ordersFilter);
+        btn.setAttribute("aria-selected", f === ordersFilter ? "true" : "false");
+        const badge = btn.querySelector(".orders-tab-count");
+        if (badge) badge.textContent = counts[f] ?? 0;
+    });
+
+    if (empty) empty.classList.toggle("show", visible === 0);
+    if (endNote) endNote.classList.toggle("show", visible > 0);
 }
 
 async function loadOrders(userId, { background = false } = {}) {
@@ -925,11 +1019,30 @@ function initOrdersPage() {
     const pathParts = window.location.pathname.split("/");
     const userId = window.APP_USER_ID || pathParts[pathParts.length - 1];
     ordersCtx.userId = userId;
-    const no_order_container = document.getElementById("No_orders_container");
-    const filterDropdown = document.getElementById("filterDropdown");
-    filterDropdown.addEventListener("change", () => applyFilterFor(filterDropdown, no_order_container), { signal });
 
-    loadOrders(userId).then(() => applyFilterFor(filterDropdown, no_order_container));
+    // tabs: Active / Completed / Cancelled
+    ordersFilter = "placed";
+    document.querySelectorAll(".orders-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            ordersFilter = btn.dataset.filter;
+            applyFilter();
+        }, { signal });
+    });
+
+    // sort toggle (newest <-> oldest)
+    const sortBtn = document.getElementById("ordersSortBtn");
+    if (sortBtn) {
+        sortBtn.addEventListener("click", () => {
+            ordersSort = ordersSort === "newest" ? "oldest" : "newest";
+            const label = ordersSort === "newest" ? "Sorted: newest first" : "Sorted: oldest first";
+            sortBtn.title = label;
+            sortBtn.setAttribute("aria-label", label);
+            renderOrders(lastOrders, ordersList, document.getElementById("No_orders_container"));
+        }, { signal });
+    }
+
+    applyFilter();
+    loadOrders(userId);
 
     // hide Edit buttons the moment their cutoff passes
     const tick = setInterval(refreshEditButtons, 20000);
@@ -954,19 +1067,39 @@ function initOrdersPage() {
             return;
         }
 
-        const qrBtn = e.target.closest(".qrBtn");
-        if (qrBtn) {
-            openQRSheet(qrBtn.closest(".order-card"));
+        const moreBtn = e.target.closest(".oc-more");
+        if (moreBtn) {
+            const card = moreBtn.closest(".order-card");
+            const open = card.classList.toggle("expanded");
+            moreBtn.textContent = open ? "Show less" : moreLabel(Number(moreBtn.dataset.extra) || 0);
             return;
         }
 
-        const editBtn = e.target.closest(".editBtn");
+        const viewBtn = e.target.closest(".oc-view");
+        if (viewBtn) {
+            openViewSheet(viewBtn.closest(".order-card").dataset.orderId);
+            return;
+        }
+
+        const reorderBtn = e.target.closest(".oc-reorder");
+        if (reorderBtn) {
+            reorderOrder(reorderBtn.closest(".order-card").dataset.orderId);
+            return;
+        }
+
+        const qrBtn = e.target.closest(".qrBtn");
+        if (qrBtn) {
+            if (!qrBtn.disabled) openQRSheet(qrBtn.closest(".order-card"));
+            return;
+        }
+
+        const editBtn = e.target.closest(".oc-edit");
         if (editBtn) {
             openEditSheet(editBtn.closest(".order-card").dataset.orderId);
             return;
         }
 
-        const cancelBtn = e.target.closest(".cancelBtn");
+        const cancelBtn = e.target.closest(".oc-cancel");
         if (cancelBtn) {
             openCancelSheet(cancelBtn.closest(".order-card").dataset.orderId);
         }

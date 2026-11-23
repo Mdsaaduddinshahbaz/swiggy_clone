@@ -172,8 +172,15 @@
             </div>
 
             <div class="live-row">
-                <span class="live-chip live"><i class="live-dot"></i> Live: <b id="liveShopCount">0</b>&nbsp;shops near you</span>
-                <span class="live-chip"><i class="fa-solid fa-motorcycle"></i> Avg <b id="avgEta">15</b>&nbsp;min delivery</span>
+                <span class="live-chip live">
+                    <i class="live-dot"></i>
+                    <span class="live-label">Live</span>
+                    <span class="live-marquee"><span class="live-track"><b id="liveShopCount">0</b>&nbsp;shops near you</span></span>
+                </span>
+                <span class="live-chip eta-chip">
+                    <span class="eta-ico"><i class="fa-solid fa-motorcycle"></i></span>
+                    <span class="live-marquee"><span class="live-track eta-track">Avg&nbsp;<b id="avgEta">15</b>&nbsp;min delivery</span></span>
+                </span>
                 <button class="map-view-btn" id="mapViewBtn" type="button"><i class="fa-solid fa-location-dot"></i> Map view</button>
             </div>
 
@@ -320,28 +327,39 @@
 
     <template id="tpl-orders">
         <div class="orders-container">
-            <div class="header">
+            <div class="orders-head">
                 <h1>Your Orders</h1>
-                <select id="filterDropdown">
-                    <option value="placed">Pending</option>
-                    <option value="all">All Orders</option>
-                    <option value="completed">Completed</option>
-                    <option value="canceled">Canceled</option>
-                </select>
+                <button type="button" class="orders-sort-btn" id="ordersSortBtn" aria-label="Sorted: newest first" title="Sorted: newest first">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8h4m-2 13v-9m0-4V3m5 13h4m-2-4V3m0 18v-5M3 14h4m-2-4V3m0 18v-7"/></svg>
+                </button>
             </div>
 
-            <p class="orders-help-note" style="margin:0 0 12px;font-size:13px;color:#6b5f58;">
-                Shop closed or something not right? Tap <strong>Report a problem</strong> on your pending order.
-            </p>
-
-            <div class="empty-state" id="No_orders_container">
-                <div class="icon">🛍️</div>
-                <h1>No Orders Yet</h1>
-                <p>Looks like you haven't placed any orders yet. Start exploring our products and find something you'll love.</p>
-                <button class="btn" id="shopBtn">Start Shopping</button>
+            <div class="orders-tabs" id="ordersTabs" role="tablist" aria-label="Order status">
+                <button type="button" class="orders-tab active" data-filter="placed" role="tab" aria-selected="true">Active<span class="orders-tab-count">0</span></button>
+                <button type="button" class="orders-tab" data-filter="completed" role="tab" aria-selected="false">Completed<span class="orders-tab-count">0</span></button>
+                <button type="button" class="orders-tab" data-filter="canceled" role="tab" aria-selected="false">Cancelled<span class="orders-tab-count">0</span></button>
             </div>
 
-            <div id="orders-list"></div>
+            <div class="orders-body">
+                <p class="orders-help-note">
+                    Shop closed or something not right? Tap <strong>Report a problem</strong> on your active order.
+                </p>
+
+                <div class="empty-state" id="No_orders_container">
+                    <div class="icon">🛍️</div>
+                    <h1>No Orders Yet</h1>
+                    <p>Looks like you haven't placed any orders yet. Start exploring our products and find something you'll love.</p>
+                    <button class="btn" id="shopBtn">Start Shopping</button>
+                </div>
+
+                <div id="orders-list"></div>
+
+                <div class="orders-end" id="ordersEndNote">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11"/></svg>
+                    <p>No more orders</p>
+                    <p>Start shopping to see new orders here</p>
+                </div>
+            </div>
         </div>
     </template>
 
