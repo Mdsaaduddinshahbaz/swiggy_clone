@@ -1404,3 +1404,94 @@ canvas#salesChart { width: 100%; height: 220px; display: block; }
   -webkit-user-select: text;
   user-select: text;
 }
+
+
+/* =====================================================================
+   9. WALK-IN SALE (offline customers)
+===================================================================== */
+.ws-open { margin-right: auto; background: var(--green); }
+.action-btn.ws-quick { grid-column: 1 / -1; }
+
+.ws-backdrop {
+  position: fixed; inset: 0; background: rgba(32, 35, 31, .5);
+  z-index: 2700; opacity: 0; pointer-events: none; transition: opacity .25s ease;
+}
+.ws-backdrop.show { opacity: 1; pointer-events: auto; }
+
+.ws-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto;
+  width: 100%; max-width: 520px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  background: #FFFFFB; color: #20231F;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -14px 40px -18px rgba(0, 0, 0, .5);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.22, .8, .3, 1);
+  z-index: 2701;
+}
+.ws-sheet.show { transform: translateY(0); }
+
+.ws-handle { width: 40px; height: 4px; border-radius: 999px; background: #E1DED2; margin: 10px auto 4px; flex-shrink: 0; }
+.ws-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px; flex-shrink: 0; }
+.ws-title { font-size: 17px; font-weight: 700; }
+.ws-sub { font-size: 12px; color: #87897F; margin-top: 2px; }
+.ws-close { width: 34px; height: 34px; border: none; border-radius: 50%; background: rgba(0, 0, 0, .06); font-size: 16px; cursor: pointer; }
+
+.ws-search {
+  margin: 0 20px 8px; padding: 11px 14px; border: 1px solid #D3CEBA; border-radius: 10px;
+  font-size: 14px; font-family: inherit; flex-shrink: 0;
+  -webkit-user-select: text; user-select: text;
+}
+
+.ws-list { overflow-y: auto; padding: 0 20px; flex: 1; min-height: 120px; }
+.ws-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid #E1DED2; }
+.ws-row.in-cart .ws-name { color: #2E6F4E; }
+.ws-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: #EEE; flex-shrink: 0; }
+.ws-info { flex: 1; min-width: 0; }
+.ws-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.ws-meta { font-size: 11.5px; color: #87897F; margin-top: 2px; }
+.ws-meta .low { color: #C97A1F; font-weight: 600; }
+
+.ws-add {
+  flex-shrink: 0; height: 34px; padding: 0 16px; border-radius: 8px;
+  border: 1.5px solid #2E6F4E; background: #fff; color: #2E6F4E; font-weight: 700; cursor: pointer;
+}
+.ws-step { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ws-step button {
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid #D3CEBA;
+  background: #fff; font-size: 18px; line-height: 1; cursor: pointer;
+}
+.ws-step button:disabled { opacity: .35; cursor: not-allowed; }
+.ws-step span { min-width: 28px; text-align: center; font-family: var(--font-mono); font-weight: 700; }
+.ws-empty { padding: 36px 0; text-align: center; color: #87897F; font-size: 13.5px; }
+
+.ws-foot { padding: 12px 20px 18px; border-top: 1px solid #E1DED2; flex-shrink: 0; }
+.ws-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; padding-bottom: 10px; }
+.ws-total span:last-child { font-family: var(--font-mono); }
+.ws-confirm {
+  width: 100%; border: none; border-radius: 12px; padding: 14px 0;
+  background: #2E6F4E; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.ws-confirm:disabled { opacity: .5; cursor: not-allowed; }
+.ws-clear { width: 100%; margin-top: 8px; background: transparent; border: none; padding: 8px 0; color: #87897F; font-weight: 600; cursor: pointer; }
+
+.ws-orders-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #2E6F4E;
+  color: #fff;
+  font-family: var(--font-ticket-body);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.ws-orders-btn:hover { background: #245a3f; }
+
+@media (max-width: 480px) {
+  .ws-orders-btn { padding: 10px 12px; width: 100%; text-align: center; }
+}

@@ -993,6 +993,7 @@ async function loadInventory() {
             unit: item.unit || "",
             price: Number(item.price),
             stock: Number(item.item_qty - item.sold),
+            sold: Number(item.sold) || 0,  
             lowAt: Number(item.lowat),
             available: item.available,
             subId: String(item.sub_id),
@@ -1212,7 +1213,11 @@ async function saveItem() {
         if (file) {
             formData.append("photo", file);
         }
-
+        const soldNow = Number(state.editingItem.sold) || 0;
+        formData.set("itm_qty", item.stock + soldNow);
+        formData.set("stock", item.stock + soldNow);
+        formData.set("sold", soldNow);
+        item.sold = soldNow;
         const res = await fetch("/update_item_details", {
             method: "POST",
             body: formData
@@ -4556,7 +4561,9 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
   /* =====================================================================
      INVENTORY helpers (3, 4, 5)
   ===================================================================== */
-  async function pushItem(item) {
+    async function pushItem(item) {
+    const sold = Number(item.sold) || 0;
+    const qty = (Number(item.stock) || 0) + sold;
     const fd = new FormData();
     fd.append("res_id", resId);
     fd.append("sub_id", item.subId);
@@ -4564,15 +4571,15 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
     fd.append("itm_name", item.name);
     fd.append("unit", item.unit);
     fd.append("price", item.price);
-    fd.append("itm_qty", item.stock);
+    fd.append("itm_qty", qty);
     fd.append("lowat", item.lowAt);
     fd.append("available", item.available);
-    fd.append("sold", 0);
+    fd.append("sold", sold);
     fd.append("item_id", item.id);
     fd.append("name", item.name);
     fd.append("lowAt", item.lowAt);
     fd.append("subId", item.subId);
-    fd.append("stock", item.stock);
+    fd.append("stock", qty);
     const res = await fetch("/update_item_details", { method: "POST", body: fd });
     const data = await res.json();
     if (!data.success) throw new Error(data.message || "Update failed");
@@ -4776,4 +4783,283 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
   // redraw with the new renderers
   loadOrders();
   loadDashboard();
+})();
+
+/* =====================================================================
+   8. WALK-IN SALE — deduct stock for customers buying in the shop
+   Uses existing /update_item_details (same payload as the bulk restock).
+===================================================================== */
+(function () {
+    "use strict";
+    const H = escapeSellerHtml;
+    const money = n => "₹" + Math.round(Number(n) || 0).toLocaleString("en-IN");
+    const $ = (s, r = document) => r.querySelector(s);
+
+    const cart = {};            // itemId -> qty
+    let query = "";
+    let busy = false;
+    let backdrop, sheet;
+
+    function toast(msg, kind) {
+        let el = document.getElementById("sdToast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "sdToast"; el.className = "sd-toast";
+            document.body.appendChild(el);
+        }
+        el.textContent = msg;
+        el.dataset.kind = kind || "info";
+        el.classList.add("show");
+        clearTimeout(toast.t);
+        toast.t = setTimeout(() => el.classList.remove("show"), 3200);
+    }
+
+        async function pushStock(item, newStock) {
+        const sold = Number(item.sold) || 0;
+        const qty = newStock + sold;     // server stores item_qty; screen shows item_qty - sold
+        const fd = new FormData();
+        fd.append("res_id", resId);
+        fd.append("sub_id", item.subId);
+        fd.append("desc", item.desc);
+        fd.append("itm_name", item.name);
+        fd.append("unit", item.unit);
+        fd.append("price", item.price);
+        fd.append("itm_qty", qty);
+        fd.append("lowat", item.lowAt);
+        fd.append("available", item.available);
+        fd.append("sold", sold);
+        fd.append("item_id", item.id);
+        fd.append("name", item.name);
+        fd.append("lowAt", item.lowAt);
+        fd.append("subId", item.subId);
+        fd.append("stock", qty);
+        const res = await fetch("/update_item_details", { method: "POST", body: fd });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) throw new Error((data && data.message) || "Update failed");
+    }
+
+    const find = id => state.items.find(i => i.id === id);
+    const cartIds = () => Object.keys(cart).filter(id => cart[id] > 0);
+
+    /* ---------- build the sheet once ---------- */
+    function build() {
+        if (sheet) return;
+        backdrop = document.createElement("div");
+        backdrop.className = "ws-backdrop";
+        sheet = document.createElement("div");
+        sheet.className = "ws-sheet";
+        sheet.setAttribute("role", "dialog");
+        sheet.setAttribute("aria-label", "Walk-in sale");
+        sheet.innerHTML = `
+            <div class="ws-handle"></div>
+            <div class="ws-head">
+                <div><div class="ws-title">Walk-in sale</div>
+                <div class="ws-sub">Tap items the customer is buying in the shop</div></div>
+                <button type="button" class="ws-close" aria-label="Close">✕</button>
+            </div>
+            <input class="ws-search" type="search" placeholder="Search item name">
+            <div class="ws-list"></div>
+            <div class="ws-foot">
+                <div class="ws-total"><span id="wsCount">0 items</span><span id="wsTotal">₹0</span></div>
+                <button type="button" class="ws-confirm" disabled>Confirm sale</button>
+                <button type="button" class="ws-clear">Clear</button>
+            </div>`;
+        document.body.appendChild(backdrop);
+        document.body.appendChild(sheet);
+
+        backdrop.addEventListener("click", closeSheet);
+        $(".ws-close", sheet).addEventListener("click", closeSheet);
+        $(".ws-search", sheet).addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); drawList(); });
+        $(".ws-clear", sheet).addEventListener("click", () => { clearCart(); drawList(); drawFoot(); });
+        $(".ws-confirm", sheet).addEventListener("click", confirmSale);
+        document.addEventListener("keydown", e => { if (e.key === "Escape" && isOpen()) closeSheet(); });
+
+                $(".ws-list", sheet).addEventListener("click", e => {
+            const btn = e.target.closest("button[data-act]");
+            if (!btn || busy) return;
+            const id = btn.dataset.id, item = find(id);
+            if (!item) return;
+            const cur = cart[id] || 0;
+            if (btn.dataset.act === "add" || btn.dataset.act === "inc") cart[id] = Math.min(item.stock, cur + 1);
+            else if (btn.dataset.act === "dec") cart[id] = Math.max(0, cur - 1);
+            patchRow(id);   // instant, only this row
+            drawFoot();
+        });
+    }
+
+    const isOpen = () => !!sheet && sheet.classList.contains("show");
+    function clearCart() { Object.keys(cart).forEach(k => delete cart[k]); }
+
+        function rightHtml(i, q) {
+        return q === 0
+            ? `<button type="button" class="ws-add" data-act="add" data-id="${H(i.id)}">Add</button>`
+            : `<div class="ws-step">
+                   <button type="button" data-act="dec" data-id="${H(i.id)}" aria-label="Decrease">−</button>
+                   <span>${q}</span>
+                   <button type="button" data-act="inc" data-id="${H(i.id)}" aria-label="Increase" ${q >= i.stock ? "disabled" : ""}>+</button>
+               </div>`;
+    }
+
+    function drawList() {
+        const list = $(".ws-list", sheet);
+        const items = state.items
+            .filter(i => i.stock > 0 && i.name.toLowerCase().includes(query))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (!items.length) {
+            list.innerHTML = `<div class="ws-empty">${query ? "No in-stock item matches." : "Nothing in stock."}</div>`;
+            return;
+        }
+        list.innerHTML = items.map(i => {
+            const q = cart[i.id] || 0;
+            const low = i.stock <= i.lowAt;
+            return `<div class="ws-row ${q ? "in-cart" : ""}" data-id="${H(i.id)}">
+                ${i.url ? `<img class="ws-img" src="${H(i.url)}" alt="" loading="lazy">` : ""}
+                <div class="ws-info">
+                    <div class="ws-name">${H(i.name)}</div>
+                    <div class="ws-meta">${H(i.unit)} · ${money(i.price)} · <span class="${low ? "low" : ""}">${i.stock} left</span></div>
+                </div>${rightHtml(i, q)}</div>`;
+        }).join("");
+    }
+
+    // Update ONE row in place (no list rebuild, images untouched)
+    function patchRow(id) {
+        const item = find(id);
+        if (!item) return;
+        const row = Array.from($(".ws-list", sheet).children).find(r => r.dataset.id === id);
+        if (!row) return;
+        const q = cart[id] || 0;
+        const step = row.querySelector(".ws-step");
+        if (q > 0 && step) {
+            step.querySelector("span").textContent = q;
+            step.querySelector('[data-act="inc"]').disabled = q >= item.stock;
+        } else {
+            const ctrl = row.querySelector(".ws-add, .ws-step");
+            if (ctrl) ctrl.outerHTML = rightHtml(item, q);
+        }
+        row.classList.toggle("in-cart", q > 0);
+    }
+
+    function drawFoot() {
+        const ids = cartIds();
+        let units = 0, total = 0;
+        ids.forEach(id => { const it = find(id); if (it) { units += cart[id]; total += it.price * cart[id]; } });
+        $("#wsCount").textContent = `${units} item${units === 1 ? "" : "s"}`;
+        $("#wsTotal").textContent = money(total);
+        const btn = $(".ws-confirm", sheet);
+        btn.disabled = busy || !ids.length;
+        btn.textContent = busy ? "Saving…" : "Confirm sale";
+    }
+
+        async function openSheet() {
+        build();
+        query = ""; $(".ws-search", sheet).value = "";
+        clearCart();
+        // showView("inventory", false);
+
+        // show the popup right away, using the stock we already have
+        drawList(); drawFoot();
+        void sheet.offsetHeight;
+        backdrop.classList.add("show");
+        sheet.classList.add("show");
+        document.body.style.overflow = "hidden";
+
+        // refresh stock in the background (online orders placed meanwhile)
+        const before = state.items.map(i => i.id + ":" + i.stock).join("|");
+        try { await loadInventory(); } catch (e) { console.error(e); }
+        if (!isOpen()) return;
+
+        const after = state.items.map(i => i.id + ":" + i.stock).join("|");
+        if (before !== after) {
+            // keep the cart valid against the fresh stock
+            Object.keys(cart).forEach(id => {
+                const it = find(id);
+                if (!it) delete cart[id];
+                else cart[id] = Math.min(cart[id], it.stock);
+            });
+            drawList(); drawFoot();   // only redraws if stock really changed
+        }
+    }
+
+    function closeSheet() {
+        if (!sheet) return;
+        sheet.classList.remove("show");
+        backdrop.classList.remove("show");
+        document.body.style.overflow = "";
+    }
+
+    async function confirmSale() {
+        const ids = cartIds();
+        if (!ids.length || busy) return;
+        busy = true; drawFoot();
+
+        let ok = 0, fail = 0, revenue = 0;
+        const lowNow = [];
+        for (const id of ids) {
+            const item = find(id);
+            if (!item) { fail++; continue; }
+            const qty = Math.min(cart[id], item.stock);
+            const newStock = item.stock - qty;
+            console.log("new stock for", item.name, ":", newStock);
+            try {
+                await pushStock(item, newStock);
+                item.stock = newStock;
+                revenue += item.price * qty;
+                ok++;
+                if (newStock <= item.lowAt) lowNow.push(item.name);
+            } catch (e) {
+                console.error("walk-in update failed", e);
+                fail++;
+            }
+        }
+
+        busy = false;
+        render();                                   // inventory cards + stats
+        if (typeof loadDashboard === "function") loadDashboard();
+
+        if (fail) {
+            // keep only the failed lines in the cart so the seller can retry
+            ids.forEach(id => { const it = find(id); if (it && ok && cart[id] && it.stock >= 0) { /* keep as-is */ } });
+            toast(`${ok} updated, ${fail} failed. Check and retry.`, "warn");
+            drawList(); drawFoot();
+            return;
+        }
+        clearCart();
+        closeSheet();
+        toast(`Sale recorded · ${money(revenue)}` + (lowNow.length ? ` · Low: ${lowNow.slice(0, 2).join(", ")}` : ""), lowNow.length ? "warn" : "success");
+    }
+
+    /* ---------- entry points (injected, so seller.html stays unchanged) ---------- */
+    const toolbar = document.querySelector("#view-inventory .toolbar");
+    if (toolbar) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "primary-btn ws-open";
+        b.textContent = "🛒 Walk-in sale";
+        b.addEventListener("click", openSheet);
+        toolbar.prepend(b);
+    }
+
+    const grid = document.querySelector("#view-dashboard .actions-grid");
+    if (grid) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "action-btn ws-quick";
+        b.innerHTML = `<span class="action-icon"><i data-lucide="shopping-cart" width="18" height="18"></i></span>
+            <span class="action-label">Walk-in sale</span>
+            <span class="action-desc">Reduce stock for in-shop customers</span>`;
+        b.addEventListener("click", openSheet);
+        grid.appendChild(b);
+        if (window.lucide) lucide.createIcons();
+    }
+        const ordersHeaderRow = document.querySelector("#view-orders .header > div:last-child");
+        ordersHeaderRow.style.flexDirection = "column";
+    if (ordersHeaderRow) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ws-orders-btn";
+        b.textContent = "🛒 Walk-in sale";
+        b.addEventListener("click", openSheet);
+        ordersHeaderRow.appendChild(b);
+    }
 })();
