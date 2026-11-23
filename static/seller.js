@@ -4154,7 +4154,7 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
           <div class="total">Total: ₹${bill.total}</div>
           ${order.cancel_reason ? `<div class="cancel-reason">Reason: ${H(order.cancel_reason)}</div>` : ""}
           <button class="editOrderBtn" data-order-id="${H(order.order_id)}">✎ Edit items</button>
-          <button class="printBtn" data-order-id="${H(order.order_id)}">🖨 Print slip</button>
+          <button class="printBtn shareBtn" data-order-id="${H(order.order_id)}">📤 Share receipt</button>
           <button class="completeBtn statusBtn" style="
               background: green;
               color: white;
@@ -4301,55 +4301,252 @@ if (VIEWS.includes(hashView)) showView(hashView, false);
   }, true);
 
   /* =====================================================================
-     6. PRINT SLIP
+     6. SHARE RECEIPT  (preview + share options in a bottom sheet)
   ===================================================================== */
-  function printSlip(orderId) {
+  let receiptState = null;
+
+  function receiptData(o) {
+    const bill = orderBill(o);
+    const items = Object.values(o.items || {})
+      .filter(i => Number(i.qty) > 0)
+      .map(i => ({
+        name: String(i.name),
+        qty: Number(i.qty),
+        amount: (Number(i.price) || 0) * Number(i.qty)
+      }));
+
+    const isDelivery = o.pickup_time === null && o.delivery_address;
+    const meta = [`Token ${o.token_no}`, `Order #${o.order_id}`];
+    if (o.time) meta.push(String(o.time));
+    if (isDelivery) {
+      meta.push(`Delivery: ${o.delivery_address.adrs_type} - ${o.delivery_address.address}`);
+      if (o.delivery_address.phone) meta.push(`Phone: ${o.delivery_address.phone}`);
+    } else {
+      meta.push(`Pickup: ${o.pickup_time || "-"}`);
+    }
+
+    // customer's number (delivery orders only) so WhatsApp can open their chat
+    let phone = "";
+    if (isDelivery && o.delivery_address.phone) {
+      const digits = String(o.delivery_address.phone).replace(/\D/g, "");
+      phone = digits.length === 10 ? "91" + digits : digits;
+    }
+
+    return {
+      id: o.order_id,
+      token: o.token_no,
+      shop: document.querySelector(".seller-name")?.textContent || "Store",
+      meta, items, bill, status: o.status, phone
+    };
+  }
+
+  function receiptText(r) {
+    const L = [`*${r.shop}*`, ...r.meta, ""];
+    r.items.forEach(i => L.push(`${i.name} x ${i.qty}  -  ₹${i.amount}`));
+    if (r.bill.discount > 0) {
+      L.push("", `Subtotal: ₹${r.bill.subtotal}`);
+      L.push(`Coupon${r.bill.code ? " " + r.bill.code : ""}: - ₹${r.bill.discount}`);
+    }
+    L.push("", `*Total: ₹${r.bill.total}*`, `Status: ${r.status}`, "Thank you!");
+    return L.join("\n");
+  }
+
+  function drawReceipt(r) {
+    const W = 520, pad = 28, scale = 2;
+    const extra = r.bill.discount > 0 ? 2 : 0;
+    const h = pad + 70 + r.meta.length * 22 + 30 + (r.items.length + extra) * 28 + 120;
+
+    const c = document.createElement("canvas");
+    c.width = W * scale; c.height = h * scale;
+    const g = c.getContext("2d");
+    g.scale(scale, scale);
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, W, h);
+
+    const fit = (txt, max) => {
+      txt = String(txt);
+      while (g.measureText(txt).width > max && txt.length > 3) txt = txt.slice(0, -2);
+      return txt;
+    };
+    const dashed = y => {
+      g.strokeStyle = "#D9D5C7"; g.setLineDash([6, 4]); g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(pad, y); g.lineTo(W - pad, y); g.stroke(); g.setLineDash([]);
+    };
+    const row = (left, right, y, bold) => {
+      g.textAlign = "left"; g.fillStyle = "#20231F";
+      g.font = (bold ? "bold " : "") + "15px sans-serif";
+      g.fillText(fit(left, W - pad * 2 - 100), pad, y);
+      g.textAlign = "right"; g.font = (bold ? "bold " : "") + "15px monospace";
+      g.fillText(right, W - pad, y);
+    };
+
+    let y = pad + 12;
+    g.textAlign = "center"; g.fillStyle = "#20231F"; g.font = "bold 22px sans-serif";
+    g.fillText(fit(r.shop, W - pad * 2), W / 2, y);
+
+    g.fillStyle = "#6b6f66"; g.font = "14px sans-serif";
+    y += 14;
+    r.meta.forEach((m, i) => {
+      y += 22;
+      g.font = i === 0 ? "bold 16px sans-serif" : "14px sans-serif";
+      g.fillStyle = i === 0 ? "#20231F" : "#6b6f66";
+      g.fillText(fit(m, W - pad * 2), W / 2, y);
+    });
+
+    y += 16; dashed(y);
+    r.items.forEach(i => { y += 28; row(`${i.name} x ${i.qty}`, `₹${i.amount}`, y); });
+
+    if (r.bill.discount > 0) {
+      y += 28; row("Subtotal", `₹${r.bill.subtotal}`, y);
+      y += 28; g.fillStyle = "#2E6F4E";
+      row(`Coupon${r.bill.code ? " " + r.bill.code : ""}`, `- ₹${r.bill.discount}`, y);
+    }
+
+    y += 14; dashed(y);
+    y += 34; row("Total", `₹${r.bill.total}`, y, true);
+    y += 30; g.textAlign = "center"; g.fillStyle = "#6b6f66"; g.font = "13px sans-serif";
+    g.fillText(`Status: ${r.status}  •  Thank you!`, W / 2, y);
+    return c;
+  }
+
+  function ensureReceiptSheet() {
+    let sheet = document.getElementById("rcSheet");
+    if (sheet) return sheet;
+
+    const style = document.createElement("style");
+    style.textContent = `
+      #rcOverlay { position: fixed; inset: 0; background: rgba(32,35,31,.5); opacity: 0; pointer-events: none; transition: opacity .3s ease; z-index: 3200; }
+      #rcOverlay.show { opacity: 1; pointer-events: auto; }
+      #rcSheet { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: 520px; max-height: 92vh;
+        display: flex; flex-direction: column; background: #FFFFFB; color: #20231F; border-radius: 20px 20px 0 0;
+        box-shadow: 0 -14px 40px -18px rgba(0,0,0,.5);
+        transform: translateY(100%); transition: transform .35s cubic-bezier(.22,.8,.3,1); z-index: 3201; }
+      #rcSheet.show { transform: translateY(0); }
+      #rcSheet .rcHandle { width: 40px; height: 4px; background: #E1DED2; border-radius: 999px; margin: 12px auto 8px; flex-shrink: 0; }
+      #rcSheet .rcTitle { font-size: 16px; font-weight: 700; text-align: center; margin: 0 0 10px; flex-shrink: 0; }
+      #rcSheet .rcPreview { overflow-y: auto; padding: 4px 20px 12px; flex: 1; min-height: 120px; text-align: center; -webkit-overflow-scrolling: touch; }
+      #rcSheet .rcPreview img { width: 100%; max-width: 420px; border: 1px solid #E1DED2; border-radius: 12px; box-shadow: 0 6px 18px -10px rgba(0,0,0,.4); }
+      #rcSheet .rcShare { flex-shrink: 0; padding: 12px 20px calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px dashed #E1DED2; }
+      #rcSheet .rcNative { width: 100%; background: #2C4A6E; color: #fff; border: none; border-radius: 12px; padding: 13px 0; font-weight: 700; font-size: 15px; cursor: pointer; margin-bottom: 12px; }
+      #rcSheet .rcGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      #rcSheet .rcOpt { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; color: #20231F; padding: 4px 0; }
+      #rcSheet .rcIcon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; }
+      #rcSheet .rcClose { width: 100%; margin-top: 12px; background: #FFFFFB; border: 1.5px solid #E1DED2; border-radius: 12px; padding: 11px 0; font-weight: 700; font-size: 14px; cursor: pointer; color: #20231F; }
+    `;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement("div");
+    overlay.id = "rcOverlay";
+    sheet = document.createElement("div");
+    sheet.id = "rcSheet";
+    sheet.setAttribute("role", "dialog");
+    sheet.setAttribute("aria-label", "Share receipt");
+    sheet.innerHTML = `
+      <div class="rcHandle"></div>
+      <p class="rcTitle">Share receipt</p>
+      <div class="rcPreview"></div>
+      <div class="rcShare">
+        <button type="button" class="rcNative" data-rc="native" style="display:none">Share via...</button>
+        <div class="rcGrid">
+          <button type="button" class="rcOpt" data-rc="whatsapp"><span class="rcIcon" style="background:#25D366">💬</span><span>WhatsApp</span></button>
+          <button type="button" class="rcOpt" data-rc="email"><span class="rcIcon" style="background:#B23B30">✉️</span><span>Email</span></button>
+          <button type="button" class="rcOpt" data-rc="copy"><span class="rcIcon" style="background:#6b6f66">📋</span><span>Copy</span></button>
+          <button type="button" class="rcOpt" data-rc="download"><span class="rcIcon" style="background:#2b7de9">⬇️</span><span>Save image</span></button>
+        </div>
+        <button type="button" class="rcClose" data-rc="close">Close</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.body.appendChild(sheet);
+
+    overlay.addEventListener("click", closeReceiptSheet);
+    sheet.addEventListener("click", e => {
+      const t = e.target.closest("[data-rc]");
+      if (t) handleReceiptAction(t.dataset.rc, t);
+    });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeReceiptSheet(); });
+    return sheet;
+  }
+
+  function openReceiptSheet(orderId) {
     const o = sellerOrders.find(x => String(x.order_id) === String(orderId));
     if (!o) return;
-    const bill = orderBill(o);
-    const rows = Object.values(o.items || {}).filter(i => Number(i.qty) > 0).map(i => {
-      const line = (Number(i.price) || 0) * (Number(i.qty) || 0);
-      return `<tr><td>${H(i.name)} x ${H(i.qty)}</td><td style="text-align:right">₹${line}</td></tr>`;
-    }).join("");
+    const sheet = ensureReceiptSheet();
+    const overlay = document.getElementById("rcOverlay");
+    const r = receiptData(o);
 
-    // subtotal + coupon lines only when a coupon was used
-    const couponRows = bill.discount > 0
-      ? `<tr><td>Subtotal</td><td style="text-align:right">₹${bill.subtotal}</td></tr>
-         <tr><td>Coupon${bill.code ? " " + H(bill.code) : ""}</td><td style="text-align:right">- ₹${bill.discount}</td></tr>`
-      : "";
+    if (receiptState && receiptState.url) URL.revokeObjectURL(receiptState.url);
+    const state = receiptState = {
+      id: r.id, token: r.token, phone: r.phone, text: receiptText(r),
+      url: null, file: null, canFiles: false
+    };
 
-    const store = document.querySelector(".seller-name")?.textContent || "Store";
-    const doc = `<html><head><title>Order ${H(o.token_no)}</title>
-      <style>
-        body{font-family:monospace;width:280px;margin:0 auto;padding:10px;color:#000}
-        h2,h3,p{margin:4px 0;text-align:center} table{width:100%;border-collapse:collapse;margin:8px 0}
-        td{padding:3px 0;font-size:13px} hr{border:none;border-top:1px dashed #000}
-        .t{font-weight:700;font-size:15px}
-      </style></head><body>
-      <h2>${H(store)}</h2><hr>
-      <h3>TOKEN ${H(o.token_no)}</h3>
-      <p>Order #${H(o.order_id)}</p><p>${H(o.time || "")}</p><p>Pickup: ${H(o.pickup_time || "-")}</p><hr>
-      <table>${rows}${couponRows}</table><hr>
-      <table><tr class="t"><td>Total</td><td style="text-align:right">₹${bill.total}</td></tr></table>
-      <p>Thank you!</p></body></html>`;
+    const preview = sheet.querySelector(".rcPreview");
+    preview.innerHTML = `<span style="font-size:13px;color:#87897F">Preparing receipt...</span>`;
+    sheet.querySelector(".rcNative").style.display = "none";
 
-    const frame = document.createElement("iframe");
-    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-    document.body.appendChild(frame);
-    frame.contentDocument.open();
-    frame.contentDocument.write(doc);
-    frame.contentDocument.close();
-    setTimeout(() => {
-      frame.contentWindow.focus();
-      frame.contentWindow.print();
-      setTimeout(() => frame.remove(), 1500);
-    }, 200);
+    void sheet.offsetHeight;
+    overlay.classList.add("show");
+    sheet.classList.add("show");
+    document.body.style.overflow = "hidden";
+
+    drawReceipt(r).toBlob(blob => {
+      if (receiptState !== state || !blob) return;
+      state.url = URL.createObjectURL(blob);
+      preview.innerHTML = `<img src="${state.url}" alt="Receipt preview">`;
+      state.file = new File([blob], `receipt-${r.token}.png`, { type: "image/png" });
+      state.canFiles = !!(navigator.canShare && navigator.canShare({ files: [state.file] }));
+      sheet.querySelector(".rcNative").style.display = navigator.share ? "block" : "none";
+    }, "image/png");
   }
-  document.addEventListener("click", e => {
-    const b = e.target.closest(".printBtn");
-    if (b) printSlip(b.dataset.orderId);
-  });
 
+  function closeReceiptSheet() {
+    const sheet = document.getElementById("rcSheet");
+    if (!sheet) return;
+    sheet.classList.remove("show");
+    document.getElementById("rcOverlay")?.classList.remove("show");
+    document.body.style.overflow = "";
+  }
+
+  async function handleReceiptAction(action, el) {
+    if (action === "close") return closeReceiptSheet();
+    const st = receiptState;
+    if (!st) return;
+    const title = `Receipt - Token ${st.token}`;
+    const plain = st.text.replace(/\*/g, "");
+
+    if (action === "native") {
+      try {
+        if (st.canFiles && st.file) await navigator.share({ files: [st.file], title, text: plain });
+        else await navigator.share({ title, text: plain });
+      } catch (e) { /* user closed the share popup */ }
+    } else if (action === "whatsapp") {
+      const base = st.phone ? `https://wa.me/${st.phone}` : "https://wa.me/";
+      window.open(`${base}?text=${encodeURIComponent(st.text)}`, "_blank", "noopener");
+    } else if (action === "email") {
+      window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(plain)}`;
+    } else if (action === "copy") {
+      try {
+        await navigator.clipboard.writeText(plain);
+      } catch (e) {
+        const ta = document.createElement("textarea");
+        ta.value = plain;
+        document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+      }
+      const label = el.querySelector("span:last-child");
+      const old = label.textContent;
+      label.textContent = "Copied!";
+      setTimeout(() => (label.textContent = old), 1500);
+    } else if (action === "download") {
+      if (!st.url) return;
+      const a = document.createElement("a");
+      a.href = st.url; a.download = `receipt-${st.token}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+  }
+
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".shareBtn");
+    if (b) openReceiptSheet(b.dataset.orderId);
+  });
   /* =====================================================================
      INVENTORY helpers (3, 4, 5)
   ===================================================================== */
